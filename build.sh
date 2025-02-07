@@ -1,0 +1,1 @@
+cmake .. -DCMAKE_PREFIX_PATH=/Volumes/Build/pipeline/3rdparty/build/macosx/arm64.debug -DCMAKE_MODULE_PATH=/Users/mikaelsundell/Git/private/usdviewer/modules -G Xcode

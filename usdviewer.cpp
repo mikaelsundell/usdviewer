@@ -1,5 +1,6 @@
-// Copyright 2024-present Rapid Images AB
-// https://gitlab.rapidimages.se/one-cx/pipeline/usdviewer
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2024 - present Mikael Sundell
+// https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
 #include <QObject>
@@ -54,10 +55,11 @@ Usdviewer::set_arguments(const QStringList& arguments)
     for (int i = 0; i < arguments.size(); ++i) {
         if (arguments[i] == "--open" && i + 1 < arguments.size()) {
             QString filename = arguments[i + 1];
-
             if (!filename.isEmpty()) {
-                qDebug() << "Opening file:" << filename;
-                p->d.ui->renderer->load_file(filename);
+                qDebug() << "opening file:" << filename;
+                if (!p->d.ui->renderer->load_file(filename)) {
+                    qDebug() << "could not load usd file: " << filename;
+                }
             }
             break;
         }

@@ -1,5 +1,6 @@
-# Copyright 2024-present Rapid Images AB
-# https://gitlab.rapidimages.se/one-cx/pipeline/usdviewer
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2024 - present Mikael Sundell
+# https://github.com/mikaelsundell/usdviewer
 
 cmake_minimum_required (VERSION 3.27)
 set (project_name "usdviewer")
@@ -21,11 +22,17 @@ set (app_name "usdviewer")
 
 # sources
 set (app_sources
-    hydrarenderer.h
-    hydrarenderer.cpp
+    gldebugger.h
+    gldebugger.cpp
+    main.cpp
+    usdstagewidget.h
+    usdstagewidget.cpp
     usdviewer.h
     usdviewer.cpp
-    main.cpp
+    usdviewcamera.h
+    usdviewcamera.cpp
+    usddebug.h
+    usddebug.cpp
     test.h
     test.cpp
     test.h

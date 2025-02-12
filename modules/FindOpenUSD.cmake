@@ -1,5 +1,23 @@
-# Copyright 2024-present Rapid Images AB
-# https://gitlab.rapidimages.se/one-cx/pipeline/usdviewer
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2024 - present Mikael Sundell
+# https://github.com/mikaelsundell/usdviewer
+
+cmake_minimum_required(VERSION 3.14)
+
+set(OpenUSD_COMPONENTS
+  BOOST
+  PYTHON
+  CAMERAUTIL
+  GF
+  GLF
+  SDF
+  TF
+  USD
+  USDGEOM
+  USDIMAGING
+  USDIMAGINGGL
+  VT
+)
 
 find_path(OpenUSD_INCLUDE_DIR
   NAMES pxr/usd/usd/api.h
@@ -7,89 +25,44 @@ find_path(OpenUSD_INCLUDE_DIR
   PATHS ${CMAKE_PREFIX_PATH}
 )
 
-find_library(OpenUSD_BOOST_LIBRARY
-  NAMES usd_boost
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
+set(OpenUSD_LIBRARIES "")
+set(OpenUSD_ALL_FOUND TRUE)
 
-find_library(OpenUSD_PYTHON_LIBRARY
-  NAMES usd_python
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-find_library(OpenUSD_USD_LIBRARY
-  NAMES usd_usd
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-find_library(OpenUSD_USD_GEOM_LIBRARY
-  NAMES usd_usdGeom
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-find_library(OpenUSD_USD_SDF_LIBRARY
-  NAMES usd_sdf
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-find_library(OpenUSD_USD_GF_LIBRARY
-  NAMES usd_gf
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-find_library(OpenUSD_USD_TF_LIBRARY
-  NAMES usd_tf
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-find_library(OpenUSD_USD_VT_LIBRARY
-  NAMES usd_vt
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-
-find_library(OpenUSD_USD_USDIMAGINGGL_LIBRARY
-  NAMES usd_usdImagingGL
-  PATH_SUFFIXES lib
-  PATHS ${CMAKE_PREFIX_PATH}
-)
-
-if (OpenUSD_INCLUDE_DIR AND OpenUSD_USD_LIBRARY)
-  set(OpenUSD_FOUND TRUE)
-  set(OpenUSD_LIBRARIES 
-    ${OpenUSD_BOOST_LIBRARY}
-    ${OpenUSD_PYTHON_LIBRARY}
-    ${OpenUSD_USD_LIBRARY} 
-    ${OpenUSD_USD_GEOM_LIBRARY} 
-    ${OpenUSD_USD_SDF_LIBRARY}
-    ${OpenUSD_USD_GF_LIBRARY}
-    ${OpenUSD_USD_TF_LIBRARY}
-    ${OpenUSD_USD_VT_LIBRARY}
-    ${OpenUSD_USD_USDIMAGINGGL_LIBRARY}
+foreach(component ${OpenUSD_COMPONENTS})
+  string(TOLOWER ${component} component_name)
+  find_library(OpenUSD_${component}_LIBRARY
+    NAMES usd_${component_name}
+    PATH_SUFFIXES lib
+    PATHS ${CMAKE_PREFIX_PATH}
   )
+
+  if (NOT OpenUSD_${component}_LIBRARY)
+    message(WARNING "OpenUSD: Missing library usd_${component_name}")
+    set(OpenUSD_ALL_FOUND FALSE)
+  else()
+    list(APPEND OpenUSD_LIBRARIES ${OpenUSD_${component}_LIBRARY})
+  endif()
+endforeach()
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(OpenUSD
+  REQUIRED_VARS OpenUSD_INCLUDE_DIR
+  HANDLE_COMPONENTS
+)
+
+if (OpenUSD_INCLUDE_DIR AND OpenUSD_ALL_FOUND)
+  set(OpenUSD_FOUND TRUE)
   set(OpenUSD_INCLUDE_DIRS ${OpenUSD_INCLUDE_DIR})
 
-  # Report to the user
   message(STATUS "Found OpenUSD: ${OpenUSD_LIBRARIES}")
   message(STATUS "Include directory: ${OpenUSD_INCLUDE_DIR}")
 
-else()
-  set(OpenUSD_FOUND FALSE)
-  message(WARNING "OpenUSD library not found.")
-endif()
-
-if (OpenUSD_FOUND)
-  add_library(OpenUSD::OpenUSD INTERFACE IMPORTED)
+  add_library(OpenUSD::OpenUSD INTERFACE IMPORTED GLOBAL)
   set_target_properties(OpenUSD::OpenUSD PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES ${OpenUSD_INCLUDE_DIRS}
+    INTERFACE_INCLUDE_DIRECTORIES "${OpenUSD_INCLUDE_DIRS}"
     INTERFACE_LINK_LIBRARIES "${OpenUSD_LIBRARIES}"
   )
+
+else()
+  message(FATAL_ERROR "OpenUSD: Required components missing. Ensure all libraries are installed.")
 endif()

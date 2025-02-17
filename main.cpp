@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2024 - present Mikael Sundell
+// Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
@@ -13,8 +13,8 @@ main(int argc, char* argv[])
         test();
     }
     QApplication app(argc, argv);
-    Usdviewer* usdviewer = new Usdviewer();
-    usdviewer->set_arguments(QCoreApplication::arguments());
-    usdviewer->show();
+    Usdviewer viewer;
+    viewer.set_arguments(QCoreApplication::arguments());
+    viewer.show();
     return app.exec();
 }

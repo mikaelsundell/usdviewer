@@ -1,11 +1,40 @@
-
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2024 - present Mikael Sundell
+// Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#pragma once
+#include "usdutils.h"
+#include <pxr/usd/usdGeom/bboxCache.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/primRange.h>
+#include <pxr/usd/usdGeom/imageable.h>
 
-#include "usddebug.h"
+#include <QColor>
+
+GfVec4f QColor_GfVec4f(const QColor& color) {
+    return GfVec4f(
+        color.redF(),
+        color.greenF(),
+        color.blueF(),
+        color.alphaF()
+    );
+}
+
+TfToken QString_TfToken(const QString& str) {
+    return pxr::TfToken(str.toStdString());
+}
+
+QString TfToken_QString(const pxr::TfToken& token) {
+    return QString::fromStdString(token.GetString());
+}
+
+QList<QString> TfTokenVector_QList(const TfTokenVector& tokens) {
+    QList<QString> list;
+    list.reserve(tokens.size());
+    for (const auto& token : tokens) {
+        list.append(QString::fromStdString(token.GetString()));
+    }
+    return list;
+}
 
 void CheckOpenGLError(const char* function, const char* file, int line) {
     GLenum err;
@@ -16,17 +45,43 @@ void CheckOpenGLError(const char* function, const char* file, int line) {
     }
 }
 
-QDebug operator<<(QDebug debug, const UsdImagingGLRenderParams::BBoxVector& bboxes) {
-    QDebugStateSaver saver(debug);
-    debug.nospace() << "BBoxVector { ";
-
-    for (const auto& bbox : bboxes) {
-        const GfRange3d& range = bbox.GetRange();
-        debug.nospace() << "[Min: (" << range.GetMin()[0] << ", " << range.GetMin()[1] << ", " << range.GetMin()[2]
-                        << ") Max: (" << range.GetMax()[0] << ", " << range.GetMax()[1] << ", " << range.GetMax()[2]
-                        << ")], ";
+void DebugStagePrims(const UsdStageRefPtr& stage)
+{
+    if (!stage) {
+        qDebug() << "no stage loaded";
+        return;
     }
-    debug.nospace() << " }";
+    qDebug() << "scene objects (traversed prims):";
+    for (const auto& prim : UsdPrimRange(stage->GetPseudoRoot())) {
+        qDebug() << "- " << prim.GetPath() << " (" << prim.GetTypeName() << ")";
+    }
+}
+
+void DebugBoundingBoxes(const UsdStageRefPtr& stage) {
+    if (!stage) {
+        qDebug() << "no stage loaded";
+        return;
+    }
+    UsdGeomBBoxCache bboxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens());
+    qDebug() << "bounding boxes:";
+    for (const auto& prim : stage->Traverse()) {
+        if (UsdGeomImageable(prim)) {
+            GfBBox3d bbox = bboxCache.ComputeWorldBound(prim);
+            GfRange3d range = bbox.ComputeAlignedBox();
+            if (!range.IsEmpty()) {
+                qDebug() << prim.GetPath()
+                         << " bounds: Min(" << range.GetMin() << ") Max(" << range.GetMax() << ")";
+            } else {
+                qDebug() << prim.GetPath() << " has no valid bounding box!";
+            }
+        }
+    }
+}
+
+QDebug operator<<(QDebug debug, const GfRange1f& range) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfRange1f(Min: " << range.GetMin()
+                    << ", Max: " << range.GetMax() << ")";
     return debug;
 }
 
@@ -44,6 +99,14 @@ QDebug operator<<(QDebug debug, const GfVec2i& vec) {
     QDebugStateSaver saver(debug);
     debug.nospace() << "GfVec2i("
                     << vec[0] << ", " << vec[1]
+                    << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfVec3d& vec) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfVec3d("
+                    << vec[0] << ", " << vec[1] << ", " << vec[2]
                     << ")";
     return debug;
 }
@@ -92,9 +155,28 @@ QDebug operator<<(QDebug debug, const CameraUtilFraming& framing) {
     return debug;
 }
 
+QDebug operator<<(QDebug debug, const SdfPath& path) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "SdfPath(\"" << QString::fromStdString(path.GetString()) << "\")";
+    return debug;
+}
+
 QDebug operator<<(QDebug debug, const TfToken& token) {
     QDebugStateSaver saver(debug);
     debug.nospace() << "TfToken(\"" << token.GetString().c_str() << "\")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const pxr::TfTokenVector& tokens) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "TfTokenVector [";
+
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        if (i > 0) debug << ", ";
+        debug << "TfToken(\"" << tokens[i].GetString().c_str() << "\")";
+    }
+
+    debug << "]";
     return debug;
 }
 
@@ -175,5 +257,38 @@ QDebug operator<<(QDebug debug, const UsdImagingGLRenderParams& params) {
                     << "\n  bboxLineColor: " << params.bboxLineColor
                     << "\n  bboxLineDashSize: " << params.bboxLineDashSize
                     << "\n)";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const UsdImagingGLRenderParams::BBoxVector& bboxes) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "BBoxVector { ";
+
+    for (const auto& bbox : bboxes) {
+        const GfRange3d& range = bbox.GetRange();
+        debug.nospace() << "[Min: (" << range.GetMin()[0] << ", " << range.GetMin()[1] << ", " << range.GetMin()[2]
+                        << ") Max: (" << range.GetMax()[0] << ", " << range.GetMax()[1] << ", " << range.GetMax()[2]
+                        << ")], ";
+    }
+    debug.nospace() << " }";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const UsdImagingGLRenderParams::ClipPlanesVector& clipPlanes) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "ClipPlanesVector [";
+
+    for (size_t i = 0; i < clipPlanes.size(); ++i) {
+        const pxr::GfVec4d& plane = clipPlanes[i];
+        debug.nospace() << " Plane" << i << " ("
+                        << plane[0] << ", " << plane[1] << ", "
+                        << plane[2] << ", " << plane[3] << ")";
+
+        if (i < clipPlanes.size() - 1) {
+            debug.nospace() << ", ";
+        }
+    }
+
+    debug.nospace() << " ]";
     return debug;
 }

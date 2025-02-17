@@ -14,49 +14,51 @@ set (CMAKE_AUTOMOC ON)
 set (CMAKE_AUTORCC ON)
 set (CMAKE_AUTOUIC ON)
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
-find_package(OpenUSD REQUIRED)
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package (OpenUSD REQUIRED)
+find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
 
-# app
-set (app_name "usdviewer")
-
-# sources
-set (app_sources
-    gldebugger.h
-    gldebugger.cpp
-    main.cpp
-    usdstagewidget.h
-    usdstagewidget.cpp
-    usdviewer.h
-    usdviewer.cpp
-    usdviewcamera.h
-    usdviewcamera.cpp
-    usddebug.h
-    usddebug.cpp
-    test.h
-    test.cpp
-    test.h
-    usdviewer.ui
+file (GLOB project_sources
+    "${CMAKE_SOURCE_DIR}/*.h"
+    "${CMAKE_SOURCE_DIR}/*.cpp"
+    "${CMAKE_SOURCE_DIR}/*.ui"
 )
 
-set(app_name "usdviewer")
-set(APP_VERSION "0.0.1")
-set(APP_COPYRIGHT "Copyright 2024-present Contributors to the ${app_name} project")
-set(GITHUB_URL "https://github.com/mikaelsundell/flipman")
+set (project_bundle
+    "${CMAKE_SOURCE_DIR}/resources/MacOSXBundle.plist.in"
+)
+
+set (project_version "0.0.0")
+set (project_copyright "Copyright 2025-present Contributors to the ${app_name} project")
+set (project_url "https://github.com/mikaelsundell/usdviewer")
 
 if (APPLE)
-    set(app_icon "resources/usdviewer.icns")
-    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.mikaelsundell.${APP_NAME}")
+    file (GLOB project_resources
+        "${CMAKE_SOURCE_DIR}/resources/*.icns"
+    )
+    set (MACOSX_BUNDLE_EXECUTABLE_NAME ${project_name})
+    set (MACOSX_BUNDLE_INFO_STRING ${project_name})
+    set (MACOSX_BUNDLE_BUNDLE_NAME ${project_name})
+    set (MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.mikaelsundell.${project_name}")
+    set (MACOSX_BUNDLE_ICON_FILE usdviewer.icns)
+    set (MACOSX_BUNDLE_LONG_VERSION_STRING "${project_version}")
+    set (MACOSX_BUNDLE_SHORT_VERSION_STRING "${project_version}")
+    set (MACOSX_BUNDLE_BUNDLE_VERSION ${MACOSX_BUNDLE_LONG_VERSION_STRING})
+    set (MACOSX_BUNDLE_COPYRIGHT "Copyright 2022-present Contributors to the ${app_name} project")
+    set_source_files_properties(${project_resources} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
-    add_executable(${project_name} MACOSX_BUNDLE ${app_sources} ${app_icon})
-    target_include_directories(${project_name} PRIVATE ${Python3_INCLUDE_DIRS})
+    add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_icon} ${project_resources})
 
-    #set_target_properties(${project_name} PROPERTIES
-    #    MACOSX_BUNDLE_GUI_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
-    #    MACOSX_BUNDLE_INFO_PLIST ${bundle_sources}
-    #)
+    set_target_properties (${project_name} PROPERTIES
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
+        XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${MACOSX_DEPLOYMENT_TARGET}"
+        MACOSX_BUNDLE_INFO_PLIST "${project_bundle}"
+    )
 
-    target_link_libraries(${project_name} 
+    if (NOT DEFINED MACOSX_DEPLOYMENT_TARGET)
+        set(MACOSX_DEPLOYMENT_TARGET "15.2")
+    endif()
+
+    target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
         Python3::Python
         OpenUSD::OpenUSD
@@ -66,24 +68,16 @@ if (APPLE)
         "-framework AppKit")
 
 elseif (WIN32)
-    set(APP_ICON "AppIcon.ico")
+    set (APP_ICON "AppIcon.ico")
+    add_executable (${project_name} WIN32 ${app_sources} ${APP_ICON})
 
-    add_executable(${project_name} WIN32 ${app_sources} ${APP_ICON})
-
-    #set_target_properties(${project_name} PROPERTIES
-    #    OUTPUT_NAME "${APP_NAME}"
-    #    VERSION "${APP_VERSION}"
-    #)
-
-    # Windows-specific dependencies
-    target_link_libraries(${project_name}
+    target_link_libraries (${project_name}
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
         d3d11 dxgi dwmapi)
 
 elseif (UNIX)
-    add_executable(${project_name} ${APP_SOURCES})
-
-    target_link_libraries(${project_name}
+    add_executable (${project_name} ${APP_SOURCES})
+    target_link_libraries (${project_name}
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
         pthread dl)
 
@@ -92,10 +86,10 @@ else()
 endif()
 
 target_compile_definitions(${project_name} PRIVATE
-    -DAPP_NAME="${APP_NAME}"
-    -DAPP_VERSION="${APP_VERSION}"
-    -DAPP_COPYRIGHT="${APP_COPYRIGHT}"
-    -DGITHUB_URL="${GITHUB_URL}"
+    -DPROJECT_NAME="${project_name}"
+    -DPROJECT_VERSION="${project_version}"
+    -DPROJECT_COPYRIGHT="${project_copyright}"
+    -DGITHUB_URL="${project_url}"
 )
 
 target_include_directories(${project_name} PRIVATE ${CMAKE_SOURCE_DIR})

@@ -40,3 +40,12 @@ https://github.com/mikaelsundell/usdviewer
 * Issues   
 https://github.com/mikaelsundell/usdviewer/issues
 
+## License ##
+
+3rdparty packages and their copyrights:
+
+OpenUSD
+Copyright 2022 Pixar
+
+Qt
+Copyright (C) 2019 The Qt Company Ltd.

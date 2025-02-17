@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Copyright (c) 2024 - present Mikael Sundell
+// Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewcamera.h"
 #include <pxr/base/gf/frustum.h>
 #include <pxr/base/gf/rotation.h>
+#include <pxr/base/gf/range1d.h>
 #include <QDebug>
 
 class UsdViewCameraPrivate : public QSharedData {
@@ -27,8 +28,9 @@ class UsdViewCameraPrivate : public QSharedData {
             GfMatrix4d yzupmatrix;
             GfMatrix4d invyzupmatrix;
 
-            size_t defaultnear = 1;
-            size_t defaulfar = 2000000;
+            float near = 1;
+            float far = 2000000;
+            
             size_t maxsafezresolution = 1e6;
             size_t goodzresolution = 5e4;
             
@@ -70,6 +72,7 @@ UsdViewCameraPrivate::init()
         d.yzupmatrix = GfMatrix4d(1.0);
         d.invyzupmatrix = GfMatrix4d(1.0);
     }
+    d.camera.SetClippingRange(GfRange1f(d.near, d.far));
 }
 
 void

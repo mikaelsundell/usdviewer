@@ -21,7 +21,7 @@
        <item>
         <widget class="QPushButton" name="pushButton_3">
          <property name="text">
-          <string>PushButton</string>
+          <string>Open</string>
          </property>
         </widget>
        </item>
@@ -38,18 +38,11 @@
          </property>
         </spacer>
        </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_4">
-         <property name="text">
-          <string>PushButton</string>
-         </property>
-        </widget>
-       </item>
       </layout>
      </widget>
     </item>
     <item>
-     <widget class="UsdStageWidget" name="renderer">
+     <widget class="UsdImagingGLWidget" name="imagingglwidget">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
         <horstretch>0</horstretch>
@@ -62,9 +55,14 @@
      <widget class="QWidget" name="widget_2" native="true">
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QPushButton" name="pushButton">
+        <widget class="QLabel" name="label">
+         <property name="font">
+          <font>
+           <pointsize>13</pointsize>
+          </font>
+         </property>
          <property name="text">
-          <string>PushButton</string>
+          <string>Ready.</string>
          </property>
         </widget>
        </item>
@@ -82,9 +80,18 @@
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_2">
-         <property name="text">
-          <string>PushButton</string>
+        <widget class="QFrame" name="clearcolor">
+         <property name="minimumSize">
+          <size>
+           <width>20</width>
+           <height>20</height>
+          </size>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::Shape::NoFrame</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Plain</enum>
          </property>
         </widget>
        </item>
@@ -107,9 +114,9 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>UsdStageWidget</class>
+   <class>UsdImagingGLWidget</class>
    <extends>QOpenGLWidget</extends>
-   <header>../../../usdstagewidget.h</header>
+   <header>../../../usdimagingglwidget.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

@@ -7,14 +7,15 @@
 #include <QMainWindow>
 #include <QScopedPointer>
 
-class UsdviewerPrivate;
-class Usdviewer : public QMainWindow {
-    Q_OBJECT
+namespace usd {
+class ViewerPrivate;
+class Viewer : public QMainWindow {
     public:
-        Usdviewer(QWidget* parent = nullptr);
-        virtual ~Usdviewer();
-        void set_arguments(const QStringList& arguments);
-
+        Viewer(QWidget* parent = nullptr);
+        virtual ~Viewer();
+        void setArguments(const QStringList& arguments);
+        
     private:
-        QScopedPointer<UsdviewerPrivate> p;
-};
+        QScopedPointer<ViewerPrivate> p;
+    };
+}

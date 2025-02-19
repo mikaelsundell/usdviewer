@@ -2,23 +2,23 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "mousefilter.h"
+#include "mouseevent.h"
 #include <QMouseEvent>
 
-Mousefilter::Mousefilter(QObject* parent)
+MouseEvent::MouseEvent(QObject* parent)
 : QObject(parent)
 {
 }
 
-Mousefilter::~Mousefilter()
+MouseEvent::~MouseEvent()
 {
 }
 
 bool
-Mousefilter::eventFilter(QObject *obj, QEvent *event)
+MouseEvent::eventFilter(QObject* obj, QEvent* event)
 {
     if (event->type() == QEvent::MouseButtonPress) {
-        QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         if (mouseEvent->button() == Qt::LeftButton) {
             emit pressed();
         }

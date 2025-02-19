@@ -10,15 +10,35 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-class UsdViewCameraPrivate;
-class UsdViewCamera : public QObject {
-    Q_OBJECT
+namespace usd {
+class ViewCameraPrivate;
+class ViewCamera {
     public:
-        UsdViewCamera();
-        UsdViewCamera(double aspectratio, double fov, GfCamera::FOVDirection direction = GfCamera::FOVVertical);
-        virtual ~UsdViewCamera();
+        enum CameraMode { None, Truck, Tumble, Zoom, Pick };
+        enum FovDirection { Vertical, Horizontal };
+        ViewCamera();
+        ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection direction = Vertical);
+        virtual ~ViewCamera();
+        void frameAll() const;
+        void tumble(double x, double y);
+    
         GfCamera camera() const;
+        qreal aspectRatio() const;
+        void setAspectRatio(qreal aspectRatio);
+        GfBBox3d boundingBox() const;
+        void setBoundingBox(const GfBBox3d& boundingBox);
+        CameraMode cameraMode();
+        void setCameraMode(ViewCamera::CameraMode cameraMode);
+        qreal fov() const;
+        void setFov(qreal fov);
+        FovDirection fovDirection() const;
+        void setFovDirection(ViewCamera::FovDirection direction);
+        qreal near() const;
+        void setNear(qreal near);
+        qreal far() const;
+        void setFar(qreal near);
         
     private:
-        QExplicitlySharedDataPointer<UsdViewCameraPrivate> p;
-};
+        QExplicitlySharedDataPointer<ViewCameraPrivate> p;
+    };
+}

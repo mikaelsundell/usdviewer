@@ -13,8 +13,8 @@ main(int argc, char* argv[])
         test();
     }
     QApplication app(argc, argv);
-    Usdviewer viewer;
-    viewer.set_arguments(QCoreApplication::arguments());
+    usd::Viewer viewer;
+    viewer.setArguments(QCoreApplication::arguments());
     viewer.show();
     return app.exec();
 }

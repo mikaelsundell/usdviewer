@@ -20,7 +20,7 @@ GfVec4f QColor_GfVec4f(const QColor& color) {
 }
 
 TfToken QString_TfToken(const QString& str) {
-    return pxr::TfToken(str.toStdString());
+    return TfToken(str.toStdString());
 }
 
 QString TfToken_QString(const pxr::TfToken& token) {
@@ -76,6 +76,18 @@ void DebugBoundingBoxes(const UsdStageRefPtr& stage) {
             }
         }
     }
+}
+
+QDebug operator<<(QDebug debug, const pxr::GfBBox3d& bbox) {
+    QDebugStateSaver saver(debug);
+    const pxr::GfRange3d& range = bbox.GetRange();
+    const pxr::GfVec3d& min = range.GetMin();
+    const pxr::GfVec3d& max = range.GetMax();
+    debug.nospace() << "GfBBox3d("
+                    << "min: (" << min[0] << ", " << min[1] << ", " << min[2] << "), "
+                    << "max: (" << max[0] << ", " << max[1] << ", " << max[2] << ")"
+                    << ")";
+    return debug;
 }
 
 QDebug operator<<(QDebug debug, const GfRange1f& range) {
@@ -167,7 +179,7 @@ QDebug operator<<(QDebug debug, const TfToken& token) {
     return debug;
 }
 
-QDebug operator<<(QDebug debug, const pxr::TfTokenVector& tokens) {
+QDebug operator<<(QDebug debug, const TfTokenVector& tokens) {
     QDebugStateSaver saver(debug);
     debug.nospace() << "TfTokenVector [";
 
@@ -175,7 +187,6 @@ QDebug operator<<(QDebug debug, const pxr::TfTokenVector& tokens) {
         if (i > 0) debug << ", ";
         debug << "TfToken(\"" << tokens[i].GetString().c_str() << "\")";
     }
-
     debug << "]";
     return debug;
 }
@@ -183,6 +194,94 @@ QDebug operator<<(QDebug debug, const pxr::TfTokenVector& tokens) {
 QDebug operator<<(QDebug debug, const UsdTimeCode& timeCode) {
     QDebugStateSaver saver(debug);
     debug.nospace() << "UsdTimeCode(" << timeCode.GetValue() << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const VtValue& value)
+{
+    QDebugStateSaver saver(debug);
+    if (value.IsHolding<int>()) {
+        debug << value.UncheckedGet<int>();
+    }
+    else if (value.IsHolding<unsigned long>()) {
+        debug << value.UncheckedGet<unsigned long>();
+    }
+    else if (value.IsHolding<float>()) {
+        debug << value.UncheckedGet<float>();
+    }
+    else if (value.IsHolding<double>()) {
+        debug << value.UncheckedGet<double>();
+    }
+    else if (value.IsHolding<std::string>()) {
+        debug << "\"" << QString::fromStdString(value.UncheckedGet<std::string>()) << "\"";
+    }
+    else if (value.IsHolding<pxr::VtDictionary>()) {
+        debug << value.UncheckedGet<pxr::VtDictionary>();
+    }
+    else if (value.IsArrayValued()) {
+        debug << "[";
+        VtValue array = value;
+        bool first = true;
+        if (array.IsHolding<VtArray<int>>()) {
+            for (const auto& item : array.UncheckedGet<VtArray<int>>()) {
+                if (!first) debug << ", ";
+                first = false;
+                debug << item;
+            }
+        }
+        if (array.IsHolding<VtArray<unsigned long>>()) {
+            for (const auto& item : array.UncheckedGet<VtArray<unsigned long>>()) {
+                if (!first) debug << ", ";
+                first = false;
+                debug << item;
+            }
+        }
+        else if (array.IsHolding<VtArray<float>>()) {
+            for (const auto& item : array.UncheckedGet<VtArray<float>>()) {
+                if (!first) debug << ", ";
+                first = false;
+                debug << item;
+            }
+        }
+        else if (array.IsHolding<VtArray<double>>()) {
+            for (const auto& item : array.UncheckedGet<VtArray<double>>()) {
+                if (!first) debug << ", ";
+                first = false;
+                debug << item;
+            }
+        }
+        else if (array.IsHolding<VtArray<std::string>>()) {
+            for (const auto& item : array.UncheckedGet<VtArray<std::string>>()) {
+                if (!first) debug << ", ";
+                first = false;
+                debug << "\"" << QString::fromStdString(item) << "\"";
+            }
+        }
+        else {
+            debug << "<unsupported array type: " << QString::fromStdString(array.GetTypeName()) << ">";
+        }
+        debug << "]";
+    }
+    else {
+        debug << "<unsupported type: " << QString::fromStdString(value.GetTypeName()) << ">";
+    }
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const VtDictionary& dict) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "VtDictionary {";
+    bool first = true;
+    for (const auto& pair : dict) {
+        if (!first) debug << ", ";
+        first = false;
+        const std::string& key = pair.first;
+        const VtValue& value = pair.second;
+        debug << "\"" << QString::fromStdString(key) << "\": ";
+        debug << value;
+    }
+
+    debug << "}";
     return debug;
 }
 
@@ -207,7 +306,6 @@ QDebug operator<<(QDebug debug, UsdImagingGLDrawMode drawMode) {
 QDebug operator<<(QDebug debug, UsdImagingGLCullStyle cullStyle) {
     QDebugStateSaver saver(debug);
     debug.nospace() << "UsdImagingGLCullStyle(";
-
     switch (cullStyle) {
         case UsdImagingGLCullStyle::CULL_STYLE_NO_OPINION: debug.nospace() << "CULL_STYLE_NO_OPINION"; break;
         case UsdImagingGLCullStyle::CULL_STYLE_NOTHING: debug.nospace() << "CULL_STYLE_NOTHING"; break;
@@ -279,7 +377,7 @@ QDebug operator<<(QDebug debug, const UsdImagingGLRenderParams::ClipPlanesVector
     debug.nospace() << "ClipPlanesVector [";
 
     for (size_t i = 0; i < clipPlanes.size(); ++i) {
-        const pxr::GfVec4d& plane = clipPlanes[i];
+        const GfVec4d& plane = clipPlanes[i];
         debug.nospace() << " Plane" << i << " ("
                         << plane[0] << ", " << plane[1] << ", "
                         << plane[2] << ", " << plane[3] << ")";

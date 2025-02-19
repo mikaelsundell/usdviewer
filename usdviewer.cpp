@@ -3,7 +3,8 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
-#include "mousefilter.h"
+#include "usdstage.h"
+#include "mouseevent.h"
 #include <QColorDialog>
 #include <QObject>
 #include <QPointer>
@@ -11,79 +12,101 @@
 // generated files
 #include "ui_usdviewer.h"
 
-class UsdviewerPrivate : public QObject {
+namespace usd {
+class ViewerPrivate : public QObject {
     Q_OBJECT
     public:
-        UsdviewerPrivate();
+        ViewerPrivate();
         void init();
     public Q_SLOTS:
+        void ready();
         void clearcolor();
-    
+        void aovChanged(int index);
     public:
         struct Data {
             QStringList arguments;
-            QScopedPointer<Mousefilter> clearcolorfilter;
+            QScopedPointer<MouseEvent> clearColorFilter;
             QScopedPointer<Ui_Usdviewer> ui;
-            QPointer<Usdviewer> viewer;
+            QPointer<Viewer> viewer;
         };
         Data d;
 };
 
-UsdviewerPrivate::UsdviewerPrivate()
+ViewerPrivate::ViewerPrivate()
 {
 }
 
 void
-UsdviewerPrivate::init()
+ViewerPrivate::init()
 {
     d.ui.reset(new Ui_Usdviewer());
     d.ui->setupUi(d.viewer.data());
-    d.clearcolorfilter.reset(new Mousefilter);
-    d.ui->clearcolor->installEventFilter(d.clearcolorfilter.data());
+    d.clearColorFilter.reset(new MouseEvent);
+    d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
     // connect
-    connect(d.clearcolorfilter.data(), &Mousefilter::pressed, this, &UsdviewerPrivate::clearcolor);
+    connect(d.ui->imagingglwidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
+    connect(d.ui->aovs, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
+    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearcolor);
 }
 
 void
-UsdviewerPrivate::clearcolor()
+ViewerPrivate::ready()
 {
-    QColor color = QColorDialog::getColor(d.ui->imagingglwidget->clearcolor(), d.viewer.data(), "Select Color");
+    for(QString aov : d.ui->imagingglwidget->rendererAovs()) {
+        d.ui->aovs->addItem(aov, QVariant::fromValue(aov));
+    }
+}
+
+void
+ViewerPrivate::clearcolor()
+{
+    QColor color = QColorDialog::getColor(d.ui->imagingglwidget->clearColor(), d.viewer.data(), "Select Color");
     if (color.isValid()) {
-        d.ui->imagingglwidget->set_clearcolor(color);
+        d.ui->imagingglwidget->setClearColor(color);
         d.ui->clearcolor->setStyleSheet("background-color: " + color.name() + ";");
     }
 }
 
+void
+ViewerPrivate::aovChanged(int index)
+{
+    QString aov = d.ui->aovs->itemData(index, Qt::UserRole).value<QString>();
+    d.ui->imagingglwidget->setRendererAov(aov);
+}
+
 #include "usdviewer.moc"
 
-Usdviewer::Usdviewer(QWidget* parent)
+Viewer::Viewer(QWidget* parent)
 : QMainWindow(parent)
-, p(new UsdviewerPrivate())
+, p(new ViewerPrivate())
 {
     p->d.viewer = this;
     p->init();
 }
 
-Usdviewer::~Usdviewer()
+Viewer::~Viewer()
 {
 }
 
 void
-Usdviewer::set_arguments(const QStringList& arguments)
+Viewer::setArguments(const QStringList& arguments)
 {
-    qDebug() << "arguments: " << arguments;
-    
     p->d.arguments = arguments;
     for (int i = 0; i < arguments.size(); ++i) {
         if (arguments[i] == "--open" && i + 1 < arguments.size()) {
             QString filename = arguments[i + 1];
             if (!filename.isEmpty()) {
-                qDebug() << "opening file:" << filename;
-                if (!p->d.ui->imagingglwidget->load_file(filename)) {
-                    qDebug() << "could not load usd file: " << filename;
+                Stage stage(filename);
+                if (stage.isValid()) {
+                    p->d.ui->imagingglwidget->setStage(stage);
+                }
+                else {
+                    qWarning() << "could not load stage from filename: " << filename;
                 }
             }
             break;
         }
     }
 }
+}
+

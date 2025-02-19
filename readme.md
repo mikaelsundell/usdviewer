@@ -30,6 +30,9 @@ https://openusd.org/release/api/index.html
 * USD Tutorials    
 https://openusd.org/release/tut_usd_tutorials.html
 
+* USD Cookbook    
+https://github.com/ColinKennedy/USD-Cookbook
+
 
 Project
 -------

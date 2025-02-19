@@ -4,26 +4,31 @@
 
 #pragma once
 
+#include "usdstage.h"
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 
-class UsdImagingGLWidgetPrivate;
-class UsdImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
-    public:
-        UsdImagingGLWidget(QWidget* parent = nullptr);
-        virtual ~UsdImagingGLWidget();
-    
-        bool load_file(const QString& filename);
-    
-        float complexity() const;
-        void set_complexity(float complexity);
-    
-        QColor clearcolor() const;
-        void set_clearcolor(const QColor& color);
-    
-        QList<QString> rendereraovs() const;
-        void set_rendereraov(const QString& aov);
+#include <QResizeEvent>
 
+namespace usd {
+class ImagingGLWidgetPrivate;
+class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
+    Q_OBJECT
+    public:
+        ImagingGLWidget(QWidget* parent = nullptr);
+        virtual ~ImagingGLWidget();
+        Stage stage() const;
+        bool setStage(const Stage& stage);
+        float complexity() const;
+        void setComplexity(float complexity);
+        QColor clearColor() const;
+        void setClearColor(const QColor& color);
+        QList<QString> rendererAovs() const;
+        void setRendererAov(const QString& aov);
+        
+    Q_SIGNALS:
+        void rendererReady();
+        
     protected:
         void initializeGL() override;
         void paintGL() override;
@@ -31,7 +36,8 @@ class UsdImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
         void mouseMoveEvent(QMouseEvent* event) override;
         void mouseReleaseEvent(QMouseEvent* event) override;
         void wheelEvent(QWheelEvent* event) override;
-    
+
     private:
-        QScopedPointer<UsdImagingGLWidgetPrivate> p;
+        QScopedPointer<ImagingGLWidgetPrivate> p;
 };
+}

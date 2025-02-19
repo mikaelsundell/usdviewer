@@ -3,154 +3,257 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewcamera.h"
+#include "usdutils.h"
 #include <pxr/base/gf/frustum.h>
 #include <pxr/base/gf/rotation.h>
 #include <pxr/base/gf/range1d.h>
 #include <QDebug>
 
-class UsdViewCameraPrivate : public QSharedData {
-    public:
-        void init();
-        void push_cameratransform();
-        void pull_cameratransform();
-        GfMatrix4d rotate_matrix(const GfVec3d& vec, double angle);
+namespace usd {
+class ViewCameraPrivate : public QSharedData {
+public:
+    void frameAll();
+    void tumble(double x, double y);
+    GfCamera camera();
+    GfMatrix4d rotateAngle(const GfVec3d& value, double angle);
+    struct Data
+    {
+        double fov = 60.0;
+        double aspectratio = 1.0;
+        double near = 1;
+        double far = 2000000;
+        double fit = 1.1;
+        double distance;
+        GfBBox3d boundingBox;
+        GfVec3d center;
+        ViewCamera::CameraMode cameraMode;
+        ViewCamera::FovDirection direction = ViewCamera::Vertical;
+        GfCamera camera;
     
-        struct Data
-        {
-            GfCamera camera;
-            GfCamera::FOVDirection direction = GfCamera::FOVVertical;
-            
-            
-            
-            GfMatrix4d zupmatrix;
-            GfMatrix4d invzupmatrix;
-            
-            GfMatrix4d yzupmatrix;
-            GfMatrix4d invyzupmatrix;
+        bool valid = false;
+        
+        // internals
+        
+        GfMatrix4d zupmatrix;
+        GfMatrix4d invzupmatrix;
+        
+        GfMatrix4d yzupmatrix;
+        GfMatrix4d invyzupmatrix;
+        
+        size_t maxsafezresolution = 1e6;
+        size_t goodzresolution = 5e4;
+        
+        bool zup = true;
+        bool overridenear = false;
+        bool overridefar = false;
+        
+        double rottheta = 0;
+        double rotphi = 0;
+        double rotpsi = 0;
+        
+        double closesvisibledist = 0.0;
+        double lastframeddist = 0.0;
+        double lastframedclosestdist = 0.0;
+        double selsize = 10;
+        
+        
+        
+        // internals
+        
+        
 
-            float near = 1;
-            float far = 2000000;
-            
-            size_t maxsafezresolution = 1e6;
-            size_t goodzresolution = 5e4;
-            
-            bool zup = true;
-            bool overridenear = false;
-            bool overridefar = false;
-            qreal fov = 60.0;
-            qreal aspectratio = 1.0;
-            qreal rottheta = 0;
-            qreal rotphi = 0;
-            qreal rotpsi = 0;
-            
-
-            
-            GfVec3d center = GfVec3d(0.0, 0.0, 0.0);
-            qreal distance = 100;
-            double focusdistance = distance;
-            qreal closesvisibledist = 0.0;
-            qreal lastframeddist = 0.0;
-            qreal lastframedclosestdist = 0.0;
-            qreal selsize = 10;
-            
-            bool dirty = false;
-        };
-        Data d;
+    };
+    Data d;
 };
 
 void
-UsdViewCameraPrivate::init()
+ViewCameraPrivate::frameAll()
 {
-    d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectratio, d.fov, GfCamera::FOVVertical);
-    if (d.zup) {
-        d.zupmatrix = GfMatrix4d().SetRotate(
-            GfRotation(GfVec3d().XAxis(), -90)
-        );
-        d.invzupmatrix = d.zupmatrix.GetInverse();
+    d.center = d.boundingBox.ComputeCentroid();
+    GfRange3d range = d.boundingBox.ComputeAlignedRange();
+    GfVec3d size = range.GetSize();
+    double maxsize = std::max(size[0], std::max(size[1], size[2]));
+    double fovangle = d.fov * 0.5;
+    if (fovangle == 0.0) {
+        fovangle = 0.5;
     }
-    else {
-        d.yzupmatrix = GfMatrix4d(1.0);
-        d.invyzupmatrix = GfMatrix4d(1.0);
+    double length = maxsize * d.fit * 0.5;
+    d.distance = length / std::atan(fovangle * M_PI / 180.0);
+    if (d.distance < d.near + maxsize * 0.5) {
+        d.distance = d.near + length;
     }
-    d.camera.SetClippingRange(GfRange1f(d.near, d.far));
+    d.valid = false;
 }
 
 void
-UsdViewCameraPrivate::push_cameratransform()
+ViewCameraPrivate::tumble(double x, double y)
 {
-    // updates the camera's transform matrix, that is, the matrix that
-    // brings the camera to the origin, with the camera view pointing down:
-    //   +Y if this is a Zup camera, or
-    //   -Z if this is a Yup camera
-    if (!d.dirty) {
-        return;
-    }
-    GfMatrix4d matrix = GfMatrix4d().SetTranslate(GfVec3d().ZAxis() * d.distance);
-    matrix *= rotate_matrix(GfVec3d().ZAxis(), -d.rotpsi);
-    matrix *= rotate_matrix(GfVec3d().XAxis(), -d.rotphi);
-    matrix *= rotate_matrix(GfVec3d().YAxis(), -d.rottheta);
-    matrix *= d.invzupmatrix;
-    matrix *= GfMatrix4d().SetTranslate(d.center);
-    d.camera.SetTransform(matrix);
-    d.dirty = false;
+    d.rottheta += x;
+    d.rotphi += y;
+    d.valid = false;
 }
 
-void
-UsdViewCameraPrivate::pull_cameratransform()
+GfCamera
+ViewCameraPrivate::camera()
 {
-    // updates parameters (center, rotTheta, etc.) from the camera transform
-    GfMatrix4d cameratransform = d.camera.GetTransform();
-    float distance = d.camera.GetFocusDistance();
-    GfFrustum frustum = d.camera.GetFrustum();
-    GfVec3d position = frustum.GetPosition();
-    GfVec3d viewdirection = frustum.ComputeViewDirection();
-    d.distance = distance;
-    d.selsize = distance / 10.0;
-    d.center = position + distance * viewdirection;
-    
-    GfMatrix4d transform = cameratransform * d.yzupmatrix;
-    transform.Orthonormalize();
-    GfRotation rotation = transform.ExtractRotation();
-    
-    GfVec3d yaxis = GfVec3d::YAxis();
-    GfVec3d xaxis = GfVec3d::XAxis();
-    GfVec3d zaxis = GfVec3d::ZAxis();
-    
-    GfVec3d vec = rotation.Decompose(yaxis, xaxis, zaxis);
-    d.rottheta = -vec[0];
-    d.rotphi = -vec[1];
-    d.rotpsi = -vec[2];
-    d.dirty = true;
-    return;
+    if (!d.valid) {
+        GfMatrix4d matrix = GfMatrix4d().SetTranslate(GfVec3d().ZAxis() * d.distance);
+        matrix *= rotateAngle(GfVec3d().ZAxis(), -d.rotpsi);
+        matrix *= rotateAngle(GfVec3d().XAxis(), -d.rotphi);
+        matrix *= rotateAngle(GfVec3d().YAxis(), -d.rottheta);
+        matrix *= GfMatrix4d().SetTranslate(d.center);
+        d.camera.SetTransform(matrix);
+        d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectratio, d.fov, GfCamera::FOVVertical);
+        d.camera.SetClippingRange(GfRange1f(d.near, d.far));
+        d.valid = true;
+    }
+    return d.camera;
 }
 
 GfMatrix4d
-UsdViewCameraPrivate::rotate_matrix(const GfVec3d& vec, double angle)
+ViewCameraPrivate::rotateAngle(const GfVec3d& value, double angle)
 {
-    return GfMatrix4d(1.0).SetRotate(GfRotation(vec, angle));
+    return GfMatrix4d(1.0).SetRotate(GfRotation(value, angle));
 }
 
-UsdViewCamera::UsdViewCamera()
-: p(new UsdViewCameraPrivate())
+ViewCamera::ViewCamera()
+: p(new ViewCameraPrivate())
 {
-    p->init();
 }
 
-UsdViewCamera::UsdViewCamera(double aspectratio, double fov, GfCamera::FOVDirection direction)
-: p(new UsdViewCameraPrivate())
+ViewCamera::ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection direction)
+: p(new ViewCameraPrivate())
 {
     p->d.aspectratio = aspectratio;
     p->d.fov = fov;
     p->d.direction = direction;
-    p->init();
 }
 
-UsdViewCamera::~UsdViewCamera()
+ViewCamera::~ViewCamera()
 {
+}
+
+void
+ViewCamera::frameAll() const
+{
+    p->frameAll();
+}
+
+void
+ViewCamera::tumble(double x, double y)
+{
+    p->tumble(x, y);
+}
+
+qreal
+ViewCamera::aspectRatio() const
+{
+    return p->d.aspectratio;
+}
+
+void
+ViewCamera::setAspectRatio(qreal aspectRatio)
+{
+    if (!qFuzzyCompare(p->d.aspectratio, aspectRatio)) {
+        p->d.aspectratio = aspectRatio;
+        p->d.valid = false;
+    }
+}
+
+GfBBox3d
+ViewCamera::boundingBox() const
+{
+    return p->d.boundingBox;
+}
+
+void
+ViewCamera::setBoundingBox(const GfBBox3d& boundingBox)
+{
+    if (p->d.boundingBox != boundingBox) {
+        p->d.boundingBox = boundingBox;
+        p->d.valid = false;
+    }
+}
+
+ViewCamera::CameraMode
+ViewCamera::cameraMode()
+{
+    return p->d.cameraMode;
+}
+
+void
+ViewCamera::setCameraMode(ViewCamera::CameraMode cameraMode)
+{
+    if (p->d.cameraMode != cameraMode) {
+        p->d.cameraMode = cameraMode;
+        p->d.valid = false;
+    }
+}
+
+double
+ViewCamera::fov() const
+{
+    return p->d.fov;
+}
+
+void
+ViewCamera::setFov(double fov)
+{
+    if (p->d.fov != fov) {
+        p->d.fov = fov;
+        p->d.valid = false;
+    }
+}
+
+ViewCamera::FovDirection
+ViewCamera::fovDirection() const
+{
+    return p->d.direction;
+}
+
+void
+ViewCamera::setFovDirection(ViewCamera::FovDirection direction)
+{
+    if (p->d.direction != direction) {
+        p->d.direction = direction;
+        p->d.valid = false;
+    }
+}
+
+qreal
+ViewCamera::near() const
+{
+    return p->d.near;
+}
+
+void
+ViewCamera::setNear(qreal near)
+{
+    if (p->d.near != near) {
+        p->d.near = near;
+        p->d.valid = false;
+    }
+}
+
+qreal
+ViewCamera::far() const
+{
+    return p->d.far;
+}
+
+void
+ViewCamera::setFar(qreal far)
+{
+    if (p->d.far != far) {
+        p->d.far = far;
+        p->d.valid = false;
+    }
 }
 
 GfCamera
-UsdViewCamera::camera() const
+ViewCamera::camera() const
 {
-    return p->d.camera;
+    return p->camera();
 }
+}
+

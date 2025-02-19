@@ -6,6 +6,7 @@ Ongoing issues and development notes for testing and verification.
 Ongoing
 ------------
 - Port usdview to c++/ Qt version of stageview.
+- Fix build.sh, make it more generic, contains fixed paths now
 
 Refactor
 ------------

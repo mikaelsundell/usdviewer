@@ -5,16 +5,15 @@
 #pragma once
 #include <QObject>
 
-class Mousefilter : public QObject
-{
+class MouseEvent : public QObject {
     Q_OBJECT
     public:
-        Mousefilter(QObject* object = nullptr);
-        virtual ~Mousefilter();
+        MouseEvent(QObject* object = nullptr);
+        virtual ~MouseEvent();
 
     Q_SIGNALS:
         void pressed();
     
     protected:
-        bool eventFilter(QObject *obj, QEvent *event) override;
+        bool eventFilter(QObject* obj, QEvent* event) override;
 };

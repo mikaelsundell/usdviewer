@@ -5,6 +5,7 @@
 #pragma once
 
 #include "usdstage.h"
+#include "usdviewcamera.h"
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 
@@ -17,6 +18,8 @@ class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     public:
         ImagingGLWidget(QWidget* parent = nullptr);
         virtual ~ImagingGLWidget();
+        ViewCamera viewCamera() const;
+    
         Stage stage() const;
         bool setStage(const Stage& stage);
         float complexity() const;

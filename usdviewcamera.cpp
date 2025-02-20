@@ -12,10 +12,15 @@
 namespace usd {
 class ViewCameraPrivate : public QSharedData {
 public:
+    void init();
     void frameAll();
     void tumble(double x, double y);
+    void truck(double up, double down);
+    void distance(double factor);
+    double mapToFrustumHeight(int height);
+    GfMatrix4d mapToCameraUp();
     GfCamera camera();
-    GfMatrix4d rotateAngle(const GfVec3d& value, double angle);
+    GfMatrix4d rotateAxis(const GfVec3d& value, double angle);
     struct Data
     {
         double fov = 60.0;
@@ -24,15 +29,20 @@ public:
         double far = 2000000;
         double fit = 1.1;
         double distance;
+        GfMatrix4d matrixUp = GfMatrix4d(1.0);
         GfBBox3d boundingBox;
         GfVec3d center;
-        ViewCamera::CameraMode cameraMode;
+        GfRange3d range;
+        ViewCamera::CameraUp cameraUp = ViewCamera::Z;
+        ViewCamera::CameraMode cameraMode = ViewCamera::None;
         ViewCamera::FovDirection direction = ViewCamera::Vertical;
+        double axisyaw = 0; // x-axis
+        double axispitch = 0; // y-axis
+        double axisroll = 0; // z-axis
         GfCamera camera;
-    
         bool valid = false;
         
-        // internals
+        // todo: internals
         
         GfMatrix4d zupmatrix;
         GfMatrix4d invzupmatrix;
@@ -46,32 +56,28 @@ public:
         bool zup = true;
         bool overridenear = false;
         bool overridefar = false;
-        
-        double rottheta = 0;
-        double rotphi = 0;
-        double rotpsi = 0;
+    
         
         double closesvisibledist = 0.0;
         double lastframeddist = 0.0;
         double lastframedclosestdist = 0.0;
         double selsize = 10;
         
-        
-        
-        // internals
-        
-        
-
+        // todo: internals
     };
     Data d;
 };
 
 void
+ViewCameraPrivate::init()
+{
+    d.matrixUp = mapToCameraUp();
+}
+
+void
 ViewCameraPrivate::frameAll()
 {
-    d.center = d.boundingBox.ComputeCentroid();
-    GfRange3d range = d.boundingBox.ComputeAlignedRange();
-    GfVec3d size = range.GetSize();
+    GfVec3d size = d.range.GetSize();
     double maxsize = std::max(size[0], std::max(size[1], size[2]));
     double fovangle = d.fov * 0.5;
     if (fovangle == 0.0) {
@@ -88,9 +94,53 @@ ViewCameraPrivate::frameAll()
 void
 ViewCameraPrivate::tumble(double x, double y)
 {
-    d.rottheta += x;
-    d.rotphi += y;
+    d.axisroll += x;
+    d.axispitch += y;
     d.valid = false;
+}
+
+void
+ViewCameraPrivate::truck(double right, double up)
+{
+    const GfFrustum frustum = camera().GetFrustum();
+    GfVec3d cameraUp = frustum.ComputeUpVector();
+    GfVec3d cameraRight = GfCross(frustum.ComputeViewDirection(), cameraUp);
+    d.center += (right * cameraRight + up * cameraUp);
+    d.valid = false;
+}
+
+void
+ViewCameraPrivate::distance(double factor)
+{
+    if (factor > 1 && d.distance < 2) {
+        GfVec3d size = d.range.GetSize();
+        double maxsize = std::max(size[0], std::max(size[1], size[2]));
+        d.distance += std::min(maxsize / 25.0, factor);
+    }
+    else {
+        d.distance *= factor;
+    }
+    d.valid = false;
+}
+
+double
+ViewCameraPrivate::mapToFrustumHeight(int height)
+{
+    const GfFrustum frustum = camera().GetFrustum();
+    return frustum.GetWindow().GetSize()[1] * d.distance / height;
+}
+
+GfMatrix4d
+ViewCameraPrivate::mapToCameraUp()
+{
+    GfMatrix4d matrix;
+    if (d.cameraUp == ViewCamera::Z) {
+        matrix.SetRotate(GfRotation(GfVec3d::XAxis(), -90.0));
+    }
+    else if (d.cameraUp == ViewCamera::Z) {
+        matrix.SetRotate(GfRotation(GfVec3d::YAxis(), -90.0));
+    }
+    return matrix.GetInverse();
 }
 
 GfCamera
@@ -98,9 +148,10 @@ ViewCameraPrivate::camera()
 {
     if (!d.valid) {
         GfMatrix4d matrix = GfMatrix4d().SetTranslate(GfVec3d().ZAxis() * d.distance);
-        matrix *= rotateAngle(GfVec3d().ZAxis(), -d.rotpsi);
-        matrix *= rotateAngle(GfVec3d().XAxis(), -d.rotphi);
-        matrix *= rotateAngle(GfVec3d().YAxis(), -d.rottheta);
+        matrix *= rotateAxis(GfVec3d().ZAxis(), -d.axisyaw);
+        matrix *= rotateAxis(GfVec3d().XAxis(), -d.axispitch);
+        matrix *= rotateAxis(GfVec3d().YAxis(), -d.axisroll);
+        matrix *= d.matrixUp;
         matrix *= GfMatrix4d().SetTranslate(d.center);
         d.camera.SetTransform(matrix);
         d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectratio, d.fov, GfCamera::FOVVertical);
@@ -111,7 +162,7 @@ ViewCameraPrivate::camera()
 }
 
 GfMatrix4d
-ViewCameraPrivate::rotateAngle(const GfVec3d& value, double angle)
+ViewCameraPrivate::rotateAxis(const GfVec3d& value, double angle)
 {
     return GfMatrix4d(1.0).SetRotate(GfRotation(value, angle));
 }
@@ -119,6 +170,7 @@ ViewCameraPrivate::rotateAngle(const GfVec3d& value, double angle)
 ViewCamera::ViewCamera()
 : p(new ViewCameraPrivate())
 {
+    p->init();
 }
 
 ViewCamera::ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection direction)
@@ -127,6 +179,12 @@ ViewCamera::ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection di
     p->d.aspectratio = aspectratio;
     p->d.fov = fov;
     p->d.direction = direction;
+    p->init();
+}
+
+ViewCamera::ViewCamera(const ViewCamera& other)
+: p(other.p)
+{
 }
 
 ViewCamera::~ViewCamera()
@@ -143,6 +201,24 @@ void
 ViewCamera::tumble(double x, double y)
 {
     p->tumble(x, y);
+}
+
+void
+ViewCamera::truck(double up, double down)
+{
+    p->truck(up, down);
+}
+
+void
+ViewCamera::distance(double factor)
+{
+    p->distance(factor);
+}
+
+double
+ViewCamera::mapToFrustumHeight(int height)
+{
+    return p->mapToFrustumHeight(height);
 }
 
 qreal
@@ -171,6 +247,8 @@ ViewCamera::setBoundingBox(const GfBBox3d& boundingBox)
 {
     if (p->d.boundingBox != boundingBox) {
         p->d.boundingBox = boundingBox;
+        p->d.center = boundingBox.ComputeCentroid();
+        p->d.range = boundingBox.ComputeAlignedRange();
         p->d.valid = false;
     }
 }
@@ -186,6 +264,22 @@ ViewCamera::setCameraMode(ViewCamera::CameraMode cameraMode)
 {
     if (p->d.cameraMode != cameraMode) {
         p->d.cameraMode = cameraMode;
+        p->d.valid = false;
+    }
+}
+
+ViewCamera::CameraUp
+ViewCamera::cameraUp()
+{
+    return p->d.cameraUp;
+}
+
+void
+ViewCamera::setCameraUp(ViewCamera::CameraUp cameraUp)
+{
+    if (p->d.cameraUp != cameraUp) {
+        p->d.cameraUp = cameraUp;
+        p->mapToCameraUp();
         p->d.valid = false;
     }
 }
@@ -254,6 +348,15 @@ GfCamera
 ViewCamera::camera() const
 {
     return p->camera();
+}
+
+ViewCamera&
+ViewCamera::operator=(const ViewCamera& other)
+{
+    if (this != &other) {
+        p = other.p;
+    }
+    return *this;
 }
 }
 

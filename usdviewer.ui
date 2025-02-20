@@ -12,7 +12,7 @@
   </property>
   <property name="minimumSize">
    <size>
-    <width>400</width>
+    <width>800</width>
     <height>400</height>
    </size>
   </property>
@@ -21,10 +21,25 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>2</number>
+    </property>
+    <property name="leftMargin">
+     <number>8</number>
+    </property>
+    <property name="topMargin">
+     <number>8</number>
+    </property>
+    <property name="rightMargin">
+     <number>8</number>
+    </property>
+    <property name="bottomMargin">
+     <number>8</number>
+    </property>
     <item>
      <widget class="QWidget" name="widget_3" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
@@ -46,9 +61,48 @@
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
-        <widget class="QPushButton" name="pushButton_3">
+        <widget class="QPushButton" name="open">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
          <property name="text">
           <string>Open</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="frame_2">
+         <property name="frameShape">
+          <enum>QFrame::Shape::VLine</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="exportSelected">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Export selected ...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="exportImage">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Export image ...</string>
          </property>
         </widget>
        </item>
@@ -66,14 +120,60 @@
         </spacer>
        </item>
        <item>
-        <widget class="QLabel" name="label_2">
-         <property name="text">
-          <string>AOVs</string>
+        <widget class="QFrame" name="frame_3">
+         <property name="frameShape">
+          <enum>QFrame::Shape::VLine</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="aovs"/>
+        <widget class="QPushButton" name="frameSelected">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Frame selected</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="frameAll">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Frame all</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="frame_5">
+         <property name="frameShape">
+          <enum>QFrame::Shape::VLine</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="resetView">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Reset view</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -96,6 +196,18 @@
        <enum>QFrame::Shadow::Raised</enum>
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <property name="leftMargin">
+        <number>8</number>
+       </property>
+       <property name="topMargin">
+        <number>8</number>
+       </property>
+       <property name="rightMargin">
+        <number>8</number>
+       </property>
+       <property name="bottomMargin">
+        <number>8</number>
+       </property>
        <item>
         <widget class="usd::ImagingGLWidget" name="imagingglwidget">
          <property name="sizePolicy">
@@ -125,7 +237,7 @@
         <widget class="QLabel" name="label">
          <property name="font">
           <font>
-           <pointsize>13</pointsize>
+           <pointsize>11</pointsize>
           </font>
          </property>
          <property name="text">
@@ -145,6 +257,31 @@
           </size>
          </property>
         </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="font">
+          <font>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>AOVs</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="aovs"/>
+       </item>
+       <item>
+        <widget class="QFrame" name="frame_4">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QFrame" name="clearcolor">
@@ -179,8 +316,89 @@
      <height>24</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuDisplay">
+    <property name="title">
+     <string>Display</string>
+    </property>
+    <addaction name="separator"/>
+    <addaction name="displayFrameAll"/>
+    <addaction name="displayFrameSelected"/>
+    <addaction name="displayResetView"/>
+    <addaction name="separator"/>
+   </widget>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <addaction name="fileOpen"/>
+    <addaction name="separator"/>
+    <addaction name="fileExportSelected"/>
+    <addaction name="fileExportImage"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+    <addaction name="actionOpen_Github_README"/>
+    <addaction name="actionOpen_Github_Issues"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuDisplay"/>
+   <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="displayFrameAll">
+   <property name="text">
+    <string>Frame all</string>
+   </property>
+   <property name="shortcut">
+    <string>A</string>
+   </property>
+  </action>
+  <action name="displayResetView">
+   <property name="text">
+    <string>Reset view</string>
+   </property>
+  </action>
+  <action name="displayFrameSelected">
+   <property name="text">
+    <string>Frame selected</string>
+   </property>
+  </action>
+  <action name="fileOpen">
+   <property name="text">
+    <string>Open</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="fileExportSelected">
+   <property name="text">
+    <string>Export selected ...</string>
+   </property>
+  </action>
+  <action name="fileExportImage">
+   <property name="text">
+    <string>Export image ...</string>
+   </property>
+  </action>
+  <action name="actionOpen_Github_README">
+   <property name="text">
+    <string>Open Github README</string>
+   </property>
+  </action>
+  <action name="actionOpen_Github_Issues">
+   <property name="text">
+    <string>Open Github Issues</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>

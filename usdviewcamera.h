@@ -14,19 +14,27 @@ namespace usd {
 class ViewCameraPrivate;
 class ViewCamera {
     public:
+        enum CameraUp { X, Y, Z };
         enum CameraMode { None, Truck, Tumble, Zoom, Pick };
         enum FovDirection { Vertical, Horizontal };
         ViewCamera();
         ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection direction = Vertical);
+        ViewCamera(const ViewCamera& other);
         virtual ~ViewCamera();
         void frameAll() const;
+        void frameSelected() const;
         void tumble(double x, double y);
-    
+        void truck(double right, double up);
+        void distance(double factor);
+        double mapToFrustumHeight(int height);
+        
         GfCamera camera() const;
         qreal aspectRatio() const;
         void setAspectRatio(qreal aspectRatio);
         GfBBox3d boundingBox() const;
         void setBoundingBox(const GfBBox3d& boundingBox);
+        CameraUp cameraUp();
+        void setCameraUp(ViewCamera::CameraUp cameraUp);
         CameraMode cameraMode();
         void setCameraMode(ViewCamera::CameraMode cameraMode);
         qreal fov() const;
@@ -37,6 +45,8 @@ class ViewCamera {
         void setNear(qreal near);
         qreal far() const;
         void setFar(qreal near);
+    
+        ViewCamera& operator=(const ViewCamera& other);
         
     private:
         QExplicitlySharedDataPointer<ViewCameraPrivate> p;

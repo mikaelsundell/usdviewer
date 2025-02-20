@@ -12,10 +12,11 @@
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdGeom/camera.h>
-#include <pxr/usdImaging/usdImagingGL/engine.h>
-#include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usd/primRange.h>
+#include <pxr/usd/usdGeom/camera.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
+#include <pxr/usd/usdGeom/metrics.h>
+#include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <QColor>
 #include <QObject>
@@ -34,7 +35,8 @@ public:
     void postGLPass();
     void initCamera();
     void initStage(const Stage& stage);
-    double deviceRatio(int value) const;
+    double deviceRatio(double value) const;
+    QPoint deviceRatio(QPoint value) const;
     GfVec2i widgetSize() const;
     GfVec4d widgetViewport() const;
     void cleanUp();
@@ -171,6 +173,14 @@ ImagingGLWidgetPrivate::initCamera()
 {
     Q_ASSERT("stage is not set" && d.stage.isValid());
     d.viewCamera.setBoundingBox(d.stage.boundingBox());
+    TfToken upAxis = UsdGeomGetStageUpAxis(d.stage.stagePtr());
+    if (upAxis == TfToken("X")) {
+        d.viewCamera.setCameraUp(ViewCamera::X);
+    } else if (upAxis == TfToken("Y")) {
+        d.viewCamera.setCameraUp(ViewCamera::Y);
+    } else if (upAxis == pxr::TfToken("Z")) {
+        d.viewCamera.setCameraUp(ViewCamera::Z);
+    }
     d.viewCamera.frameAll();
 }
 
@@ -181,10 +191,16 @@ ImagingGLWidgetPrivate::initStage(const Stage& stage)
     initCamera();
 }
 
-qreal
-ImagingGLWidgetPrivate::deviceRatio(int value) const
+double
+ImagingGLWidgetPrivate::deviceRatio(double value) const
 {
     return value * d.widget->devicePixelRatio();
+}
+
+QPoint
+ImagingGLWidgetPrivate::deviceRatio(QPoint value) const
+{
+    return (QPoint(deviceRatio(value.x()), deviceRatio(value.y())));
 }
 
 GfVec2i
@@ -220,6 +236,12 @@ ImagingGLWidget::ImagingGLWidget(QWidget* parent)
 ImagingGLWidget::~ImagingGLWidget()
 {
     p->cleanUp();
+}
+
+ViewCamera
+ImagingGLWidget::viewCamera() const
+{
+    return p->d.viewCamera;
 }
 
 Stage
@@ -301,15 +323,10 @@ ImagingGLWidget::mousePressEvent(QMouseEvent* event)
     p->d.drag = true;
     if (event->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) {
         if (event->button() == Qt::LeftButton) {
-            if (event->modifiers() & Qt::ControlModifier) {
-                p->d.viewCamera.setCameraMode(ViewCamera::Truck);
-            }
-            else {
-                p->d.viewCamera.setCameraMode(ViewCamera::Tumble);
-            }
+            p->d.viewCamera.setCameraMode(ViewCamera::Tumble);
         }
         else if (event->button() == Qt::MiddleButton) {
-            p->d.viewCamera.setCameraMode(ViewCamera::Tumble);
+            p->d.viewCamera.setCameraMode(ViewCamera::Truck);
         }
         else if (event->button() == Qt::RightButton) {
             p->d.viewCamera.setCameraMode(ViewCamera::Zoom);
@@ -329,10 +346,22 @@ ImagingGLWidget::mouseMoveEvent(QMouseEvent* event)
 {
     QPoint pos = event->pos();
     if (p->d.drag) {
-        QPoint delta = p->d.mousepos - pos;
-        p->d.viewCamera.tumble(0.25 * p->deviceRatio(delta.x()), 0.25 * p->deviceRatio(delta.y()));
+        QPoint delta = p->deviceRatio(pos) - p->deviceRatio(p->d.mousepos);
+        if (p->d.viewCamera.cameraMode() == ViewCamera::Truck) {
+            double height = p->widgetSize()[1];
+            double factor = p->d.viewCamera.mapToFrustumHeight(height);
+            p->d.viewCamera.truck(-delta.x() * factor, delta.y() * factor);
+        }
+        else if (p->d.viewCamera.cameraMode() == ViewCamera::Tumble) {
+            p->d.viewCamera.tumble(0.25 * delta.x(), 0.25 * delta.y());
+        }
+        else if (p->d.viewCamera.cameraMode() == ViewCamera::Zoom) {
+            double factor = -.002 * (delta.x() + delta.y());
+            p->d.viewCamera.distance(1 + factor);
+        }
         update();
     }
+    p->d.mousepos = event->pos();
 }
 
 void
@@ -345,6 +374,10 @@ ImagingGLWidget::mouseReleaseEvent(QMouseEvent* event)
 void
 ImagingGLWidget::wheelEvent(QWheelEvent* event)
 {
-    QOpenGLWidget::wheelEvent(event);
+    double delta = static_cast<double>(event->angleDelta().y()) / 1000.0;
+    double clamped = std::max(-0.5, std::min(0.5, delta));
+    double factor = 1.0 - clamped;
+    p->d.viewCamera.distance(factor);
+    update();
 }
 }

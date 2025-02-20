@@ -29,6 +29,7 @@ set (project_bundle
 
 set (project_version "0.0.0")
 set (project_copyright "Copyright 2025-present Contributors to the ${app_name} project")
+set (project_identifier "com.github.mikaelsundell.${project_name}")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
 if (APPLE)
@@ -38,7 +39,7 @@ if (APPLE)
     set (MACOSX_BUNDLE_EXECUTABLE_NAME ${project_name})
     set (MACOSX_BUNDLE_INFO_STRING ${project_name})
     set (MACOSX_BUNDLE_BUNDLE_NAME ${project_name})
-    set (MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.mikaelsundell.${project_name}")
+    set (MACOSX_BUNDLE_GUI_IDENTIFIER ${project_identifier})
     set (MACOSX_BUNDLE_ICON_FILE usdviewer.icns)
     set (MACOSX_BUNDLE_LONG_VERSION_STRING "${project_version}")
     set (MACOSX_BUNDLE_SHORT_VERSION_STRING "${project_version}")
@@ -89,6 +90,7 @@ target_compile_definitions(${project_name} PRIVATE
     -DPROJECT_NAME="${project_name}"
     -DPROJECT_VERSION="${project_version}"
     -DPROJECT_COPYRIGHT="${project_copyright}"
+    -DPROJECT_IDENTIFIER="${project_identifier}"
     -DGITHUB_URL="${project_url}"
 )
 

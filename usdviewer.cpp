@@ -7,6 +7,7 @@
 #include "mouseevent.h"
 #include <QColorDialog>
 #include <QFileDialog>
+#include <QMimeData>
 #include <QObject>
 #include <QPointer>
 #include <QSettings>
@@ -33,6 +34,7 @@ class ViewerPrivate : public QObject {
     public:
         struct Data {
             QStringList arguments;
+            QStringList extensions;
             QScopedPointer<MouseEvent> clearColorFilter;
             QScopedPointer<Ui_Usdviewer> ui;
             QPointer<Viewer> viewer;
@@ -42,6 +44,9 @@ class ViewerPrivate : public QObject {
 
 ViewerPrivate::ViewerPrivate()
 {
+    d.extensions = {
+        ".usd", ".usda", ".usdz"
+    };
 }
 
 void
@@ -93,8 +98,12 @@ void
 ViewerPrivate::open()
 {
     QString openDir = settingsValue("openDir", QDir::homePath()).toString();
+    QStringList filters;
+    for (const QString& ext : d.extensions) {
+        filters.append("*" + ext);
+    }
     QString filter = "USD Files (*.usd *.usda *.usdz)";
-    QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", QString(), filter);
+    QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
         Stage stage(filename);
         if (stage.isValid()) {
@@ -169,6 +178,42 @@ Viewer::setArguments(const QStringList& arguments)
                 }
             }
             break;
+        }
+    }
+}
+
+void
+Viewer::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        const QList<QUrl> urls = event->mimeData()->urls();
+        if (urls.size() == 1) {
+            QString filename = urls.first().toLocalFile();
+            QString extension = QFileInfo(filename).suffix().toLower();
+            if (p->d.extensions.contains("." + extension)) {
+                event->acceptProposedAction();
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+void
+Viewer::dropEvent(QDropEvent* event)
+{
+    const QList<QUrl> urls = event->mimeData()->urls();
+    if (urls.size() == 1) {
+        QString filename = urls.first().toLocalFile();
+        QString extension = QFileInfo(filename).suffix().toLower();
+        if (p->d.extensions.contains("." + extension)) {
+            Stage stage(filename);
+            if (stage.isValid()) {
+                setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
+                p->renderer()->setStage(stage);
+            } else {
+                qWarning() << "Could not load stage from filename: " << filename;
+            }
         }
     }
 }

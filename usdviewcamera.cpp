@@ -140,6 +140,9 @@ ViewCameraPrivate::mapToCameraUp()
     else if (d.cameraUp == ViewCamera::X) {
         matrix.SetRotate(GfRotation(GfVec3d::YAxis(), -90.0));
     }
+    else {
+        matrix = GfMatrix4d(1.0);
+    }
     return matrix.GetInverse();
 }
 

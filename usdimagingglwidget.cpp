@@ -97,6 +97,7 @@ void
 ImagingGLWidgetPrivate::initCamera()
 {
     Q_ASSERT("stage is not set" && d.stage.isValid());
+    d.viewCamera = ViewCamera();
     d.viewCamera.setBoundingBox(d.stage.boundingBox());
     TfToken upAxis = UsdGeomGetStageUpAxis(d.stage.stagePtr());
     if (upAxis == TfToken("X")) {
@@ -114,6 +115,8 @@ ImagingGLWidgetPrivate::initStage(const Stage& stage)
 {
     d.stage = stage;
     initCamera();
+    d.glEngine.reset();
+    initGL();
 }
 
 void
@@ -264,7 +267,6 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
         pickfrustum.ComputeProjectionMatrix(),
         d.stage.stagePtr()->GetPseudoRoot(),
         d.params,
-        pr,
         &hitPoint,
         &hitNormal,
         &hitPrimPath,

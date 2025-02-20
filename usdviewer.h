@@ -14,7 +14,11 @@ class Viewer : public QMainWindow {
         Viewer(QWidget* parent = nullptr);
         virtual ~Viewer();
         void setArguments(const QStringList& arguments);
-        
+    
+    protected:
+        void dragEnterEvent(QDragEnterEvent* event) override;
+        void dropEvent(QDropEvent* event) override;
+    
     private:
         QScopedPointer<ViewerPrivate> p;
     };

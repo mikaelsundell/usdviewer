@@ -12,7 +12,15 @@ Ongoing
 - Fix all todo: comments
 - Add complexity dropdown (low, medium ...)
 - Sweep selection
-
+- Rember window size, clear color and possibly others
+- Add link in Help menu ti Github
+- Add in display settings (Wireframe, shaded etc)
+- AOVs depth, not compatible with buffer
+- AOVs added, will increment the dropdown
+- Animations, simple frame slider in the bottom
+- Clean up variables in ViewCamera private
+- Verify memory use and leaks
+  
 Planning
 ------------
 - Port usdview to c++/ Qt version of stageview.

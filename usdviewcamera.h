@@ -18,7 +18,7 @@ class ViewCamera {
         enum CameraMode { None, Truck, Tumble, Zoom, Pick };
         enum FovDirection { Vertical, Horizontal };
         ViewCamera();
-        ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection direction = Vertical);
+        ViewCamera(double aspectratio, double fov, ViewCamera::FovDirection direction = Vertical);
         ViewCamera(const ViewCamera& other);
         virtual ~ViewCamera();
         void frameAll() const;
@@ -27,24 +27,24 @@ class ViewCamera {
         void truck(double right, double up);
         void distance(double factor);
         double mapToFrustumHeight(int height);
-        
         GfCamera camera() const;
-        qreal aspectRatio() const;
-        void setAspectRatio(qreal aspectRatio);
+    
+        double aspectRatio() const;
+        void setAspectRatio(double aspectRatio);
         GfBBox3d boundingBox() const;
         void setBoundingBox(const GfBBox3d& boundingBox);
         CameraUp cameraUp();
         void setCameraUp(ViewCamera::CameraUp cameraUp);
         CameraMode cameraMode();
         void setCameraMode(ViewCamera::CameraMode cameraMode);
-        qreal fov() const;
-        void setFov(qreal fov);
+        double fov() const;
+        void setFov(double fov);
         FovDirection fovDirection() const;
         void setFovDirection(ViewCamera::FovDirection direction);
-        qreal near() const;
-        void setNear(qreal near);
-        qreal far() const;
-        void setFar(qreal near);
+        double near() const;
+        void setNear(double near);
+        double far() const;
+        void setFar(double near);
     
         ViewCamera& operator=(const ViewCamera& other);
         

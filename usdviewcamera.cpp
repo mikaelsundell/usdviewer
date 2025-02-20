@@ -23,17 +23,17 @@ public:
     GfMatrix4d rotateAxis(const GfVec3d& value, double angle);
     struct Data
     {
+        double aspectRatio = 1.0;
         double fov = 60.0;
-        double aspectratio = 1.0;
         double near = 1;
         double far = 2000000;
         double fit = 1.1;
         double distance;
-        GfMatrix4d matrixUp = GfMatrix4d(1.0);
+        GfMatrix4d inverseUp = GfMatrix4d(1.0);
         GfBBox3d boundingBox;
         GfVec3d center;
         GfRange3d range;
-        ViewCamera::CameraUp cameraUp = ViewCamera::Z;
+        ViewCamera::CameraUp cameraUp = ViewCamera::Y;
         ViewCamera::CameraMode cameraMode = ViewCamera::None;
         ViewCamera::FovDirection direction = ViewCamera::Vertical;
         double axisyaw = 0; // x-axis
@@ -71,7 +71,7 @@ public:
 void
 ViewCameraPrivate::init()
 {
-    d.matrixUp = mapToCameraUp();
+    d.inverseUp = mapToCameraUp();
 }
 
 void
@@ -137,7 +137,7 @@ ViewCameraPrivate::mapToCameraUp()
     if (d.cameraUp == ViewCamera::Z) {
         matrix.SetRotate(GfRotation(GfVec3d::XAxis(), -90.0));
     }
-    else if (d.cameraUp == ViewCamera::Z) {
+    else if (d.cameraUp == ViewCamera::X) {
         matrix.SetRotate(GfRotation(GfVec3d::YAxis(), -90.0));
     }
     return matrix.GetInverse();
@@ -151,11 +151,14 @@ ViewCameraPrivate::camera()
         matrix *= rotateAxis(GfVec3d().ZAxis(), -d.axisyaw);
         matrix *= rotateAxis(GfVec3d().XAxis(), -d.axispitch);
         matrix *= rotateAxis(GfVec3d().YAxis(), -d.axisroll);
-        matrix *= d.matrixUp;
+        matrix *= d.inverseUp;
         matrix *= GfMatrix4d().SetTranslate(d.center);
         d.camera.SetTransform(matrix);
-        d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectratio, d.fov, GfCamera::FOVVertical);
+        d.camera.SetFocusDistance(d.distance);
+        d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectRatio, d.fov, GfCamera::FOVVertical);
         d.camera.SetClippingRange(GfRange1f(d.near, d.far));
+        CameraUtilConformWindowPolicy policy = CameraUtilConformWindowPolicy::CameraUtilFit;
+        CameraUtilConformWindow(&d.camera, policy, d.aspectRatio);
         d.valid = true;
     }
     return d.camera;
@@ -173,10 +176,10 @@ ViewCamera::ViewCamera()
     p->init();
 }
 
-ViewCamera::ViewCamera(qreal aspectratio, qreal fov, ViewCamera::FovDirection direction)
+ViewCamera::ViewCamera(double aspectratio, double fov, ViewCamera::FovDirection direction)
 : p(new ViewCameraPrivate())
 {
-    p->d.aspectratio = aspectratio;
+    p->d.aspectRatio = aspectratio;
     p->d.fov = fov;
     p->d.direction = direction;
     p->init();
@@ -221,17 +224,25 @@ ViewCamera::mapToFrustumHeight(int height)
     return p->mapToFrustumHeight(height);
 }
 
-qreal
+GfCamera
+ViewCamera::camera() const
+{
+    return p->camera();
+}
+
+
+double
 ViewCamera::aspectRatio() const
 {
-    return p->d.aspectratio;
+    return p->d.aspectRatio;
 }
 
 void
-ViewCamera::setAspectRatio(qreal aspectRatio)
+ViewCamera::setAspectRatio(double aspectRatio)
 {
-    if (!qFuzzyCompare(p->d.aspectratio, aspectRatio)) {
-        p->d.aspectratio = aspectRatio;
+    if (p->d.aspectRatio != aspectRatio)
+    {
+        p->d.aspectRatio = aspectRatio;
         p->d.valid = false;
     }
 }
@@ -279,7 +290,7 @@ ViewCamera::setCameraUp(ViewCamera::CameraUp cameraUp)
 {
     if (p->d.cameraUp != cameraUp) {
         p->d.cameraUp = cameraUp;
-        p->mapToCameraUp();
+        p->d.inverseUp = p->mapToCameraUp();
         p->d.valid = false;
     }
 }
@@ -314,14 +325,14 @@ ViewCamera::setFovDirection(ViewCamera::FovDirection direction)
     }
 }
 
-qreal
+double
 ViewCamera::near() const
 {
     return p->d.near;
 }
 
 void
-ViewCamera::setNear(qreal near)
+ViewCamera::setNear(double near)
 {
     if (p->d.near != near) {
         p->d.near = near;
@@ -329,25 +340,19 @@ ViewCamera::setNear(qreal near)
     }
 }
 
-qreal
+double
 ViewCamera::far() const
 {
     return p->d.far;
 }
 
 void
-ViewCamera::setFar(qreal far)
+ViewCamera::setFar(double far)
 {
     if (p->d.far != far) {
         p->d.far = far;
         p->d.valid = false;
     }
-}
-
-GfCamera
-ViewCamera::camera() const
-{
-    return p->camera();
 }
 
 ViewCamera&

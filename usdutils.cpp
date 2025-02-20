@@ -23,7 +23,7 @@ TfToken QString_TfToken(const QString& str) {
     return TfToken(str.toStdString());
 }
 
-QString TfToken_QString(const pxr::TfToken& token) {
+QString TfToken_QString(const TfToken& token) {
     return QString::fromStdString(token.GetString());
 }
 
@@ -78,15 +78,22 @@ void DebugBoundingBoxes(const UsdStageRefPtr& stage) {
     }
 }
 
-QDebug operator<<(QDebug debug, const pxr::GfBBox3d& bbox) {
+QDebug operator<<(QDebug debug, const GfBBox3d& bbox) {
     QDebugStateSaver saver(debug);
-    const pxr::GfRange3d& range = bbox.GetRange();
-    const pxr::GfVec3d& min = range.GetMin();
-    const pxr::GfVec3d& max = range.GetMax();
+    const GfRange3d& range = bbox.GetRange();
+    const GfVec3d& min = range.GetMin();
+    const GfVec3d& max = range.GetMax();
     debug.nospace() << "GfBBox3d("
                     << "min: (" << min[0] << ", " << min[1] << ", " << min[2] << "), "
                     << "max: (" << max[0] << ", " << max[1] << ", " << max[2] << ")"
                     << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfRange1d& range) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfRange1d(Min: " << range.GetMin()
+                    << ", Max: " << range.GetMax() << ")";
     return debug;
 }
 
@@ -104,6 +111,23 @@ QDebug operator<<(QDebug debug, const GfRange2d& range) {
                     << "] Max: ["
                     << range.GetMax()[0] << ", " << range.GetMax()[1]
                     << "])";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfRotation& rotation) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfRotation("
+                    << "axis = " << rotation.GetAxis() << ", "
+                    << "angle = " << rotation.GetAngle()
+                    << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfVec2d& vec) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfVec2d("
+                    << vec[0] << ", " << vec[1]
+                    << ")";
     return debug;
 }
 
@@ -149,6 +173,61 @@ QDebug operator<<(QDebug debug, const GfMatrix4d& matrix) {
         }
         debug.nospace() << "]\n";
     }
+    debug.nospace() << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfQuaternion& quat) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfQuaternion("
+                    << quat.GetReal() << ", "
+                    << quat.GetImaginary()[0] << ", "
+                    << quat.GetImaginary()[1] << ", "
+                    << quat.GetImaginary()[2]
+                    << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfCamera& camera) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfCamera(\n";
+    debug.nospace() << "  transform = " << camera.GetTransform() << ",\n";
+    auto projection = camera.GetProjection();
+    QString projType = (projection == GfCamera::Projection::Perspective)
+                       ? "Perspective"
+                       : "Orthographic";
+    debug.nospace() << "  projection = " << projType << ",\n";
+    debug.nospace() << "  horizontalAperture = " << camera.GetHorizontalAperture() << ",\n";
+    debug.nospace() << "  verticalAperture = " << camera.GetVerticalAperture() << ",\n";
+    debug.nospace() << "  focalLength = " << camera.GetFocalLength() << ",\n";
+    debug.nospace() << "  clippingRange = " << camera.GetClippingRange() << ",\n";
+    debug.nospace() << "  focusDistance = " << camera.GetFocusDistance() << "\n";
+    debug.nospace() << ")";
+    return debug;
+}
+
+QDebug operator<<(QDebug debug, const GfFrustum& frustum) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfFrustum(\n";
+    debug.nospace() << "  position = " << frustum.GetPosition() << ",\n";
+    debug.nospace() << "  rotation = " << frustum.GetRotation() << ",\n";
+    debug.nospace() << "  window = " << frustum.GetWindow() << ",\n";
+    debug.nospace() << "  nearFar = " << frustum.GetNearFar() << ",\n";
+    debug.nospace() << "  viewDistance = " << frustum.GetViewDistance() << ",\n";
+    auto projectionType = frustum.GetProjectionType();
+    QString projType = (projectionType == GfFrustum::ProjectionType::Perspective)
+                       ? "Perspective"
+                       : "Orthographic";
+    debug.nospace() << "  projection = " << projType << ",\n";
+    debug.nospace() << "  viewMatrix = " << frustum.ComputeViewMatrix() << ",\n";
+    debug.nospace() << "  projectionMatrix = " << frustum.ComputeProjectionMatrix() << ",\n";
+    auto corners = frustum.ComputeCorners();
+    debug.nospace() << "  corners = [\n";
+    for (const auto& corner : corners) {
+        debug.nospace() << "    " << corner << ",\n";
+    }
+    debug.nospace() << "  ]\n";
+
     debug.nospace() << ")";
     return debug;
 }
@@ -215,8 +294,8 @@ QDebug operator<<(QDebug debug, const VtValue& value)
     else if (value.IsHolding<std::string>()) {
         debug << "\"" << QString::fromStdString(value.UncheckedGet<std::string>()) << "\"";
     }
-    else if (value.IsHolding<pxr::VtDictionary>()) {
-        debug << value.UncheckedGet<pxr::VtDictionary>();
+    else if (value.IsHolding<VtDictionary>()) {
+        debug << value.UncheckedGet<VtDictionary>();
     }
     else if (value.IsArrayValued()) {
         debug << "[";

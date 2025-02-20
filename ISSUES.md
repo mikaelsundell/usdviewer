@@ -6,6 +6,7 @@ Ongoing issues and development notes for testing and verification.
 Ongoing
 ------------
 - Open, flush existing Stage from renderer
+- Drag and drop open file USD
 - Truck, Tumble and Zoom make aware of distance, is now very slow for zoom-ins
 - Selection set and picking
 - Camera lights

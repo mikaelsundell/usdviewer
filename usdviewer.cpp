@@ -5,7 +5,9 @@
 #include "usdviewer.h"
 #include "usdstage.h"
 #include "mouseevent.h"
+#include <QClipboard>
 #include <QColorDialog>
+#include <QDragEnterEvent>
 #include <QFileDialog>
 #include <QMimeData>
 #include <QObject>
@@ -28,14 +30,21 @@ class ViewerPrivate : public QObject {
     public Q_SLOTS:
         void open();
         void ready();
-        void clearcolor();
+        void copyImage();
+        void clearColor();
+        void exportAll();
+        void exportSelected();
+        void exportImage();
         void frameAll();
+        void frameSelected();
+        void resetView();
         void aovChanged(int index);
     public:
         struct Data {
             QStringList arguments;
             QStringList extensions;
             QScopedPointer<MouseEvent> clearColorFilter;
+            QScopedPointer<Selection> selection;
             QScopedPointer<Ui_Usdviewer> ui;
             QPointer<Viewer> viewer;
         };
@@ -54,20 +63,33 @@ ViewerPrivate::init()
 {
     d.ui.reset(new Ui_Usdviewer());
     d.ui->setupUi(d.viewer.data());
-    d.clearColorFilter.reset(new MouseEvent);
-    d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
+    // selection
+    d.selection.reset(new Selection());
+    d.ui->imagingglwidget->setSelection(d.selection.data());
     // clear color
     QColor color(100, 150, 150);
     d.ui->imagingglwidget->setClearColor(color);
     d.ui->clearcolor->setStyleSheet("background-color: " + color.name() + ";");
+    d.clearColorFilter.reset(new MouseEvent);
+    d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
     // connect
     connect(d.ui->imagingglwidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
-    connect(d.ui->aovs, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
-    connect(d.ui->open, &QPushButton::clicked, this, &ViewerPrivate::open);
-    connect(d.ui->frameAll, &QPushButton::clicked, this, &ViewerPrivate::frameAll);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
+    connect(d.ui->fileExportAll, &QAction::triggered, this, &ViewerPrivate::exportAll);
+    connect(d.ui->fileExportSelected, &QAction::triggered, this, &ViewerPrivate::exportSelected);
+    connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
-    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearcolor);
+    connect(d.ui->displayFrameSelected, &QAction::triggered, this, &ViewerPrivate::frameSelected);
+    connect(d.ui->displayResetView, &QAction::triggered, this, &ViewerPrivate::resetView);
+    connect(d.ui->open, &QPushButton::clicked, this, &ViewerPrivate::open);
+    connect(d.ui->exportSelected, &QPushButton::clicked, this, &ViewerPrivate::exportSelected);
+    connect(d.ui->exportImage, &QPushButton::clicked, this, &ViewerPrivate::exportImage);
+    connect(d.ui->frameSelected, &QPushButton::clicked, this, &ViewerPrivate::frameAll);
+    connect(d.ui->frameAll, &QPushButton::clicked, this, &ViewerPrivate::frameAll);
+    connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
+    connect(d.ui->aovs, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
+    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget, &ImagingGLWidget::updateSelection);
 }
 
 usd::ViewCamera
@@ -123,7 +145,15 @@ ViewerPrivate::ready()
 }
 
 void
-ViewerPrivate::clearcolor()
+ViewerPrivate::copyImage()
+{
+    QImage image = d.ui->imagingglwidget->image();
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    clipboard->setImage(image);
+}
+
+void
+ViewerPrivate::clearColor()
 {
     QColor color = QColorDialog::getColor(d.ui->imagingglwidget->clearColor(), d.viewer.data(), "Select Color");
     if (color.isValid()) {
@@ -133,10 +163,40 @@ ViewerPrivate::clearcolor()
 }
 
 void
+ViewerPrivate::exportAll()
+{
+    qDebug() << "todo: export all";
+}
+
+void
+ViewerPrivate::exportSelected()
+{
+    qDebug() << "todo: export selected";
+}
+
+void
+ViewerPrivate::exportImage()
+{
+    qDebug() << "todo: export image";
+}
+
+void
 ViewerPrivate::frameAll()
 {
     d.ui->imagingglwidget->viewCamera().frameAll();
     d.ui->imagingglwidget->update();
+}
+
+void
+ViewerPrivate::frameSelected()
+{
+    qDebug() << "todo: frame selected";
+}
+
+void
+ViewerPrivate::resetView()
+{
+    qDebug() << "todo: reset view";
 }
 
 void

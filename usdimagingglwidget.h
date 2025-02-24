@@ -5,11 +5,10 @@
 #pragma once
 
 #include "usdstage.h"
+#include "usdselection.h"
 #include "usdviewcamera.h"
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
-
-#include <QResizeEvent>
 
 namespace usd {
 class ImagingGLWidgetPrivate;
@@ -19,16 +18,26 @@ class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
         ImagingGLWidget(QWidget* parent = nullptr);
         virtual ~ImagingGLWidget();
         ViewCamera viewCamera() const;
+        QImage image();
     
         Stage stage() const;
         bool setStage(const Stage& stage);
+    
         float complexity() const;
         void setComplexity(float complexity);
+    
         QColor clearColor() const;
         void setClearColor(const QColor& color);
+    
         QList<QString> rendererAovs() const;
         void setRendererAov(const QString& aov);
-        
+    
+        Selection* selection();
+        void setSelection(Selection* selection);
+    
+    public Q_SLOTS:
+        void updateSelection();
+    
     Q_SIGNALS:
         void rendererReady();
         

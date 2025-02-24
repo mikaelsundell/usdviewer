@@ -41,29 +41,6 @@ public:
         double axisroll = 0; // z-axis
         GfCamera camera;
         bool valid = false;
-        
-        // todo: internals
-        
-        GfMatrix4d zupmatrix;
-        GfMatrix4d invzupmatrix;
-        
-        GfMatrix4d yzupmatrix;
-        GfMatrix4d invyzupmatrix;
-        
-        size_t maxsafezresolution = 1e6;
-        size_t goodzresolution = 5e4;
-        
-        bool zup = true;
-        bool overridenear = false;
-        bool overridefar = false;
-    
-        
-        double closesvisibledist = 0.0;
-        double lastframeddist = 0.0;
-        double lastframedclosestdist = 0.0;
-        double selsize = 10;
-        
-        // todo: internals
     };
     Data d;
 };

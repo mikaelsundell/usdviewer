@@ -5,7 +5,6 @@
 #include "usdimagingglwidget.h"
 #include "usdviewcamera.h"
 #include "usdutils.h"
-
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/diagnostic.h>
@@ -16,9 +15,10 @@
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/metrics.h>
+#include <pxr/usdImaging/usdImaging/delegate.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
-
 #include <QColor>
+#include <QMouseEvent>
 #include <QObject>
 #include <QPointer>
 
@@ -37,6 +37,7 @@ public:
     void mouseReleaseEvent(QMouseEvent* event);
     void wheelEvent(QWheelEvent* event);
     void pickEvent(QMouseEvent* event);
+    void updateSelection();
     QPoint deviceRatio(QPoint value) const;
     double deviceRatio(double value) const;
     double widgetAspectRatio() const;
@@ -62,6 +63,7 @@ public:
         GfBBox3d selectionBBox;
         UsdImagingGLRenderParams params;
         QScopedPointer<UsdImagingGLEngine> glEngine;
+        QPointer<Selection> selection;
         QPointer<ImagingGLWidget> widget;
     };
     Data d;
@@ -153,7 +155,7 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.enableSceneLights = true;
             d.params.flipFrontFacing = true;
             d.params.gammaCorrectColors = false;
-            d.params.highlight = false;
+            d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;
             d.params.showRender = true;
@@ -271,8 +273,23 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
         &hitNormal,
         &hitPrimPath,
         &hitInstancerPath)) {
-        // todo: handle hit
+        
+        d.selection->addItem(hitPrimPath);
     }
+    else {
+        d.selection->clear();
+    }
+}
+
+void
+ImagingGLWidgetPrivate::updateSelection()
+{
+    Q_ASSERT("gl engine is not set" && d.glEngine);
+    d.glEngine->ClearSelected();
+    for(SdfPath path : d.selection->selection()) {
+        d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
+    }
+    d.widget->update();
 }
 
 QPoint
@@ -337,6 +354,12 @@ ImagingGLWidget::viewCamera() const
     return p->d.viewCamera;
 }
 
+QImage
+ImagingGLWidget::image()
+{
+    return QOpenGLWidget::grabFramebuffer();
+}
+
 Stage
 ImagingGLWidget::stage() const
 {
@@ -395,6 +418,27 @@ ImagingGLWidget::setRendererAov(const QString& aov)
         p->v.aov = aov;
         update();
     }
+}
+
+Selection*
+ImagingGLWidget::selection()
+{
+    return p->d.selection;
+}
+
+void
+ImagingGLWidget::setSelection(Selection* selection)
+{
+    if (p->d.selection != selection) {
+        p->d.selection = selection;
+        update();
+    }
+}
+
+void
+ImagingGLWidget::updateSelection()
+{
+    p->updateSelection();
 }
 
 void

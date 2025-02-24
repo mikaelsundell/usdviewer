@@ -5,7 +5,6 @@ Ongoing issues and development notes for testing and verification.
 
 Ongoing
 ------------
-- Selection set and picking
 - Frame selected and frame all (test and verify)
 - Camera lights
 - Tree view for scene explorer
@@ -13,15 +12,14 @@ Ongoing
 - Add complexity dropdown (low, medium ...)
 - Sweep selection
 - Rember window size, clear color and possibly others
-- Add link in Help menu ti Github
+- Add link in Help menu to Github
 - Add in display settings (Wireframe, shaded etc)
 - AOVs depth, not compatible with buffer
 - AOVs added, will increment the dropdown
 - Animations, simple frame slider in the bottom
-- Clean up variables in ViewCamera private
 - Verify memory use and leaks
   
-Planning
+Planning and limitations
 ------------
 - Port usdview to c++/ Qt version of stageview.
 - Fix build.sh, make it more generic, contains fixed paths now

@@ -20,9 +20,10 @@ class Selection : public QObject {
         Selection(QObject* parent = nullptr);
         ~Selection();
         bool isSelected(const SdfPath& path) const;
-        void addItem(const SdfPath& path);
-        void removeItem(const SdfPath& path);
-        QList<SdfPath> selection() const;
+        void addPath(const SdfPath& path);
+        void replacePaths(const QList<SdfPath>& paths);
+        void removePath(const SdfPath& path);
+        QList<SdfPath> paths() const;
         void clear();
         bool isValid() const;
     

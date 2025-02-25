@@ -73,6 +73,23 @@ Stage::boundingBox() const
     return bboxCache.ComputeWorldBound(p->d.stageptr->GetPseudoRoot());
 }
 
+GfBBox3d
+Stage::boundingBox(const QList<SdfPath> paths) const
+{
+    Q_ASSERT("stage is not set" && isValid());
+    UsdGeomBBoxCache bboxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens());
+    GfBBox3d bbox;
+    for (const SdfPath& path : paths) {
+        UsdPrim prim = p->d.stageptr->GetPrimAtPath(path);
+        if (!prim || !prim.IsA<UsdGeomImageable>()) {
+            continue;
+        }
+        GfBBox3d worldbbox = bboxCache.ComputeWorldBound(prim);
+        bbox = GfBBox3d::Combine(bbox, worldbbox);
+    }
+    return bbox;
+}
+
 UsdStageRefPtr
 Stage::stagePtr() const
 {

@@ -38,29 +38,24 @@ public:
     void wheelEvent(QWheelEvent* event);
     void pickEvent(QMouseEvent* event);
     void updateSelection();
+    double complexityRefinement(ImagingGLWidget::Complexity complexity);
     QPoint deviceRatio(QPoint value) const;
     double deviceRatio(double value) const;
     double widgetAspectRatio() const;
     GfVec2i widgetSize() const;
     GfVec4d widgetViewport() const;
     void cleanUp();
-    struct ViewSettings {
-        QString aov = "color";
-        QColor clearColor = QColor::fromRgbF(0.18, 0.18, 0.18);
-        float complexity = 1.0;
-    };
-    ViewSettings v;
-    struct SelectionModel {
-    };
-    SelectionModel s;
     struct Data {
-        size_t count = 0;
-        qint64 frame = 0;
-        bool drag = false;
+        QString aov;
+        QColor clearColor;
+        size_t count;
+        qint64 frame;
+        bool drag;
         QPoint mousepos;
         Stage stage;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
+        ImagingGLWidget::Complexity complexity = ImagingGLWidget::Low;
         UsdImagingGLRenderParams params;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<Selection> selection;
@@ -75,6 +70,10 @@ ImagingGLWidgetPrivate::init()
     QSurfaceFormat format;
     format.setSamples(4);
     d.widget->setFormat(format);
+    d.aov = "color";
+    d.count = 0;
+    d.frame = 0;
+    d.drag = false;
 }
 
 void
@@ -126,8 +125,8 @@ ImagingGLWidgetPrivate::paintGL()
 {
     if (d.stage.isValid()) {
         if (d.glEngine) {
-            Q_ASSERT("aov is not set and is required" && v.aov.size());
-            TfToken aovtoken(QString_TfToken(v.aov));
+            Q_ASSERT("aov is not set and is required" && d.aov.size());
+            TfToken aovtoken(QString_TfToken(d.aov));
             d.glEngine->SetRendererAov(aovtoken);
             GfVec4d viewport = widgetViewport();
 
@@ -143,8 +142,8 @@ ImagingGLWidgetPrivate::paintGL()
             GfMatrix4d projectionMatrix = frustum.ComputeProjectionMatrix();
             d.glEngine->SetCameraState(viewModel, projectionMatrix);
           
-            d.params.clearColor = QColor_GfVec4f(v.clearColor);
-            d.params.complexity = v.complexity;
+            d.params.clearColor = QColor_GfVec4f(d.clearColor);
+            d.params.complexity = complexityRefinement(d.complexity);
             d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
             d.params.drawMode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE; // todo: changed to DRAW_SHADED_SMOOTH;
             d.params.forceRefresh = true;
@@ -274,7 +273,7 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
         &hitPrimPath,
         &hitInstancerPath)) {
         
-        d.selection->addItem(hitPrimPath);
+        d.selection->replacePaths(QList<SdfPath>() << hitPrimPath);
     }
     else {
         d.selection->clear();
@@ -286,10 +285,28 @@ ImagingGLWidgetPrivate::updateSelection()
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
     d.glEngine->ClearSelected();
-    for(SdfPath path : d.selection->selection()) {
+    for(SdfPath path : d.selection->paths()) {
         d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
     }
     d.widget->update();
+}
+
+double
+ImagingGLWidgetPrivate::complexityRefinement(ImagingGLWidget::Complexity complexity)
+{
+    switch (complexity) {
+        case ImagingGLWidget::Low:
+            return 1.0;
+        case ImagingGLWidget::Medium:
+            return 1.1;
+        case ImagingGLWidget::High:
+            return 1.2;
+        case ImagingGLWidget::VeryHigh:
+            return 1.3;
+        default:
+            Q_ASSERT("complexity value not defined");
+            return 1.0;
+    }
 }
 
 QPoint
@@ -360,31 +377,17 @@ ImagingGLWidget::image()
     return QOpenGLWidget::grabFramebuffer();
 }
 
-Stage
-ImagingGLWidget::stage() const
-{
-    Q_ASSERT("stage is not set" && p->d.stage.isValid());
-    return p->d.stage;
-}
-
-bool
-ImagingGLWidget::setStage(const Stage& stage)
-{
-    p->initStage(stage);
-    update();
-}
-
-float
+ImagingGLWidget::Complexity
 ImagingGLWidget::complexity() const
 {
-    return p->v.complexity;
+    return p->d.complexity;
 }
 
 void
-ImagingGLWidget::setComplexity(float complexity)
+ImagingGLWidget::setComplexity(ImagingGLWidget::Complexity complexity)
 {
-    if (!qFuzzyCompare(complexity, p->v.complexity)) {
-        p->v.complexity = complexity;
+    if (p->d.complexity != complexity) {
+        p->d.complexity = complexity;
         update();
     }
 }
@@ -392,14 +395,14 @@ ImagingGLWidget::setComplexity(float complexity)
 QColor
 ImagingGLWidget::clearColor() const
 {
-    return p->v.clearColor;
+    return p->d.clearColor;
 }
 
 void
 ImagingGLWidget::setClearColor(const QColor& color)
 {
-    if (color != p->v.clearColor) {
-        p->v.clearColor = color;
+    if (color != p->d.clearColor) {
+        p->d.clearColor = color;
         update();
     }
 }
@@ -414,8 +417,8 @@ ImagingGLWidget::rendererAovs() const
 void
 ImagingGLWidget::setRendererAov(const QString& aov)
 {
-    if (p->v.aov != aov) {
-        p->v.aov = aov;
+    if (p->d.aov != aov) {
+        p->d.aov = aov;
         update();
     }
 }
@@ -434,6 +437,21 @@ ImagingGLWidget::setSelection(Selection* selection)
         update();
     }
 }
+
+Stage
+ImagingGLWidget::stage() const
+{
+    Q_ASSERT("stage is not set" && p->d.stage.isValid());
+    return p->d.stage;
+}
+
+bool
+ImagingGLWidget::setStage(const Stage& stage)
+{
+    p->initStage(stage);
+    update();
+}
+
 
 void
 ImagingGLWidget::updateSelection()

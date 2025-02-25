@@ -7,6 +7,7 @@
 #include <pxr/base/gf/frustum.h>
 #include <pxr/base/gf/rotation.h>
 #include <pxr/base/gf/range1d.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
 #include <QDebug>
 
 namespace usd {
@@ -23,22 +24,22 @@ public:
     GfMatrix4d rotateAxis(const GfVec3d& value, double angle);
     struct Data
     {
-        double aspectRatio = 1.0;
-        double fov = 60.0;
-        double near = 1;
-        double far = 2000000;
-        double fit = 1.1;
+        double aspectRatio;
+        double fov;
+        double near;
+        double far;
+        double fit;
         double distance;
-        GfMatrix4d inverseUp = GfMatrix4d(1.0);
+        GfMatrix4d inverseUp;
         GfBBox3d boundingBox;
         GfVec3d center;
         GfRange3d range;
-        ViewCamera::CameraUp cameraUp = ViewCamera::Y;
-        ViewCamera::CameraMode cameraMode = ViewCamera::None;
-        ViewCamera::FovDirection direction = ViewCamera::Vertical;
-        double axisyaw = 0; // x-axis
-        double axispitch = 0; // y-axis
-        double axisroll = 0; // z-axis
+        ViewCamera::CameraUp cameraUp;
+        ViewCamera::CameraMode cameraMode;
+        ViewCamera::FovDirection direction;
+        double axisyaw; // x-axis
+        double axispitch; // y-axis
+        double axisroll; // z-axis
         GfCamera camera;
         bool valid = false;
     };
@@ -48,7 +49,20 @@ public:
 void
 ViewCameraPrivate::init()
 {
+    d.aspectRatio = 1.0;
+    d.fov = 60.0;
+    d.near = 1;
+    d.far = 2000000;
+    d.fit = 1.1;
+    d.inverseUp = GfMatrix4d(1.0);
+    d.cameraUp = ViewCamera::Y;
+    d.cameraMode = ViewCamera::None;
+    d.direction = ViewCamera::Vertical;
+    d.axisyaw = 0;
+    d.axispitch = 0;
+    d.axisroll = 0;
     d.inverseUp = mapToCameraUp();
+    frameAll();
 }
 
 void
@@ -178,6 +192,12 @@ void
 ViewCamera::frameAll() const
 {
     p->frameAll();
+}
+
+void
+ViewCamera::resetView()
+{
+    p->init();
 }
 
 void

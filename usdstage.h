@@ -22,6 +22,7 @@ class Stage {
         bool loadFromFile(const QString& filename);
         bool isValid() const;
         GfBBox3d boundingBox() const;
+        GfBBox3d boundingBox(const QList<SdfPath> paths) const;
         UsdStageRefPtr stagePtr() const;
         
         Stage& operator=(const Stage& other);

@@ -13,7 +13,7 @@ public:
     ~SelectionPrivate();
     struct Data
     {
-        QList<SdfPath> selection;
+        QList<SdfPath> paths;
     };
     Data d;
 };
@@ -35,37 +35,44 @@ Selection::Selection(QObject* parent)
 bool
 Selection::isSelected(const SdfPath& path) const
 {
-    return p->d.selection.contains(path);
+    return p->d.paths.contains(path);
 }
 
 void
-Selection::addItem(const SdfPath& path)
+Selection::addPath(const SdfPath& path)
 {
-    if (!p->d.selection.contains(path)) {
-        p->d.selection.append(path);
+    if (!p->d.paths.contains(path)) {
+        p->d.paths.append(path);
         selectionChanged();
     }
 }
 
 void
-Selection::removeItem(const SdfPath& path)
+Selection::replacePaths(const QList<SdfPath>& paths)
+{
+    p->d.paths = paths;
+    selectionChanged();
+}
+
+void
+Selection::removePath(const SdfPath& path)
 {
     Q_ASSERT("item is not selected" && isSelected(path));
-    p->d.selection.removeOne(path);
+    p->d.paths.removeOne(path);
     selectionChanged();
 }
 
 QList<SdfPath>
-Selection::selection() const
+Selection::paths() const
 {
-    return p->d.selection;
+    return p->d.paths;
 }
 
 void
 Selection::clear()
 {
-    if (p->d.selection.size()) {
-        p->d.selection.clear();
+    if (p->d.paths.size()) {
+        p->d.paths.clear();
         selectionChanged();
     }
 }

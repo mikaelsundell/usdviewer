@@ -15,16 +15,14 @@ class ImagingGLWidgetPrivate;
 class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     Q_OBJECT
     public:
+        enum Complexity { Low, Medium, High, VeryHigh };
         ImagingGLWidget(QWidget* parent = nullptr);
         virtual ~ImagingGLWidget();
         ViewCamera viewCamera() const;
         QImage image();
     
-        Stage stage() const;
-        bool setStage(const Stage& stage);
-    
-        float complexity() const;
-        void setComplexity(float complexity);
+        ImagingGLWidget::Complexity complexity() const;
+        void setComplexity(ImagingGLWidget::Complexity complexity);
     
         QColor clearColor() const;
         void setClearColor(const QColor& color);
@@ -34,6 +32,9 @@ class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     
         Selection* selection();
         void setSelection(Selection* selection);
+
+        Stage stage() const;
+        bool setStage(const Stage& stage);
     
     public Q_SLOTS:
         void updateSelection();

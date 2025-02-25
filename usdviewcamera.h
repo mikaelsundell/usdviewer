@@ -22,27 +22,34 @@ class ViewCamera {
         ViewCamera(const ViewCamera& other);
         virtual ~ViewCamera();
         void frameAll() const;
-        void frameSelected() const;
+        void resetView();
         void tumble(double x, double y);
         void truck(double right, double up);
         void distance(double factor);
         double mapToFrustumHeight(int height);
         GfCamera camera() const;
-    
+
         double aspectRatio() const;
         void setAspectRatio(double aspectRatio);
+    
         GfBBox3d boundingBox() const;
         void setBoundingBox(const GfBBox3d& boundingBox);
+    
         CameraUp cameraUp();
         void setCameraUp(ViewCamera::CameraUp cameraUp);
+    
         CameraMode cameraMode();
         void setCameraMode(ViewCamera::CameraMode cameraMode);
+    
         double fov() const;
         void setFov(double fov);
+    
         FovDirection fovDirection() const;
         void setFovDirection(ViewCamera::FovDirection direction);
+    
         double near() const;
         void setNear(double near);
+    
         double far() const;
         void setFar(double near);
     

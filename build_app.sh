@@ -188,15 +188,15 @@ build_usdviewer() {
         fi
 
         # deploydmg
-        #$script_dir/scripts/deploydmg.sh -b "$xcode_type/${app_name}.app" -d "$dmg_file"
-        #if [ -n "$developerid_identity" ]; then
-        #    if [ "$sign_code" == "ON" ]; then
-        #       codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"
-        #   fi
-        #else 
-        #    echo "Developer ID identity must be set for github distribution, will use ad-hoc sign."
-        #    codesign --force --deep --sign - "$dmg_file"
-        #fi
+        $script_dir/scripts/deploydmg.sh -b "$xcode_type/${app_name}.app" -d "$dmg_file"
+        if [ -n "$developerid_identity" ]; then
+            if [ "$sign_code" == "ON" ]; then
+               codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"
+           fi
+        else 
+            echo "Developer ID identity must be set for github distribution, will use ad-hoc sign."
+            codesign --force --deep --sign - "$dmg_file"
+        fi
     fi
 }
 

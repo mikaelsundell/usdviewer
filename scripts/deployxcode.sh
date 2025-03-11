@@ -15,7 +15,7 @@ Options:
    -h, --help              Print help message
    -v, --verbose           Print verbose output
    -b, --bundle            Path to the .app bundle (optional with --dylib)
-   -d, --dylib             Path to the dylib (optional with --bundle)   
+   -d, --dylib             Path to the dylib (optional with --bundle)
    -x, --xcode             Path to the xcode location (required)
    -f, --framework         Path to the framework (required)
    -o, --overwrite         Overwrite existing files (default: false)
@@ -63,8 +63,8 @@ while test $i -lt $# ; do
 done
 
 # test arguments
-if [ -d "${bundle}" ]; then
-    if [ -d "${dylib}" ]; then
+if [ !-z "${bundle}" ]; then
+    if [ -z "${dylib}" ]; then
         echo "Error: Neither 'bundle' nor 'dylib' is specified. Exiting."
         usage
         exit 1
@@ -166,7 +166,7 @@ function deploy_framework() {
 
 # main
 function main {
-    if [ -d "${bundle}" ]; then
+    if [ ! -z "${bundle}" ]; then
         frameworks_dir="${bundle}/Contents/Frameworks"
         if [ ! -d "$frameworks_dir" ]; then
             echo "Creating Frameworks directory: $frameworks_dir"
@@ -185,7 +185,8 @@ function main {
             deploy_framework "${exe}" "${xcode}" "${framework}" "${frameworks_dir}"
         done
     fi
-    if [ -d "${dylib}" ]; then
+
+    if [ ! -z "${dylib}" ]; then
         deploy_framework "${dylib}" "${xcode}" "${framework}" "${frameworks_dir}"
     fi
 }

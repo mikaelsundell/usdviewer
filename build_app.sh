@@ -144,7 +144,7 @@ build_usdviewer() {
 
         # python
         echo "Deploy xcode shared frameworks"
-        $script_dir/scripts/macxcode.sh -b "$xcode_type/${app_name}.app" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
+        $script_dir/scripts/deployxcode.sh -b "$xcode_type/${app_name}.app" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
 
         # usd plugin info
         echo "Deploy usd plugin info"
@@ -169,7 +169,8 @@ build_usdviewer() {
 
             for lib in "$contents"/plugin/usd/*.dylib; do
                 if [ -f "$lib" ]; then
-                    echo $script_dir/scripts/macxcode.sh -d "$lib" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
+                    $script_dir/scripts/deployplugin.sh -d "$lib" -p "${prefix}"
+                    $script_dir/scripts/deployxcode.sh -d "$lib" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
                 fi
             done
         else
@@ -187,7 +188,7 @@ build_usdviewer() {
         fi
 
         # deploydmg
-        #$script_dir/scripts/macdmg.sh -b "$xcode_type/${app_name}.app" -d "$dmg_file"
+        #$script_dir/scripts/deploydmg.sh -b "$xcode_type/${app_name}.app" -d "$dmg_file"
         #if [ -n "$developerid_identity" ]; then
         #    if [ "$sign_code" == "ON" ]; then
         #       codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"

@@ -171,6 +171,17 @@ build_usdviewer() {
                 if [ -f "$lib" ]; then
                     $script_dir/scripts/deployplugin.sh -d "$lib" -p "${prefix}"
                     $script_dir/scripts/deployxcode.sh -d "$lib" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
+
+                    # sign
+                    if [ -n "$developerid_identity" ]; then
+                        if [ "$sign_code" == "ON" ]; then
+                            echo "Developer ID signing of plugin for github distribution."
+                            codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime "$lib"
+                        fi
+                    else
+                        echo "Developer ID identity must be set for github distribution, will use ad-hoc sign."
+                        codesign --force --deep --sign - "$lib"
+                    fi
                 fi
             done
         else
@@ -180,6 +191,7 @@ build_usdviewer() {
         # sign
         if [ -n "$developerid_identity" ]; then
             if [ "$sign_code" == "ON" ]; then
+                echo "Developer ID signing of bundle for github distribution."
                 codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime "$xcode_type/${app_name}.app"
             fi
         else
@@ -187,12 +199,13 @@ build_usdviewer() {
             codesign --force --deep --sign - "$xcode_type/${app_name}.app"
         fi
 
-        # deploydmg
+        # deploy dmg
         $script_dir/scripts/deploydmg.sh -b "$xcode_type/${app_name}.app" -d "$dmg_file"
         if [ -n "$developerid_identity" ]; then
             if [ "$sign_code" == "ON" ]; then
-               codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"
-           fi
+                echo "Developer ID signing of bundle for github distribution."
+                codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"
+            fi
         else 
             echo "Developer ID identity must be set for github distribution, will use ad-hoc sign."
             codesign --force --deep --sign - "$dmg_file"

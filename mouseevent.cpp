@@ -20,7 +20,7 @@ MouseEvent::eventFilter(QObject* obj, QEvent* event)
     if (event->type() == QEvent::MouseButtonPress) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         if (mouseEvent->button() == Qt::LeftButton) {
-            emit pressed();
+            pressed();
         }
     }
     return QObject::eventFilter(obj, event);

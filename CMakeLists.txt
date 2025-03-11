@@ -3,7 +3,7 @@
 # https://github.com/mikaelsundell/usdviewer
 
 cmake_minimum_required (VERSION 3.27)
-set (project_name "usdviewer")
+set (project_name "USDViewer")
 
 project (${project_name})
 
@@ -40,7 +40,7 @@ if (APPLE)
     set (MACOSX_BUNDLE_INFO_STRING ${project_name})
     set (MACOSX_BUNDLE_BUNDLE_NAME ${project_name})
     set (MACOSX_BUNDLE_GUI_IDENTIFIER ${project_identifier})
-    set (MACOSX_BUNDLE_ICON_FILE usdviewer.icns)
+    set (MACOSX_BUNDLE_ICON_FILE AppIcon.icns)
     set (MACOSX_BUNDLE_LONG_VERSION_STRING "${project_version}")
     set (MACOSX_BUNDLE_SHORT_VERSION_STRING "${project_version}")
     set (MACOSX_BUNDLE_BUNDLE_VERSION ${MACOSX_BUNDLE_LONG_VERSION_STRING})
@@ -64,8 +64,6 @@ if (APPLE)
         Python3::Python
         OpenUSD::OpenUSD
         "-framework CoreFoundation"
-        "-framework CoreMedia"
-        "-framework CoreVideo"
         "-framework AppKit")
 
 elseif (WIN32)
@@ -92,6 +90,7 @@ target_compile_definitions(${project_name} PRIVATE
     -DPROJECT_COPYRIGHT="${project_copyright}"
     -DPROJECT_IDENTIFIER="${project_identifier}"
     -DGITHUB_URL="${project_url}"
+    -DQT_NO_KEYWORDS # tbb compatibility
 )
 
 target_include_directories(${project_name} PRIVATE ${CMAKE_SOURCE_DIR})

@@ -410,7 +410,6 @@ QDebug operator<<(QDebug debug, const UsdImagingGLRenderParams& params) {
                     << "\n  forceRefresh: " << params.forceRefresh
                     << "\n  flipFrontFacing: " << params.flipFrontFacing
                     << "\n  cullStyle: " << params.cullStyle
-                    << "\n  enableIdRender: " << params.enableIdRender
                     << "\n  enableLighting: " << params.enableLighting
                     << "\n  enableSampleAlphaToCoverage: " << params.enableSampleAlphaToCoverage
                     << "\n  applyRenderState: " << params.applyRenderState

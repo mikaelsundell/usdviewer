@@ -230,7 +230,6 @@ ViewCamera::camera() const
     return p->camera();
 }
 
-
 double
 ViewCamera::aspectRatio() const
 {

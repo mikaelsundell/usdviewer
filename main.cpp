@@ -2,8 +2,8 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdviewer.h"
 #include "test.h"
+#include "usdviewer.h"
 #include <QApplication>
 
 int

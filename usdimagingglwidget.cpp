@@ -148,7 +148,6 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.drawMode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE; // todo: changed to DRAW_SHADED_SMOOTH;
             d.params.forceRefresh = true;
             d.params.enableLighting = false;
-            d.params.enableIdRender = false;
             d.params.enableSampleAlphaToCoverage = false;
             d.params.enableSceneMaterials = false;
             d.params.enableSceneLights = true;

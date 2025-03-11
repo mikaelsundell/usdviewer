@@ -6,9 +6,22 @@
 #include "usdviewer.h"
 #include <QApplication>
 
+#include <pxr/base/plug/registry.h>
+#include <pxr/base/plug/plugin.h>
+
+#include <iostream>
+
 int
 main(int argc, char* argv[])
 {
+    pxr::PlugRegistry& instance = pxr::PlugRegistry::GetInstance();
+    pxr::PlugPluginPtrVector plugins = instance.GetAllPlugins();
+    std::cout << "LIST PLUGINS: START";
+    for (const auto& plugin : plugins) {
+        std::cout << "  Path: " << plugin->GetPath() << std::endl;
+    }
+    std::cout << "LIST PLUGINS: END";
+
     if (0) {
         test();
     }

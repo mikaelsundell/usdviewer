@@ -14,7 +14,8 @@ usage: $0 [options]
 Options:
    -h, --help              Print help message
    -v, --verbose           Print verbose output
-   -b, --bundle            Path to the .app bundle (required)
+   -b, --bundle            Path to the .app bundle (optional with --dylib)
+   -d, --dylib             Path to the dylib (optional with --bundle)   
    -x, --xcode             Path to the xcode location (required)
    -f, --framework         Path to the framework (required)
    -o, --overwrite         Overwrite existing files (default: false)
@@ -43,6 +44,9 @@ while test $i -lt $# ; do
         -b|--bundle) 
             i=$((i + 1)) 
             bundle=${argv[$i]};;
+        -d|--dylib) 
+            i=$((i + 1)) 
+            dylib=${argv[$i]};;
         -x|--xcode) 
             i=$((i + 1)) 
             xcode=${argv[$i]};;
@@ -59,24 +63,17 @@ while test $i -lt $# ; do
 done
 
 # test arguments
-if [ -z "${bundle}" ]; then
-    usage
-    exit 1
-fi
-
-if [ -z "${xcode}" ]; then
-    usage
-    exit 1
-fi
-
-if [ -z "${framework}" ]; then
-    usage
-    exit 1
-fi
-
-if [ ! -d "${bundle}" ]; then
-    echo "App bundle path '${bundle}' is not a directory."
-    exit 1
+if [ -d "${bundle}" ]; then
+    if [ -d "${dylib}" ]; then
+        echo "Error: Neither 'bundle' nor 'dylib' is specified. Exiting."
+        usage
+        exit 1
+    else 
+        if [ ! -d "${bundle}" ]; then
+            echo "App bundle path '${bundle}' is not a directory."
+            exit 1
+        fi
+    fi
 fi
 
 if [ ! -d "${xcode}" ]; then
@@ -135,22 +132,20 @@ function deploy_framework() {
             local deploy_id="@executable_path/../Frameworks/${framework_path}/Versions/Current/${framework_base}"
             local change_id="${dependency_path/@rpath/@executable_path/../Frameworks}"
 
-            # delete old rpaths
             local rpaths
             rpaths=$(otool -l "${deploy_path}" | awk '/cmd LC_RPATH/ {getline; getline; print $2}')
             while IFS= read -r rpath; do
                 if [[ "$rpath" == "${xcode_path}"* ]]; then
-                    echo "- deleting existing rpaths: $rpath"
+                    echo "- Deleting existing rpaths: $rpath"
                     install_name_tool -delete_rpath "$rpath" "$deploy_path"
                 fi
             done <<< "$rpaths"
 
-            # add new rpath
             local bundle_rpath="@executable_path/../Frameworks"
             if otool -l "$deploy_path" | grep -q "path $bundle_rpath"; then
                 echo "- rpath already exists: $bundle_rpath"
             else
-                echo "- adding new rpath: $bundle_rpath"
+                echo "- Adding new rpath: $bundle_rpath"
                 install_name_tool -add_rpath "${bundle_rpath}" "${deploy_path}" 
             fi
 
@@ -161,7 +156,7 @@ function deploy_framework() {
                 if echo "$processed_paths" | grep -q "|$depedency_absolute_path|"; then
                     continue
                 fi
-                echo "deploy for ${deploy_path}"
+                echo "Deploy for depedency: ${depedency_absolute_path}"
                 processed_paths="${processed_paths}|$depedency_absolute_path|"
                 deploy_framework "${depedency_absolute_path}" "${xcode_path}" "${framework_path}" "${framework_dir_path}"
             fi
@@ -171,24 +166,28 @@ function deploy_framework() {
 
 # main
 function main {
-    frameworks_dir="${bundle}/Contents/Frameworks"
-    if [ ! -d "$frameworks_dir" ]; then
-        echo "Creating Frameworks directory: $frameworks_dir"
-        mkdir -p "$frameworks_dir"
+    if [ -d "${bundle}" ]; then
+        frameworks_dir="${bundle}/Contents/Frameworks"
+        if [ ! -d "$frameworks_dir" ]; then
+            echo "Creating Frameworks directory: $frameworks_dir"
+            mkdir -p "$frameworks_dir"
+        fi
+        copy_framework "${xcode}" "${framework}" "${frameworks_dir}"
+
+        macos_dir="${bundle}/Contents/MacOS"
+        executables=($(find "$macos_dir" -type f -perm +111))
+        if [ ${#executables[@]} -eq 0 ]; then
+            echo "No executables found in ${macos_dir}"
+            return 1
+        fi
+
+        for exe in "${executables[@]}"; do
+            deploy_framework "${exe}" "${xcode}" "${framework}" "${frameworks_dir}"
+        done
     fi
-
-    copy_framework "${xcode}" "${framework}" "${frameworks_dir}"
-
-    macos_dir="${bundle}/Contents/MacOS"
-    executables=($(find "$macos_dir" -type f -perm +111))
-    if [ ${#executables[@]} -eq 0 ]; then
-        echo "No executables found in ${macos_dir}"
-        return 1
+    if [ -d "${dylib}" ]; then
+        deploy_framework "${dylib}" "${xcode}" "${framework}" "${frameworks_dir}"
     fi
-
-    for exe in "${executables[@]}"; do
-        deploy_framework "$exe" "${xcode}" "${framework}" "${frameworks_dir}"
-    done
 }
 
 main

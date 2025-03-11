@@ -136,43 +136,65 @@ build_usdviewer() {
         fi
 
         # deploy
-        $script_dir/scripts/macdeploy.sh -b "$xcode_type/${app_name}.app" -m "$prefix/bin/macdeployqt"
+        debug=""
+        if [ "$build_type" = "debug" ]; then
+            debug="-no-strip -verbose=1"
+        fi
+        $prefix/bin/macdeployqt "$xcode_type/${app_name}.app" ${debug}
 
         # python
-        $script_dir/scripts//macxcode.sh -b "$xcode_type/${app_name}.app" -f "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
+        echo "Deploy xcode shared frameworks"
+        $script_dir/scripts/macxcode.sh -b "$xcode_type/${app_name}.app" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
 
-        # usd plugins
-        plugins="$prefix/lib/usd"
-        app_plugins="$xcode_type/${app_name}.app/Contents/Frameworks"
+        # usd plugin info
+        echo "Deploy usd plugin info"
+        plugininfo="$prefix/lib/usd"
+        frameworks="$xcode_type/${app_name}.app/Contents/Frameworks"
 
-        if [ -d "$plugins" ]; then
-            echo "Copy usd plugins to bundle $app_plugins"
-            mkdir -p "$app_plugins"
-            cp -R "$plugins" "$app_plugins"
+        if [ -d "$plugininfo" ]; then
+            echo "Copy usd plugininfo to bundle $frameworks"
+            cp -R "$plugininfo" "$frameworks"
         else
-            echo "Could not find usd plugins, will be skipped."
+            echo "Could not copy usd plugin info to Frameworks, will be skipped."
         fi
 
-        # todo: temp
-        codesign --force --deep --sign - "$xcode_type/${app_name}.app"
+        # usd plugin
+        echo "Deploy usd plugin"
+        plugin="$prefix/plugin"
+        contents="$xcode_type/${app_name}.app/Contents"
+
+        if [ -d "$plugin" ]; then
+            echo "Copy usd plugin to bundle $contents"
+            cp -R "$plugin" "$contents"
+
+            for lib in "$contents"/plugin/usd/*.dylib; do
+                if [ -f "$lib" ]; then
+                    echo $script_dir/scripts/macxcode.sh -d "$lib" -x "/Applications/Xcode.app/Contents/Developer/Library/Frameworks" -f "Python3.framework"
+                fi
+            done
+        else
+            echo "Could not copy usd plugins Contents, will be skipped."
+        fi
 
         # sign
         if [ -n "$developerid_identity" ]; then
             if [ "$sign_code" == "ON" ]; then
                 codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime "$xcode_type/${app_name}.app"
             fi
-        else 
-            echo "Developer ID identity must be set for github distribution, sign will be skipped."
+        else
+            echo "Developer ID identity must be set for github distribution, will use ad-hoc sign."
+            codesign --force --deep --sign - "$xcode_type/${app_name}.app"
         fi
 
         # deploydmg
         #$script_dir/scripts/macdmg.sh -b "$xcode_type/${app_name}.app" -d "$dmg_file"
         #if [ -n "$developerid_identity" ]; then
         #    if [ "$sign_code" == "ON" ]; then
-        #        codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"
-        #    fi
+        #       codesign --force --deep --sign "$developerid_identity" --timestamp --options runtime --verbose "$dmg_file"
+        #   fi
         #else 
-        #    echo "Developer ID identity must be set for github distribution, sign will be skipped."
+        #    echo "Developer ID identity must be set for github distribution, will use ad-hoc sign."
+        #    codesign --force --deep --sign - "$dmg_file"
         #fi
     fi
 }

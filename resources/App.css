@@ -1,0 +1,490 @@
+/* Copyright 2022-present Contributors to the jobman project.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * https://github.com/mikaelsundell/jobman
+ */
+
+/* Top-level widgets */
+QMainWindow,
+QDialog
+{
+    background-color: hsl(220, 30%, 6%);
+}
+
+/* QCheckBox widgets */
+QCheckBox
+{
+    font-size: 11px;
+    spacing: 5px;
+    padding-left: 2px;
+    color: hsl(0, 0%, 80%);
+}
+
+QCheckBox::indicator {
+    background-color: hsl(220, 8%, 15%);
+    width: 20px;
+    height: 20px;
+}
+
+QCheckBox::indicator:checked {
+    image: url(":/icons/resources/Checkbox.png");
+}
+
+/* QComboBox widgets */
+QComboBox {
+    font-size: 11px;
+    color: hsl(0, 0%, 80%);
+    background-color: hsl(220, 8%, 15%);
+    padding: 4px;
+    padding-left: 10px;
+    margin-bottom: 2px;
+    border-radius: 0px;
+    outline: none;
+    border: 0px;
+    selection-background-color: hsl(220, 30%, 12%);
+}
+
+QComboBox::down-arrow {
+    image: url(":/icons/resources/Dropdown.png");
+    width: 12px;
+    height: 12px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 16px;
+    right: 4px;
+    border: 0px;
+    background: transparent;
+}
+
+QComboBox QAbstractItemView {
+    color: #FFFFFF;
+    background: hsl(220, 8%, 15%);
+    border: none;
+    outline: none;
+    selection-background-color: hsl(220, 30%, 12%);
+    selection-color: hsl(0, 0%, 80%);
+}
+
+QComboBox QAbstractItemView::item {
+    outline: none;
+    border: none;
+    padding: 4px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background: hsl(220, 30%, 12%);
+    color: hsl(0, 0%, 80%);
+    outline: none;
+    border: none;
+}
+
+/* QLabel widgets */
+QLabel {
+    font-size: 11px;
+    color: hsl(0, 0%, 80%);
+}
+
+/* QLineEdit widgets */
+QLineEdit
+{
+    font-size: 11px;
+    color: hsl(0, 0%, 80%);
+    background-color: hsl(220, 8%, 15%);
+    padding: 4px;
+    padding-left: 10px;
+    border-radius: 0px;
+    selection-background-color: hsl(220, 30%, 12%);
+}
+
+/* QListWidget widgets */
+QListView
+{
+    font-size: 11px;
+    font-weight: normal;
+    color: hsl(0, 0%, 80%);
+    outline: none;
+    background-color: hsl(220, 30%, 6%);
+    selection-background-color: hsl(220, 30%, 8%);
+}
+
+QListView::item {
+    height: 25px;
+    background: hsl(220, 30%, 8%);
+}
+
+QListView::item:alternate {
+    background: hsl(220, 30%, 6%);
+}
+
+QListView::item:selected:active {
+    background: hsl(220, 30%, 12%);
+}
+
+QListView::item:selected:!active {
+    color: hsl(0, 0%, 80%);
+    background: hsl(220, 30%, 12%);
+}
+
+/* QMenu widgets */
+QMenu
+{
+    font-size: 10px;
+    color: hsl(0, 0%, 80%);
+    background-color: hsl(220, 30%, 6%);
+    padding: 4px;
+    border-radius: 0px;
+    
+}
+
+QMenu::item {
+    padding: 6px 20px;
+    background-color: transparent;
+}
+
+QMenu::item:selected {
+    background: hsl(220, 30%, 12%);
+}
+
+QMenu::item:disabled {
+    color: gray;
+    background-color: transparent;
+}
+
+QMenu::right-arrow {
+    image: url(":/icons/resources/Right.png");
+    width: 12px;
+    height: 12px;
+}
+
+/* QWidgets widgets */
+QWidget#filedropBar,
+QWidget#logBar,
+QWidget#messageBar,
+QWidget#monitorBar,
+QWidget#preferencesBar,
+QWidget#presetBar
+{
+    background-color: hsl(220, 30%, 12%);
+    border-radius: 5px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+QWidget#filedropWidget,
+QWidget#logWidget,
+QWidget#monitorWidget,
+QWidget#optionsWidget,
+QWidget#preferencesWidget,
+QWidget#presetWidget
+{
+    background-color: hsl(220, 30%, 8%);
+    border-radius: 5px;
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
+}
+
+QWidget#optionswidget
+{
+    background-color: hsl(220, 30%, 8%);
+}
+
+/* QPushButton widgets */
+QPushButton
+{
+    font-size: 11px;
+    color:  hsl(0, 0%, 80%);
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 hsl(220, 6%, 20%),
+        stop: 1.0 hsl(220, 6%, 24%)
+    );
+    height: 20px;        
+    border: 1px solid hsl(220, 3%, 33%);
+    border-radius: 0px;        
+    padding: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+QPushButton:default
+{
+    font-weight: bold;
+    padding-left: 8px;
+    padding-right: 8px;
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 hsl(220, 6%, 20%),
+        stop: 1.0 hsl(220, 6%, 24%)
+    );
+}
+
+QPushButton:disabled
+{
+    color:  hsl(0, 0%, 40%);
+}
+
+QPushButton:pressed
+{
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 hsl(220, 6%, 14%),
+        stop: 1.0 hsl(220, 6%, 18%)
+    );
+}
+
+/* QProgressBar widgets */
+QProgressBar {
+    min-height: 10px;
+    max-height: 10px; 
+    border-radius: 4px;
+    background-color: hsl(220, 8%, 15%);
+}
+
+QProgressBar::chunk {
+    border-radius: 4px;
+    background-color: hsl(216, 82%, 20%);
+}
+
+/* QScrollArea widgets */
+QScrollArea
+{
+    background-color: hsl(220, 30%, 8%);
+    border: 0px;
+}
+
+/* QSplitter widgets */
+QSplitter::handle {
+    background-color: hsl(220, 30%, 8%);
+    height: 5px;
+}
+
+/* QTextBrowser widgets */
+QTextBrowser
+{
+    color: hsl(0, 0%, 80%);
+    font-size: 11px;
+    font-weight: normal;
+    border: 0px;
+    background: hsl(220, 30%, 6%);
+    selection-background-color: hsl(220, 30%, 12%);
+}
+
+QTextBrowser:!active 
+{
+    color: hsl(0, 0%, 80%);
+    background: hsl(220, 30%, 6%);
+}
+
+/* QTreeView widgets */
+QTreeView
+{
+    font-size: 11px;
+    font-weight: normal;
+    color: hsl(0, 0%, 80%);
+    border: 0px;
+    background: hsl(220, 30%, 6%);
+    outline: none;
+    selection-background-color: hsl(216, 82%, 80%);
+}
+
+QTreeView::item {
+    height: 20px;
+    background: hsl(220, 30%, 8%);
+}
+
+QTreeView::item:alternate {
+    background: hsl(220, 30%, 6%);
+}
+
+QTreeView::item:selected:active {
+    background: hsl(220, 30%, 12%);
+}
+
+QTreeView::item:selected:!active {
+    color: hsl(0, 0%, 80%);
+    background: hsl(220, 30%, 12%);
+}
+
+QTreeView QHeaderView:section
+{
+    color: hsl(0, 0%, 80%);
+    font-size: 10px;
+    font-weight: normal;
+    border: 1px solid hsl(220, 0%, 10%);
+    background-color: hsl(220, 30%, 12%);
+    padding: 4px;
+}
+
+/* QToolButton widgets */
+QToolButton
+{
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 hsl(220, 6%, 20%),
+        stop: 1.0 hsl(220, 6%, 24%)
+    );   
+    border: 1px solid hsl(220, 3%, 33%);
+    padding: 2px;
+}
+
+QToolButton:pressed
+{
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 hsl(220, 6%, 14%),
+        stop: 1.0 hsl(220, 6%, 18%)
+    );
+}
+
+QToolButton#togglePreset
+{
+    padding: 2px;
+    border: 0px;
+    background-color: transparent;
+}
+
+QToolButton#toggleFiledrop
+{
+    padding: 2px;
+    border: 0px;
+    background-color: transparent;
+}
+
+QToolButton#showSaveto
+{
+    padding: 2px;
+    border: 0px;
+    background-color: transparent;
+}
+
+QToolButton#toggleLog
+{
+    padding: 2px;
+    border: 0px;
+    background-color: transparent;
+}
+
+/* QScrollBar widgets */
+QScrollBar:horizontal {
+    background: hsl(220, 8%, 15%);
+    height: 10px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background: hsl(0, 0%, 80%);
+    min-width: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: hsl(0, 0%, 70%);
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: none;
+    width: 0;
+}
+
+QScrollBar::left-arrow:horizontal,
+QScrollBar::right-arrow:horizontal {
+    background: none;
+    width: 0;
+    height: 0;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
+QScrollBar:vertical {
+    background: hsl(220, 8%, 15%);
+    width: 10px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background: hsl(0, 0%, 80%);
+    min-height: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: hsl(0, 0%, 80%);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: none;
+    height: 0;
+}
+
+QScrollBar::up-arrow:vertical,
+QScrollBar::down-arrow:vertical {
+    background: none;
+    width: 0;
+    height: 0;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QAbstractScrollArea::corner { 
+    background: hsl(220, 8%, 15%);
+}
+
+/* QSlider widgets */
+QSlider
+{
+    margin: 0px;
+}
+
+QSlider::groove:horizontal
+{
+    height: 5px;
+    background-color: hsl(220, 8%, 15%);
+    border: 1px solid black;
+    border-radius: 3px;
+    margin: 2px 0;
+}
+
+QSlider::sub-page:horizontal
+{
+    height: 5px;
+    background-color: hsl(220, 6%, 30%);
+    border: 1px solid black;
+    border-radius: 4px;
+    margin: 2px 0;
+}
+
+QSlider::handle:horizontal
+{
+    background: hsl(0, 0%, 59%);
+    width: 13px;
+    margin: -4px 0;
+    border-radius: 6px;
+}
+
+/* Custom widgets */
+Filedrop {
+    border: 2px solid hsl(220, 30%, 6%);
+    background-color: hsl(220, 30%, 6%);
+}
+
+Filedrop[dragging="true"] {
+    border: 2px dashed hsl(225, 3%, 29%);
+    background-color: hsl(220, 30%, 6%);
+}

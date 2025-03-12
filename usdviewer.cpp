@@ -3,7 +3,9 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
+#include "icctransform.h"
 #include "mouseevent.h"
+#include "platform.h"
 #include "usdoutlineritem.h"
 #include "usdstage.h"
 #include <QActionGroup>
@@ -34,7 +36,10 @@ class ViewerPrivate : public QObject {
         Selection* selection();
         QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
         void setSettingsValue(const QString& key, const QVariant& value);
-
+        bool eventFilter(QObject* object, QEvent* event);
+        void profile();
+        void stylesheet();
+    
     public Q_SLOTS:
         void open();
         void ready();
@@ -73,6 +78,13 @@ ViewerPrivate::ViewerPrivate() { d.extensions = { ".usd", ".usda", ".usdz" }; }
 void
 ViewerPrivate::init()
 {
+    platform::setDarkTheme();
+    // icc profile
+    ICCTransform* transform = ICCTransform::instance();
+    QDir resources(platform::getApplicationPath() + "/Resources");
+    QString inputProfile = resources.filePath("sRGB2014.icc"); // built-in Qt input profile
+    transform->setInputProfile(inputProfile);
+    profile();
     d.ui.reset(new Ui_Usdviewer());
     d.ui->setupUi(d.viewer.data());
     // clear color
@@ -80,6 +92,8 @@ ViewerPrivate::init()
     d.ui->clearcolor->setStyleSheet("background-color: " + d.clearColor.name() + ";");
     d.clearColorFilter.reset(new MouseEvent);
     d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
+    // event filter
+    d.viewer->installEventFilter(this);
     // selection
     d.selection.reset(new Selection());
     // renderer
@@ -133,6 +147,20 @@ ViewerPrivate::init()
             &ImagingGLWidget::updateSelection);
     connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget,
             &OutlinerWidget::updateSelection);
+    // stylesheet
+    stylesheet();
+    // debug
+    #ifdef QT_DEBUG
+        QMenu* menu = d.ui->menubar->addMenu("Debug");
+        {
+            QAction* action = new QAction("Reload stylesheet...", this);
+            action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+            menu->addAction(action);
+            connect(action, &QAction::triggered, [&]() {
+                this->stylesheet();
+            });
+        }
+    #endif
 }
 
 void
@@ -179,6 +207,60 @@ ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value)
 {
     QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
     settings.setValue(key, value);
+}
+
+bool
+ViewerPrivate::eventFilter(QObject* object, QEvent* event)
+{
+    if (event->type() == QEvent::ScreenChangeInternal) {
+        profile();
+        stylesheet();
+    }
+    return QObject::eventFilter(object, event);
+}
+
+void
+ViewerPrivate::profile()
+{
+    QString outputProfile = platform::getIccProfileUrl(d.viewer->winId());
+    // icc profile
+    ICCTransform* transform = ICCTransform::instance();
+    transform->setOutputProfile(outputProfile);
+}
+
+void
+ViewerPrivate::stylesheet()
+{
+    QFile stylesheet(platform::getApplicationPath() + "/Resources/App.css");
+    stylesheet.open(QFile::ReadOnly);
+    QString qss = stylesheet.readAll();
+    QRegularExpression hslRegex("hsl\\(\\s*(\\d+)\\s*,\\s*(\\d+)%\\s*,\\s*(\\d+)%\\s*\\)");
+    QString transformqss = qss;
+    QRegularExpressionMatchIterator i = hslRegex.globalMatch(transformqss);
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+        if (match.hasMatch()) {
+            if (!match.captured(1).isEmpty() &&
+                !match.captured(2).isEmpty() &&
+                !match.captured(3).isEmpty())
+            {
+                int h = match.captured(1).toInt();
+                int s = match.captured(2).toInt();
+                int l = match.captured(3).toInt();
+                QColor color = QColor::fromHslF(h / 360.0f, s / 100.0f, l / 100.0f);
+                // icc profile
+                ICCTransform* transform = ICCTransform::instance();
+                color = transform->map(color.rgb());
+                QString hsl = QString("hsl(%1, %2%, %3%)")
+                                .arg(color.hue() == -1 ? 0 : color.hue())
+                                .arg(static_cast<int>(color.hslSaturationF() * 100))
+                                .arg(static_cast<int>(color.lightnessF() * 100));
+                
+                transformqss.replace(match.captured(0), hsl);
+            }
+        }
+    }
+    qApp->setStyleSheet(transformqss);
 }
 
 void

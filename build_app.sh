@@ -126,7 +126,7 @@ build_usdviewer() {
     xcode_type=$(echo "$build_type" | awk '{ print toupper(substr($0, 1, 1)) tolower(substr($0, 2)) }')
 
     # build
-    cmake .. -DDEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" -DCMAKE_MODULE_PATH="$script_dir/modules" -DCMAKE_PREFIX_PATH="$prefix" -G Xcode
+    cmake .. -DCMAKE_MODULE_PATH="$script_dir/modules" -DCMAKE_PREFIX_PATH="$prefix" -G Xcode
     cmake --build . --config $xcode_type --parallel &&
 
     if [ "$github" == "ON" ]; then

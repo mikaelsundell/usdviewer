@@ -17,6 +17,7 @@ set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package (OpenUSD REQUIRED)
 find_package (Boost CONFIG COMPONENTS Python REQUIRED)
 find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package (Lcms2 REQUIRED)
 
 if (WIN32)
     find_package (OpenGL REQUIRED)
@@ -27,20 +28,26 @@ file (GLOB project_sources
     "${CMAKE_SOURCE_DIR}/*.cpp"
     "${CMAKE_SOURCE_DIR}/*.ui"
 )
+list (FILTER project_sources EXCLUDE REGEX "_")
 
-set (project_bundle
-    "${CMAKE_SOURCE_DIR}/resources/MacOSXBundle.plist.in"
+file (GLOB project_resources
+    "${CMAKE_SOURCE_DIR}/resources/*.icc"
+    "${CMAKE_SOURCE_DIR}/resources/*.css"
 )
 
-set (project_version "0.0.0")
+# source groups
+source_group ("Resource Files" FILES ${project_resources})
+
+set (project_version "1.0.0")
 set (project_copyright "Copyright 2025-present Contributors to the ${app_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
 if (APPLE)
-    file (GLOB project_resources
-        "${CMAKE_SOURCE_DIR}/resources/*.icns"
+    set (project_bundle
+        "${CMAKE_SOURCE_DIR}/resources/MacOSXBundle.plist.in"
     )
+    list (FILTER project_sources EXCLUDE REGEX "_win\\.cpp$")
     set (MACOSX_BUNDLE_EXECUTABLE_NAME ${project_name})
     set (MACOSX_BUNDLE_INFO_STRING ${project_name})
     set (MACOSX_BUNDLE_BUNDLE_NAME ${project_name})
@@ -50,14 +57,9 @@ if (APPLE)
     set (MACOSX_BUNDLE_SHORT_VERSION_STRING "${project_version}")
     set (MACOSX_BUNDLE_BUNDLE_VERSION ${MACOSX_BUNDLE_LONG_VERSION_STRING})
     set (MACOSX_BUNDLE_COPYRIGHT ${project_copyright})
+    set (MACOSX_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
     set_source_files_properties(${project_resources} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-
-    if (DEFINED DEPLOYMENT_TARGET)
-        set(MACOSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
-    else()
-        set(MACOSX_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
-    endif()
-
+    list (APPEND project_sources platform_mac.mm)
     add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_resources})
 
     set_target_properties (${project_name} PROPERTIES
@@ -71,12 +73,14 @@ if (APPLE)
         Boost::python
         OpenUSD::OpenUSD
         Python3::Python
+        ${LCMS2_LIBRARY}
         "-framework CoreFoundation"
         "-framework AppKit")
 
 elseif (WIN32)
-    add_executable (${project_name} WIN32 ${project_sources})
-    target_compile_definitions(${project_name} PRIVATE 
+    list (APPEND project_sources platform_win.cpp)
+    add_executable (${project_name} WIN32 ${project_sources} ${project_resources})
+    target_compile_definitions (${project_name} PRIVATE 
         WIN32
         WINVER=0x0A00
         $<$<CONFIG:Debug>:TBB_USE_DEBUG=1>
@@ -88,15 +92,16 @@ elseif (WIN32)
         OpenGL::GL
         OpenUSD::OpenUSD
         Python3::Python
+        ${LCMS2_LIBRARY}
         "User32.lib"
         "Gdi32.lib"
         "Shell32.lib"
     )
-    set(app_icon "${CMAKE_SOURCE_DIR}/resources/resources.rc")
-    target_sources(${project_name} PRIVATE ${app_icon})
+    set (app_icon "${CMAKE_SOURCE_DIR}/resources/resources.rc")
+    target_sources (${project_name} PRIVATE ${app_icon})
 
-    set(app_debug ${CMAKE_BINARY_DIR}/Debug)
-    set(app_release ${CMAKE_BINARY_DIR}/Release)
+    set (app_debug ${CMAKE_BINARY_DIR}/Debug)
+    set (app_release ${CMAKE_BINARY_DIR}/Release)
     foreach(resource_file ${app_resources})
         get_filename_component(resource_name ${resource_file} NAME)
         add_custom_command(TARGET ${project_name} POST_BUILD
@@ -108,12 +113,12 @@ elseif (WIN32)
                 $<$<CONFIG:Debug>:${app_debug}/Resources/${resource_name}>
                 $<$<CONFIG:Release>:${app_release}/Resources/${resource_name}>
         )
-    endforeach()
+    endforeach ()
 else ()
-    message(WARNING "Unknown platform. ${project_name} may not be built correctly.")
+    message (WARNING "Unknown platform. ${project_name} may not be built correctly.")
 endif ()
 
-target_compile_definitions(${project_name} PRIVATE
+target_compile_definitions (${project_name} PRIVATE
     -DPROJECT_NAME="${project_name}"
     -DPROJECT_VERSION="${project_version}"
     -DPROJECT_COPYRIGHT="${project_copyright}"
@@ -122,4 +127,4 @@ target_compile_definitions(${project_name} PRIVATE
     -DQT_NO_KEYWORDS # tbb compatibility
 )
 
-target_include_directories(${project_name} PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories (${project_name} PRIVATE ${CMAKE_SOURCE_DIR})

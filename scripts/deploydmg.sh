@@ -7,7 +7,7 @@
 usage()
 {
 cat << EOF
-macdeploy.sh -- Deploy mac bundle to dmg including depedencies 
+deploydmg.sh -- Deploy a mac bundle as a dmg
 
 usage: $0 [options]
 

@@ -7,7 +7,7 @@
 usage()
 {
 cat << EOF
-macpython.sh -- Deploy a python mac bundle
+deployplugin.sh -- Deploy a usd plugin
 
 usage: $0 [options]
 

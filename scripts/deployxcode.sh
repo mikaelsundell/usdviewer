@@ -7,7 +7,7 @@
 usage()
 {
 cat << EOF
-macpython.sh -- Deploy a python mac bundle
+deployxcode.sh -- Deploy a xcode shared framework
 
 usage: $0 [options]
 
@@ -63,17 +63,24 @@ while test $i -lt $# ; do
 done
 
 # test arguments
-if [ !-z "${bundle}" ]; then
-    if [ -z "${dylib}" ]; then
-        echo "Error: Neither 'bundle' nor 'dylib' is specified. Exiting."
-        usage
+if [ -n "${bundle}" ] && [ -n "${dylib}" ]; then
+    echo "Error: Both 'bundle' and 'dylib' are specified. Only one is allowed."
+    usage
+    exit 1
+elif [ -n "${dylib}" ]; then
+    if [ ! -f "${dylib}" ]; then
+        echo "Error: Dylib path '${dylib}' is not a file."
         exit 1
-    else 
-        if [ ! -d "${bundle}" ]; then
-            echo "App bundle path '${bundle}' is not a directory."
-            exit 1
-        fi
     fi
+elif [ -n "${bundle}" ]; then
+    if [ ! -d "${bundle}" ]; then
+        echo "Error: App bundle path '${bundle}' is not a directory."
+        exit 1
+    fi
+else
+    echo "Error: Neither 'bundle' nor 'dylib' is specified. Exiting."
+    usage
+    exit 1
 fi
 
 if [ ! -d "${xcode}" ]; then

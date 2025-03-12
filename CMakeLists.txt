@@ -24,38 +24,40 @@ if (WIN32)
 endif ()
 
 file (GLOB project_sources
-    "${CMAKE_SOURCE_DIR}/*.h"
-    "${CMAKE_SOURCE_DIR}/*.cpp"
-    "${CMAKE_SOURCE_DIR}/*.ui"
+    "*.h"
+    "*.cpp"
+    "*.ui"
 )
 list (FILTER project_sources EXCLUDE REGEX "_")
 
 file (GLOB project_resources
-    "${CMAKE_SOURCE_DIR}/resources/*.icc"
-    "${CMAKE_SOURCE_DIR}/resources/*.css"
+    "resources/*.icc"
+    "resources/*.css"
+    "resources/*.icns"
 )
 
 # source groups
+source_group ("Icon Files" FILES ${project_icons})
 source_group ("Resource Files" FILES ${project_resources})
 
-set (project_version "1.0.0")
 set (project_copyright "Copyright 2025-present Contributors to the ${app_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
+set (project_long_version "1.2.0")
+set (project_short_version "1.2")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
 if (APPLE)
     set (project_bundle
         "${CMAKE_SOURCE_DIR}/resources/MacOSXBundle.plist.in"
     )
-    list (FILTER project_sources EXCLUDE REGEX "_win\\.cpp$")
     set (MACOSX_BUNDLE_EXECUTABLE_NAME ${project_name})
     set (MACOSX_BUNDLE_INFO_STRING ${project_name})
     set (MACOSX_BUNDLE_BUNDLE_NAME ${project_name})
     set (MACOSX_BUNDLE_GUI_IDENTIFIER ${project_identifier})
     set (MACOSX_BUNDLE_ICON_FILE AppIcon.icns)
-    set (MACOSX_BUNDLE_LONG_VERSION_STRING "${project_version}")
-    set (MACOSX_BUNDLE_SHORT_VERSION_STRING "${project_version}")
-    set (MACOSX_BUNDLE_BUNDLE_VERSION ${MACOSX_BUNDLE_LONG_VERSION_STRING})
+    set (MACOSX_BUNDLE_LONG_VERSION_STRING ${project_short_version})
+    set (MACOSX_BUNDLE_SHORT_VERSION_STRING ${project_short_version})
+    set (MACOSX_BUNDLE_BUNDLE_VERSION ${project_long_version})
     set (MACOSX_BUNDLE_COPYRIGHT ${project_copyright})
     set (MACOSX_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
     set_source_files_properties(${project_resources} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
@@ -63,9 +65,13 @@ if (APPLE)
     add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_resources})
 
     set_target_properties (${project_name} PROPERTIES
-        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${project_identifier}"
         XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${MACOSX_DEPLOYMENT_TARGET}"
         MACOSX_BUNDLE_INFO_PLIST "${project_bundle}"
+    )
+
+    set_target_properties (${project_name} PROPERTIES
+        OUTPUT_NAME ${project_name}
     )
 
     target_link_libraries (${project_name} 

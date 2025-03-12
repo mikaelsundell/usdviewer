@@ -44,8 +44,14 @@ if (APPLE)
     set (MACOSX_BUNDLE_LONG_VERSION_STRING "${project_version}")
     set (MACOSX_BUNDLE_SHORT_VERSION_STRING "${project_version}")
     set (MACOSX_BUNDLE_BUNDLE_VERSION ${MACOSX_BUNDLE_LONG_VERSION_STRING})
-    set (MACOSX_BUNDLE_COPYRIGHT "Copyright 2022-present Contributors to the ${app_name} project")
+    set (MACOSX_BUNDLE_COPYRIGHT ${project_copyright})
     set_source_files_properties(${project_resources} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+    if (DEFINED DEPLOYMENT_TARGET)
+        set(MACOSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
+    else()
+        set(MACOSX_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
+    endif()
 
     add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_icon} ${project_resources})
 
@@ -54,10 +60,6 @@ if (APPLE)
         XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${MACOSX_DEPLOYMENT_TARGET}"
         MACOSX_BUNDLE_INFO_PLIST "${project_bundle}"
     )
-
-    if (NOT DEFINED MACOSX_DEPLOYMENT_TARGET)
-        set(MACOSX_DEPLOYMENT_TARGET "15.2")
-    endif()
 
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets

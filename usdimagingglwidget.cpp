@@ -349,7 +349,7 @@ ImagingGLWidgetPrivate::cleanUp()
 {
 }
 
-#include "usdimagingglwidget.moc"
+//#include "usdimagingglwidget.moc"
 
 ImagingGLWidget::ImagingGLWidget(QWidget* parent)
 : QOpenGLWidget(parent)
@@ -449,6 +449,7 @@ ImagingGLWidget::setStage(const Stage& stage)
 {
     p->initStage(stage);
     update();
+    return true;
 }
 
 

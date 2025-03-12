@@ -47,11 +47,11 @@ class ViewCamera {
         FovDirection fovDirection() const;
         void setFovDirection(ViewCamera::FovDirection direction);
     
-        double near() const;
-        void setNear(double near);
+        double nearClipping() const;
+        void setNearClipping(double near);
     
-        double far() const;
-        void setFar(double near);
+        double farClipping() const;
+        void setFarClipping(double near);
     
         ViewCamera& operator=(const ViewCamera& other);
         

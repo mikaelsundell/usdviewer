@@ -15,7 +15,12 @@ set (CMAKE_AUTORCC ON)
 set (CMAKE_AUTOUIC ON)
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package (OpenUSD REQUIRED)
+find_package (Boost CONFIG COMPONENTS Python REQUIRED)
 find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
+
+if (WIN32)
+    find_package (OpenGL REQUIRED)
+endif ()
 
 file (GLOB project_sources
     "${CMAKE_SOURCE_DIR}/*.h"
@@ -53,7 +58,7 @@ if (APPLE)
         set(MACOSX_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
     endif()
 
-    add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_icon} ${project_resources})
+    add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_resources})
 
     set_target_properties (${project_name} PROPERTIES
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
@@ -63,28 +68,50 @@ if (APPLE)
 
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
-        Python3::Python
+        Boost::python
         OpenUSD::OpenUSD
+        Python3::Python
         "-framework CoreFoundation"
         "-framework AppKit")
 
 elseif (WIN32)
-    set (APP_ICON "AppIcon.ico")
-    add_executable (${project_name} WIN32 ${app_sources} ${APP_ICON})
-
-    target_link_libraries (${project_name}
+    add_executable (${project_name} WIN32 ${project_sources})
+    target_compile_definitions(${project_name} PRIVATE 
+        WIN32
+        WINVER=0x0A00
+        $<$<CONFIG:Debug>:TBB_USE_DEBUG=1>
+    )
+    target_include_directories (${project_name} PRIVATE ${LCMS2_INCLUDE_DIR})
+    target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
-        d3d11 dxgi dwmapi)
+        Boost::python
+        OpenGL::GL
+        OpenUSD::OpenUSD
+        Python3::Python
+        "User32.lib"
+        "Gdi32.lib"
+        "Shell32.lib"
+    )
+    set(app_icon "${CMAKE_SOURCE_DIR}/resources/resources.rc")
+    target_sources(${project_name} PRIVATE ${app_icon})
 
-elseif (UNIX)
-    add_executable (${project_name} ${APP_SOURCES})
-    target_link_libraries (${project_name}
-        Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
-        pthread dl)
-
-else()
+    set(app_debug ${CMAKE_BINARY_DIR}/Debug)
+    set(app_release ${CMAKE_BINARY_DIR}/Release)
+    foreach(resource_file ${app_resources})
+        get_filename_component(resource_name ${resource_file} NAME)
+        add_custom_command(TARGET ${project_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<$<CONFIG:Debug>:${app_release}/Resources>
+                $<$<CONFIG:Release>:${app_release}/Resources>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${resource_file}
+                $<$<CONFIG:Debug>:${app_debug}/Resources/${resource_name}>
+                $<$<CONFIG:Release>:${app_release}/Resources/${resource_name}>
+        )
+    endforeach()
+else ()
     message(WARNING "Unknown platform. ${project_name} may not be built correctly.")
-endif()
+endif ()
 
 target_compile_definitions(${project_name} PRIVATE
     -DPROJECT_NAME="${project_name}"

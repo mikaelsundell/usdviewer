@@ -26,8 +26,8 @@ public:
     {
         double aspectRatio;
         double fov;
-        double near;
-        double far;
+        double nearClipping;
+        double farClipping;
         double fit;
         double distance;
         GfMatrix4d inverseUp;
@@ -51,8 +51,8 @@ ViewCameraPrivate::init()
 {
     d.aspectRatio = 1.0;
     d.fov = 60.0;
-    d.near = 1;
-    d.far = 2000000;
+    d.nearClipping = 1;
+    d.farClipping = 2000000;
     d.fit = 1.1;
     d.inverseUp = GfMatrix4d(1.0);
     d.cameraUp = ViewCamera::Y;
@@ -76,8 +76,8 @@ ViewCameraPrivate::frameAll()
     }
     double length = maxsize * d.fit * 0.5;
     d.distance = length / std::atan(fovangle * M_PI / 180.0);
-    if (d.distance < d.near + maxsize * 0.5) {
-        d.distance = d.near + length;
+    if (d.distance < d.nearClipping + maxsize * 0.5) {
+        d.distance = d.nearClipping + length;
     }
     d.valid = false;
 }
@@ -150,7 +150,7 @@ ViewCameraPrivate::camera()
         d.camera.SetTransform(matrix);
         d.camera.SetFocusDistance(d.distance);
         d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectRatio, d.fov, GfCamera::FOVVertical);
-        d.camera.SetClippingRange(GfRange1f(d.near, d.far));
+        d.camera.SetClippingRange(GfRange1f(d.nearClipping, d.farClipping));
         CameraUtilConformWindowPolicy policy = CameraUtilConformWindowPolicy::CameraUtilFit;
         CameraUtilConformWindow(&d.camera, policy, d.aspectRatio);
         d.valid = true;
@@ -325,31 +325,31 @@ ViewCamera::setFovDirection(ViewCamera::FovDirection direction)
 }
 
 double
-ViewCamera::near() const
+ViewCamera::nearClipping() const
 {
-    return p->d.near;
+    return p->d.nearClipping;
 }
 
 void
-ViewCamera::setNear(double near)
+ViewCamera::setNearClipping(double nearClipping)
 {
-    if (p->d.near != near) {
-        p->d.near = near;
+    if (p->d.nearClipping != nearClipping) {
+        p->d.nearClipping = nearClipping;
         p->d.valid = false;
     }
 }
 
 double
-ViewCamera::far() const
+ViewCamera::farClipping() const
 {
-    return p->d.far;
+    return p->d.farClipping;
 }
 
 void
-ViewCamera::setFar(double far)
+ViewCamera::setFarClipping(double farClipping)
 {
-    if (p->d.far != far) {
-        p->d.far = far;
+    if (p->d.farClipping != farClipping) {
+        p->d.farClipping = farClipping;
         p->d.valid = false;
     }
 }

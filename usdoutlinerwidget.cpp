@@ -103,7 +103,7 @@ OutlinerWidgetPrivate::updateSelection()
     }
 }
 
-#include "usdoutlinerwidget.moc"
+//#include "usdoutlinerwidget.moc"
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)
 : QTreeWidget(parent)
@@ -144,6 +144,7 @@ OutlinerWidget::setStage(const Stage& stage)
 {
     p->initStage(stage);
     update();
+    return true;
 }
 
 void

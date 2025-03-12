@@ -56,10 +56,6 @@ find_package_handle_standard_args(OpenUSD
 if (OpenUSD_INCLUDE_DIR AND OpenUSD_ALL_FOUND)
   set(OpenUSD_FOUND TRUE)
   set(OpenUSD_INCLUDE_DIRS ${OpenUSD_INCLUDE_DIR})
-
-  message(STATUS "Found OpenUSD: ${OpenUSD_LIBRARIES}")
-  message(STATUS "Include directory: ${OpenUSD_INCLUDE_DIR}")
-
   add_library(OpenUSD::OpenUSD INTERFACE IMPORTED GLOBAL)
   set_target_properties(OpenUSD::OpenUSD PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${OpenUSD_INCLUDE_DIRS}"

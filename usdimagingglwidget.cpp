@@ -123,6 +123,9 @@ ImagingGLWidgetPrivate::initStage(const Stage& stage)
 void
 ImagingGLWidgetPrivate::paintGL()
 {
+    glClearColor(d.clearColor.redF(), d.clearColor.greenF(), d.clearColor.blueF(), d.clearColor.alphaF());
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     if (d.stage.isValid()) {
         if (d.glEngine) {
             Q_ASSERT("aov is not set and is required" && d.aov.size());
@@ -134,6 +137,13 @@ ImagingGLWidgetPrivate::paintGL()
             d.glEngine->SetFraming(CameraUtilFraming(GfRange2f(GfVec2i(), widgetSize()), GfRect2i(GfVec2i(), widgetSize())));
             d.glEngine->SetWindowPolicy(CameraUtilMatchVertically);
             d.glEngine->SetRenderViewport(viewport);
+
+            #ifdef WIN32
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glEnable(GL_DEPTH_TEST);
+                glDepthMask(GL_TRUE);
+                glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            #endif
         
             d.viewCamera.setAspectRatio(widgetAspectRatio());
             GfCamera camera = d.viewCamera.camera();
@@ -349,6 +359,7 @@ ImagingGLWidgetPrivate::cleanUp()
 {
 }
 
+// todo: not yet in use
 //#include "usdimagingglwidget.moc"
 
 ImagingGLWidget::ImagingGLWidget(QWidget* parent)

@@ -103,6 +103,7 @@ OutlinerWidgetPrivate::updateSelection()
     }
 }
 
+// todo: not yet in use
 //#include "usdoutlinerwidget.moc"
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)

@@ -4,36 +4,37 @@
 
 #include "usdoutlinerwidget.h"
 #include "usdoutlineritem.h"
-#include "usdutils.h"
 #include "usdselection.h"
-#include <pxr/usd/usd/prim.h>
+#include "usdutils.h"
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QPointer>
+#include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
 class OutlinerWidgetPrivate : public QObject {
-public:
-    void init();
-    void initStage(const Stage& stage);
-    void addItem(const UsdPrim& prim, OutlinerItem* parent);
-    void addChildren(const UsdPrim& prim, OutlinerItem* parent);
-    void selectionChanged();
-    void updateSelection();
-    struct Data {
-        Stage stage;
-        QPointer<Selection> selection;
-        QPointer<OutlinerWidget> widget;
-    };
-    Data d;
+    public:
+        void init();
+        void initStage(const Stage& stage);
+        void addItem(const UsdPrim& prim, OutlinerItem* parent);
+        void addChildren(const UsdPrim& prim, OutlinerItem* parent);
+        void selectionChanged();
+        void updateSelection();
+        struct Data {
+                Stage stage;
+                QPointer<Selection> selection;
+                QPointer<OutlinerWidget> widget;
+        };
+        Data d;
 };
 
 void
 OutlinerWidgetPrivate::init()
 {
-    connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
+    connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this,
+            &OutlinerWidgetPrivate::selectionChanged);
 }
 
 void
@@ -56,7 +57,7 @@ OutlinerWidgetPrivate::addItem(const UsdPrim& prim, OutlinerItem* parent)
 void
 OutlinerWidgetPrivate::addChildren(const UsdPrim& prim, OutlinerItem* parent)
 {
-    UsdPrimSiblingRange children = prim.GetAllChildren(); // todo: add filters for children
+    UsdPrimSiblingRange children = prim.GetAllChildren();  // todo: add filters for children
     for (const UsdPrim& child : children) {
         addItem(child, parent);
     }
@@ -85,11 +86,12 @@ OutlinerWidgetPrivate::updateSelection()
         if (!pathString.isEmpty()) {
             SdfPath path(pathString.toStdString());
             if (selectedPaths.contains(path)) {
-                if (!item->isSelected()) { // todo: needed, handled in setSelected()?
+                if (!item->isSelected()) {  // todo: needed, handled in setSelected()?
                     item->setSelected(true);
                 }
-            } else {
-                if (item->isSelected()) { // todo: needed, handled in setSelected()?
+            }
+            else {
+                if (item->isSelected()) {  // todo: needed, handled in setSelected()?
                     item->setSelected(false);
                 }
             }
@@ -104,19 +106,17 @@ OutlinerWidgetPrivate::updateSelection()
 }
 
 // todo: not yet in use
-//#include "usdoutlinerwidget.moc"
+// #include "usdoutlinerwidget.moc"
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)
-: QTreeWidget(parent)
-, p(new OutlinerWidgetPrivate())
+    : QTreeWidget(parent)
+    , p(new OutlinerWidgetPrivate())
 {
     p->d.widget = this;
     p->init();
 }
 
-OutlinerWidget::~OutlinerWidget()
-{
-}
+OutlinerWidget::~OutlinerWidget() {}
 
 Selection*
 OutlinerWidget::selection()
@@ -162,13 +162,14 @@ OutlinerWidget::keyPressEvent(QKeyEvent* event)
             QTreeWidgetItem* item = topLevelItem(i);
             item->setSelected(true);
         }
-    } else {
+    }
+    else {
         QTreeWidget::keyPressEvent(event);
     }
 }
 
 void
-OutlinerWidget::mousePressEvent(QMouseEvent *event)
+OutlinerWidget::mousePressEvent(QMouseEvent* event)
 {
     QTreeWidget::mousePressEvent(event);
     if (itemAt(event->pos()) == nullptr) {
@@ -176,4 +177,4 @@ OutlinerWidget::mousePressEvent(QMouseEvent *event)
         itemSelectionChanged();
     }
 }
-}
+}  // namespace usd

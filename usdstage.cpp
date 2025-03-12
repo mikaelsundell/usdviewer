@@ -7,44 +7,35 @@
 
 namespace usd {
 class StagePrivate : public QSharedData {
-public:
-    StagePrivate();
-    ~StagePrivate();
-    struct Data
-    {
-        UsdStageRefPtr stageptr;
-        bool updated = false;
-    };
-    Data d;
+    public:
+        StagePrivate();
+        ~StagePrivate();
+        struct Data {
+                UsdStageRefPtr stageptr;
+                bool updated = false;
+        };
+        Data d;
 };
 
-StagePrivate::StagePrivate()
-{
-}
+StagePrivate::StagePrivate() {}
 
-StagePrivate::~StagePrivate()
-{
-}
+StagePrivate::~StagePrivate() {}
 
 Stage::Stage()
-: p(new StagePrivate())
-{
-}
+    : p(new StagePrivate())
+{}
 
 Stage::Stage(const QString& filename)
-: p(new StagePrivate())
+    : p(new StagePrivate())
 {
     loadFromFile(filename);
 }
 
 Stage::Stage(const Stage& other)
-: p(other.p)
-{
-}
+    : p(other.p)
+{}
 
-Stage::~Stage()
-{
-}
+Stage::~Stage() {}
 
 bool
 Stage::loadFromFile(const QString& filename)
@@ -105,4 +96,4 @@ Stage::operator=(const Stage& other)
     }
     return *this;
 }
-}
+}  // namespace usd

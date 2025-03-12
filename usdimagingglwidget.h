@@ -4,44 +4,44 @@
 
 #pragma once
 
-#include "usdstage.h"
 #include "usdselection.h"
+#include "usdstage.h"
 #include "usdviewcamera.h"
-#include <QOpenGLWidget>
 #include <QOpenGLFunctions>
+#include <QOpenGLWidget>
 
 namespace usd {
 class ImagingGLWidgetPrivate;
 class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
-    Q_OBJECT
+        Q_OBJECT
     public:
         enum Complexity { Low, Medium, High, VeryHigh };
         ImagingGLWidget(QWidget* parent = nullptr);
         virtual ~ImagingGLWidget();
         ViewCamera viewCamera() const;
         QImage image();
-    
+
         ImagingGLWidget::Complexity complexity() const;
         void setComplexity(ImagingGLWidget::Complexity complexity);
-    
+
         QColor clearColor() const;
         void setClearColor(const QColor& color);
-    
+
         QList<QString> rendererAovs() const;
         void setRendererAov(const QString& aov);
-    
+
         Selection* selection();
         void setSelection(Selection* selection);
 
         Stage stage() const;
         bool setStage(const Stage& stage);
-    
+
     public Q_SLOTS:
         void updateSelection();
-    
+
     Q_SIGNALS:
         void rendererReady();
-        
+
     protected:
         void initializeGL() override;
         void paintGL() override;
@@ -53,4 +53,4 @@ class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     private:
         QScopedPointer<ImagingGLWidgetPrivate> p;
 };
-}
+}  // namespace usd

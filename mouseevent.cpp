@@ -6,13 +6,10 @@
 #include <QMouseEvent>
 
 MouseEvent::MouseEvent(QObject* parent)
-: QObject(parent)
-{
-}
+    : QObject(parent)
+{}
 
-MouseEvent::~MouseEvent()
-{
-}
+MouseEvent::~MouseEvent() {}
 
 bool
 MouseEvent::eventFilter(QObject* obj, QEvent* event)

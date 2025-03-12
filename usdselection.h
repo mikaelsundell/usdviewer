@@ -4,18 +4,18 @@
 
 #pragma once
 
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/sdf/path.h>
-#include <QObject>
 #include <QList>
+#include <QObject>
 #include <QScopedPointer>
+#include <pxr/usd/sdf/path.h>
+#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
 class SelectionPrivate;
 class Selection : public QObject {
-    Q_OBJECT
+        Q_OBJECT
     public:
         Selection(QObject* parent = nullptr);
         ~Selection();
@@ -26,11 +26,11 @@ class Selection : public QObject {
         QList<SdfPath> paths() const;
         void clear();
         bool isValid() const;
-    
+
     Q_SIGNALS:
         void selectionChanged() const;
-    
+
     private:
         QScopedPointer<SelectionPrivate> p;
 };
-}
+}  // namespace usd

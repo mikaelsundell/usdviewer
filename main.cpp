@@ -6,8 +6,8 @@
 #include "usdviewer.h"
 #include <QApplication>
 
-#include <pxr/base/plug/registry.h>
 #include <pxr/base/plug/plugin.h>
+#include <pxr/base/plug/registry.h>
 
 #include <iostream>
 

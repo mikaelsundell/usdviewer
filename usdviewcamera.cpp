@@ -4,46 +4,45 @@
 
 #include "usdviewcamera.h"
 #include "usdutils.h"
-#include <pxr/base/gf/frustum.h>
-#include <pxr/base/gf/rotation.h>
-#include <pxr/base/gf/range1d.h>
-#include <pxr/usd/usdGeom/bboxCache.h>
 #include <QDebug>
+#include <pxr/base/gf/frustum.h>
+#include <pxr/base/gf/range1d.h>
+#include <pxr/base/gf/rotation.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
 
 namespace usd {
 class ViewCameraPrivate : public QSharedData {
-public:
-    void init();
-    void frameAll();
-    void tumble(double x, double y);
-    void truck(double up, double down);
-    void distance(double factor);
-    double mapToFrustumHeight(int height);
-    GfMatrix4d mapToCameraUp();
-    GfCamera camera();
-    GfMatrix4d rotateAxis(const GfVec3d& value, double angle);
-    struct Data
-    {
-        double aspectRatio;
-        double fov;
-        double nearClipping;
-        double farClipping;
-        double fit;
-        double distance;
-        GfMatrix4d inverseUp;
-        GfBBox3d boundingBox;
-        GfVec3d center;
-        GfRange3d range;
-        ViewCamera::CameraUp cameraUp;
-        ViewCamera::CameraMode cameraMode;
-        ViewCamera::FovDirection direction;
-        double axisyaw; // x-axis
-        double axispitch; // y-axis
-        double axisroll; // z-axis
-        GfCamera camera;
-        bool valid = false;
-    };
-    Data d;
+    public:
+        void init();
+        void frameAll();
+        void tumble(double x, double y);
+        void truck(double up, double down);
+        void distance(double factor);
+        double mapToFrustumHeight(int height);
+        GfMatrix4d mapToCameraUp();
+        GfCamera camera();
+        GfMatrix4d rotateAxis(const GfVec3d& value, double angle);
+        struct Data {
+                double aspectRatio;
+                double fov;
+                double nearClipping;
+                double farClipping;
+                double fit;
+                double distance;
+                GfMatrix4d inverseUp;
+                GfBBox3d boundingBox;
+                GfVec3d center;
+                GfRange3d range;
+                ViewCamera::CameraUp cameraUp;
+                ViewCamera::CameraMode cameraMode;
+                ViewCamera::FovDirection direction;
+                double axisyaw;  // x-axis
+                double axispitch;  // y-axis
+                double axisroll;  // z-axis
+                GfCamera camera;
+                bool valid = false;
+        };
+        Data d;
 };
 
 void
@@ -149,7 +148,8 @@ ViewCameraPrivate::camera()
         matrix *= GfMatrix4d().SetTranslate(d.center);
         d.camera.SetTransform(matrix);
         d.camera.SetFocusDistance(d.distance);
-        d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectRatio, d.fov, GfCamera::FOVVertical);
+        d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectRatio, d.fov,
+                                                             GfCamera::FOVVertical);
         d.camera.SetClippingRange(GfRange1f(d.nearClipping, d.farClipping));
         CameraUtilConformWindowPolicy policy = CameraUtilConformWindowPolicy::CameraUtilFit;
         CameraUtilConformWindow(&d.camera, policy, d.aspectRatio);
@@ -165,13 +165,13 @@ ViewCameraPrivate::rotateAxis(const GfVec3d& value, double angle)
 }
 
 ViewCamera::ViewCamera()
-: p(new ViewCameraPrivate())
+    : p(new ViewCameraPrivate())
 {
     p->init();
 }
 
 ViewCamera::ViewCamera(double aspectratio, double fov, ViewCamera::FovDirection direction)
-: p(new ViewCameraPrivate())
+    : p(new ViewCameraPrivate())
 {
     p->d.aspectRatio = aspectratio;
     p->d.fov = fov;
@@ -180,13 +180,10 @@ ViewCamera::ViewCamera(double aspectratio, double fov, ViewCamera::FovDirection 
 }
 
 ViewCamera::ViewCamera(const ViewCamera& other)
-: p(other.p)
-{
-}
+    : p(other.p)
+{}
 
-ViewCamera::~ViewCamera()
-{
-}
+ViewCamera::~ViewCamera() {}
 
 void
 ViewCamera::frameAll() const
@@ -239,8 +236,7 @@ ViewCamera::aspectRatio() const
 void
 ViewCamera::setAspectRatio(double aspectRatio)
 {
-    if (p->d.aspectRatio != aspectRatio)
-    {
+    if (p->d.aspectRatio != aspectRatio) {
         p->d.aspectRatio = aspectRatio;
         p->d.valid = false;
     }
@@ -362,5 +358,4 @@ ViewCamera::operator=(const ViewCamera& other)
     }
     return *this;
 }
-}
-
+}  // namespace usd

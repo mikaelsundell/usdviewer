@@ -5,5 +5,5 @@
 #include "test.h"
 
 void
-test() {
-}
+test()
+{}

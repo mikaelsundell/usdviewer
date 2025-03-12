@@ -8,29 +8,23 @@
 
 namespace usd {
 class SelectionPrivate {
-public:
-    SelectionPrivate();
-    ~SelectionPrivate();
-    struct Data
-    {
-        QList<SdfPath> paths;
-    };
-    Data d;
+    public:
+        SelectionPrivate();
+        ~SelectionPrivate();
+        struct Data {
+                QList<SdfPath> paths;
+        };
+        Data d;
 };
 
-SelectionPrivate::SelectionPrivate()
-{
-}
+SelectionPrivate::SelectionPrivate() {}
 
-SelectionPrivate::~SelectionPrivate()
-{
-}
+SelectionPrivate::~SelectionPrivate() {}
 
 Selection::Selection(QObject* parent)
-: QObject(parent)
-, p(new SelectionPrivate())
-{
-}
+    : QObject(parent)
+    , p(new SelectionPrivate())
+{}
 
 bool
 Selection::isSelected(const SdfPath& path) const
@@ -77,13 +71,11 @@ Selection::clear()
     }
 }
 
-Selection::~Selection()
-{
-}
+Selection::~Selection() {}
 
 bool
 Selection::isValid() const
 {
     return true;
 }
-}
+}  // namespace usd

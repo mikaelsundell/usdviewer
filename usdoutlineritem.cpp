@@ -4,30 +4,29 @@
 
 #include "usdoutlineritem.h"
 #include "usdselection.h"
-#include <pxr/usd/usd/prim.h>
 #include <QPointer>
+#include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
 class OutlinerItemPrivate {
-public:
-    void init();
-    struct Data {
-        UsdPrim prim;
-        OutlinerItem* item;
-    };
-    Data d;
+    public:
+        void init();
+        struct Data {
+                UsdPrim prim;
+                OutlinerItem* item;
+        };
+        Data d;
 };
 
 void
 OutlinerItemPrivate::init()
-{
-}
+{}
 
 OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdPrim& prim)
-: QTreeWidgetItem(parent)
-, p(new OutlinerItemPrivate())
+    : QTreeWidgetItem(parent)
+    , p(new OutlinerItemPrivate())
 {
     p->d.item = this;
     p->d.prim = prim;
@@ -35,31 +34,25 @@ OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdPrim& prim)
 }
 
 OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim)
-: QTreeWidgetItem(parent)
-, p(new OutlinerItemPrivate())
+    : QTreeWidgetItem(parent)
+    , p(new OutlinerItemPrivate())
 {
     p->d.item = this;
     p->d.prim = prim;
     p->init();
 }
 
-OutlinerItem::~OutlinerItem()
-{
-}
+OutlinerItem::~OutlinerItem() {}
 
 QVariant
 OutlinerItem::data(int column, int role) const
 {
     if (role == Qt::DisplayRole || role == Qt::ToolTipRole) {
         switch (column) {
-            case OutlinerItem::Name:
-                return QString::fromStdString(p->d.prim.GetName().GetString());
-            case OutlinerItem::Type:
-                return QString::fromStdString(p->d.prim.GetTypeName().GetString());
-            case OutlinerItem::Visible:
-                return p->d.prim.IsActive() ? "Visible" : "Hidden";
-            default:
-                break;
+        case OutlinerItem::Name: return QString::fromStdString(p->d.prim.GetName().GetString());
+        case OutlinerItem::Type: return QString::fromStdString(p->d.prim.GetTypeName().GetString());
+        case OutlinerItem::Visible: return p->d.prim.IsActive() ? "Visible" : "Hidden";
+        default: break;
         }
     }
     else if (role == Qt::UserRole) {
@@ -67,4 +60,4 @@ OutlinerItem::data(int column, int role) const
     }
     return QTreeWidgetItem::data(column, role);
 }
-}
+}  // namespace usd

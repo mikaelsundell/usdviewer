@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include <QExplicitlySharedDataPointer>
 #include <QObject>
 #include <pxr/usd/usdGeom/camera.h>
-#include <QExplicitlySharedDataPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -31,31 +31,31 @@ class ViewCamera {
 
         double aspectRatio() const;
         void setAspectRatio(double aspectRatio);
-    
+
         GfBBox3d boundingBox() const;
         void setBoundingBox(const GfBBox3d& boundingBox);
-    
+
         CameraUp cameraUp();
         void setCameraUp(ViewCamera::CameraUp cameraUp);
-    
+
         CameraMode cameraMode();
         void setCameraMode(ViewCamera::CameraMode cameraMode);
-    
+
         double fov() const;
         void setFov(double fov);
-    
+
         FovDirection fovDirection() const;
         void setFovDirection(ViewCamera::FovDirection direction);
-    
+
         double nearClipping() const;
         void setNearClipping(double near);
-    
+
         double farClipping() const;
         void setFarClipping(double near);
-    
+
         ViewCamera& operator=(const ViewCamera& other);
-        
+
     private:
         QExplicitlySharedDataPointer<ViewCameraPrivate> p;
-    };
-}
+};
+}  // namespace usd

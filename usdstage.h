@@ -4,10 +4,10 @@
 
 #pragma once
 
+#include <QExplicitlySharedDataPointer>
 #include <QObject>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/usd/usd/stage.h>
-#include <QExplicitlySharedDataPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -24,10 +24,10 @@ class Stage {
         GfBBox3d boundingBox() const;
         GfBBox3d boundingBox(const QList<SdfPath> paths) const;
         UsdStageRefPtr stagePtr() const;
-        
+
         Stage& operator=(const Stage& other);
-    
+
     private:
         QExplicitlySharedDataPointer<StagePrivate> p;
 };
-}
+}  // namespace usd

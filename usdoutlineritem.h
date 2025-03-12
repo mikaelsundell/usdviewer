@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <pxr/usd/usd/prim.h>
 #include <QTreeWidgetItem>
+#include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -18,8 +18,8 @@ class OutlinerItem : public QTreeWidgetItem {
         OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim);
         virtual ~OutlinerItem();
         QVariant data(int column, int role) const override;
-    
+
     private:
         QScopedPointer<OutlinerItemPrivate> p;
 };
-}
+}  // namespace usd

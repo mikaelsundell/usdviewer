@@ -3,9 +3,9 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
+#include "mouseevent.h"
 #include "usdoutlineritem.h"
 #include "usdstage.h"
-#include "mouseevent.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
@@ -23,7 +23,7 @@
 
 namespace usd {
 class ViewerPrivate : public QObject {
-    Q_OBJECT
+        Q_OBJECT
     public:
         ViewerPrivate();
         void init();
@@ -34,7 +34,7 @@ class ViewerPrivate : public QObject {
         Selection* selection();
         QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
         void setSettingsValue(const QString& key, const QVariant& value);
-    
+
     public Q_SLOTS:
         void open();
         void ready();
@@ -53,27 +53,22 @@ class ViewerPrivate : public QObject {
         void asComplexityVeryHigh();
         void openGithubReadme();
         void openGithubIssues();
-        
+
     public:
         struct Data {
-            Stage stage;
-            QStringList arguments;
-            QStringList extensions;
-            QColor clearColor;
-            QScopedPointer<MouseEvent> clearColorFilter;
-            QScopedPointer<Selection> selection;
-            QScopedPointer<Ui_Usdviewer> ui;
-            QPointer<Viewer> viewer;
+                Stage stage;
+                QStringList arguments;
+                QStringList extensions;
+                QColor clearColor;
+                QScopedPointer<MouseEvent> clearColorFilter;
+                QScopedPointer<Selection> selection;
+                QScopedPointer<Ui_Usdviewer> ui;
+                QPointer<Viewer> viewer;
         };
         Data d;
 };
 
-ViewerPrivate::ViewerPrivate()
-{
-    d.extensions = {
-        ".usd", ".usda", ".usdz"
-    };
-}
+ViewerPrivate::ViewerPrivate() { d.extensions = { ".usd", ".usda", ".usdz" }; }
 
 void
 ViewerPrivate::init()
@@ -91,7 +86,9 @@ ViewerPrivate::init()
     renderer()->setClearColor(d.clearColor);
     renderer()->setSelection(d.selection.data());
     // outliner
-    outliner()->setHeaderLabels(QStringList() << "Name" << "Type" << "Visibility");
+    outliner()->setHeaderLabels(QStringList() << "Name"
+                                              << "Type"
+                                              << "Visibility");
     outliner()->setColumnWidth(OutlinerItem::Name, 100);
     outliner()->setColumnWidth(OutlinerItem::Type, 80);
     outliner()->setColumnWidth(OutlinerItem::Visible, 80);
@@ -104,9 +101,11 @@ ViewerPrivate::init()
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
-    connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
+    connect(d.ui->asComplexityMedium, &QAction::triggered, this,
+            &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
-    connect(d.ui->asComplexityVeryHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityVeryHigh);
+    connect(d.ui->asComplexityVeryHigh, &QAction::triggered, this,
+            &ViewerPrivate::asComplexityVeryHigh);
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
@@ -130,8 +129,10 @@ ViewerPrivate::init()
     connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
     connect(d.ui->aovs, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget, &ImagingGLWidget::updateSelection);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget, &OutlinerWidget::updateSelection);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget,
+            &ImagingGLWidget::updateSelection);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget,
+            &OutlinerWidget::updateSelection);
 }
 
 void
@@ -167,13 +168,15 @@ ViewerPrivate::selection()
 }
 
 QVariant
-ViewerPrivate::settingsValue(const QString& key, const QVariant& defaultValue) {
+ViewerPrivate::settingsValue(const QString& key, const QVariant& defaultValue)
+{
     QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
     return settings.value(key, defaultValue);
 }
 
 void
-ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value) {
+ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value)
+{
     QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
     settings.setValue(key, value);
 }
@@ -187,7 +190,8 @@ ViewerPrivate::open()
         filters.append("*" + ext);
     }
     QString filter = "USD Files (*.usd *.usda *.usdz)";
-    QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
+    QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir,
+                                                    filter);
     if (filename.size()) {
         Stage stage(filename);
         if (stage.isValid()) {
@@ -201,7 +205,7 @@ ViewerPrivate::open()
 void
 ViewerPrivate::ready()
 {
-    for(QString aov : d.ui->imagingglwidget->rendererAovs()) {
+    for (QString aov : d.ui->imagingglwidget->rendererAovs()) {
         d.ui->aovs->addItem(aov, QVariant::fromValue(aov));
     }
 }
@@ -256,13 +260,9 @@ ViewerPrivate::exportImage()
     filters.append("All Files (*)");
     QString filter = filters.join(";;");
     QString exportName = exportImageDir + "/image." + defaultFormat;
-    
-    QString filename = QFileDialog::getSaveFileName(
-        d.viewer.data(),
-        "Export Image",
-        exportName,
-        filter
-    );
+
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export Image", exportName,
+                                                    filter);
     if (!filename.isEmpty()) {
         QString extension = QFileInfo(filename).suffix().toLower();
         if (extension.isEmpty()) {
@@ -276,7 +276,8 @@ ViewerPrivate::exportImage()
         }
         if (image.save(filename, extension.toUtf8().constData())) {
             setSettingsValue("exportImageDir", QFileInfo(filename).absolutePath());
-        } else {
+        }
+        else {
             qWarning() << "failed to save image: " << filename;
         }
     }
@@ -339,7 +340,8 @@ ViewerPrivate::asComplexityVeryHigh()
 void
 ViewerPrivate::openGithubReadme()
 {
-    QDesktopServices::openUrl(QUrl("https://github.com/mikaelsundell/usdviewer/blob/master/README.md"));
+    QDesktopServices::openUrl(
+        QUrl("https://github.com/mikaelsundell/usdviewer/blob/master/README.md"));
 }
 
 void
@@ -351,16 +353,14 @@ ViewerPrivate::openGithubIssues()
 #include "usdviewer.moc"
 
 Viewer::Viewer(QWidget* parent)
-: QMainWindow(parent)
-, p(new ViewerPrivate())
+    : QMainWindow(parent)
+    , p(new ViewerPrivate())
 {
     p->d.viewer = this;
     p->init();
 }
 
-Viewer::~Viewer()
-{
-}
+Viewer::~Viewer() {}
 
 void
 Viewer::setArguments(const QStringList& arguments)
@@ -413,11 +413,11 @@ Viewer::dropEvent(QDropEvent* event)
             if (stage.isValid()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
                 p->initStage(stage);
-            } else {
+            }
+            else {
                 qWarning() << "Could not load stage from filename: " << filename;
             }
         }
     }
 }
-}
-
+}  // namespace usd

@@ -6,16 +6,23 @@
 #include <QProcess>
 #include <QWidget>
 
-namespace platform
-{
-    struct IccProfile {
-        int screenNumber;
-        QString displayProfileUrl;
-    };
-    IccProfile getIccProfile(WId wid);
-    void setDarkTheme();
-    QString getIccProfileUrl(WId wid);
-    QString getApplicationPath();
-    QString resolveBookmark(const QString& bookmark);
-    QString saveBookmark(const QString& bookmark);
-}
+namespace platform {
+struct IccProfile {
+    int screenNumber;
+    QString displayProfileUrl;
+};
+IccProfile
+getIccProfile(WId wid);
+void
+setDarkTheme();
+QString
+getIccProfileUrl(WId wid);
+QString
+getApplicationPath();
+QString
+restoreScopedPath(const QString& bookmark);
+QString
+persistScopedPath(const QString& bookmark);
+void
+console(const QString& message);
+}  // namespace platform

@@ -14,20 +14,20 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace usd {
 class StagePrivate;
 class Stage {
-    public:
-        Stage();
-        Stage(const QString& filename);
-        Stage(const Stage& other);
-        ~Stage();
-        bool loadFromFile(const QString& filename);
-        bool isValid() const;
-        GfBBox3d boundingBox() const;
-        GfBBox3d boundingBox(const QList<SdfPath> paths) const;
-        UsdStageRefPtr stagePtr() const;
+public:
+    Stage();
+    Stage(const QString& filename);
+    Stage(const Stage& other);
+    ~Stage();
+    bool loadFromFile(const QString& filename);
+    bool isValid() const;
+    GfBBox3d boundingBox() const;
+    GfBBox3d boundingBox(const QList<SdfPath> paths) const;
+    UsdStageRefPtr stagePtr() const;
 
-        Stage& operator=(const Stage& other);
+    Stage& operator=(const Stage& other);
 
-    private:
-        QExplicitlySharedDataPointer<StagePrivate> p;
+private:
+    QExplicitlySharedDataPointer<StagePrivate> p;
 };
 }  // namespace usd

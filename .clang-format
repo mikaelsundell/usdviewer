@@ -1,13 +1,13 @@
 Language:        Cpp
 BasedOnStyle:  WebKit
 
-AccessModifierOffset: 0
+AccessModifierOffset: -4
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignEscapedNewlines: Left
-AlignOperands:   false
-AlignTrailingComments: false
+AlignOperands:   true
+AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: true
 AllowAllConstructorInitializersOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: false
@@ -49,7 +49,7 @@ BreakConstructorInitializersBeforeComma: false
 BreakConstructorInitializers: BeforeComma
 BreakAfterJavaFieldAnnotations: false
 BreakStringLiterals: false
-ColumnLimit:     100
+ColumnLimit:     120
 CommentPragmas:  '^ IWYU pragma:'
 CompactNamespaces: false
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
@@ -73,10 +73,9 @@ IncludeCategories:
   - Regex:           '.*'
     Priority:        1
 IncludeIsMainRegex: '(Test)?$'
-IndentAccessModifiers: true  
 IndentCaseLabels: false
 IndentExternBlock: NoIndent
-IndentPPDirectives: None
+IndentPPDirectives: AfterHash
 IndentWidth:     4
 IndentWrappedFunctionNames: false
 JavaScriptQuotes: Leave
@@ -121,7 +120,6 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard:        c++17
 StatementMacros: 
-  - Q_OBJECT
   - Q_UNUSED
   - QT_REQUIRE_VERSION
 TabWidth:        8

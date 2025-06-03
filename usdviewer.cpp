@@ -25,52 +25,52 @@
 
 namespace usd {
 class ViewerPrivate : public QObject {
-        Q_OBJECT
-    public:
-        ViewerPrivate();
-        void init();
-        void initStage(const Stage& stage);
-        ViewCamera camera();
-        ImagingGLWidget* renderer();
-        OutlinerWidget* outliner();
-        Selection* selection();
-        QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
-        void setSettingsValue(const QString& key, const QVariant& value);
-        bool eventFilter(QObject* object, QEvent* event);
-        void profile();
-        void stylesheet();
-    
-    public Q_SLOTS:
-        void open();
-        void ready();
-        void copyImage();
-        void clearColor();
-        void exportAll();
-        void exportSelected();
-        void exportImage();
-        void frameAll();
-        void frameSelected();
-        void resetView();
-        void aovChanged(int index);
-        void asComplexityLow();
-        void asComplexityMedium();
-        void asComplexityHigh();
-        void asComplexityVeryHigh();
-        void openGithubReadme();
-        void openGithubIssues();
+    Q_OBJECT
+public:
+    ViewerPrivate();
+    void init();
+    void initStage(const Stage& stage);
+    ViewCamera camera();
+    ImagingGLWidget* renderer();
+    OutlinerWidget* outliner();
+    Selection* selection();
+    QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
+    void setSettingsValue(const QString& key, const QVariant& value);
+    bool eventFilter(QObject* object, QEvent* event);
+    void profile();
+    void stylesheet();
 
-    public:
-        struct Data {
-                Stage stage;
-                QStringList arguments;
-                QStringList extensions;
-                QColor clearColor;
-                QScopedPointer<MouseEvent> clearColorFilter;
-                QScopedPointer<Selection> selection;
-                QScopedPointer<Ui_Usdviewer> ui;
-                QPointer<Viewer> viewer;
-        };
-        Data d;
+public Q_SLOTS:
+    void open();
+    void ready();
+    void copyImage();
+    void clearColor();
+    void exportAll();
+    void exportSelected();
+    void exportImage();
+    void frameAll();
+    void frameSelected();
+    void resetView();
+    void aovChanged(int index);
+    void asComplexityLow();
+    void asComplexityMedium();
+    void asComplexityHigh();
+    void asComplexityVeryHigh();
+    void openGithubReadme();
+    void openGithubIssues();
+
+public:
+    struct Data {
+        Stage stage;
+        QStringList arguments;
+        QStringList extensions;
+        QColor clearColor;
+        QScopedPointer<MouseEvent> clearColorFilter;
+        QScopedPointer<Selection> selection;
+        QScopedPointer<Ui_Usdviewer> ui;
+        QPointer<Viewer> viewer;
+    };
+    Data d;
 };
 
 ViewerPrivate::ViewerPrivate() { d.extensions = { ".usd", ".usda", ".usdz" }; }
@@ -82,7 +82,7 @@ ViewerPrivate::init()
     // icc profile
     ICCTransform* transform = ICCTransform::instance();
     QDir resources(platform::getApplicationPath() + "/Resources");
-    QString inputProfile = resources.filePath("sRGB2014.icc"); // built-in Qt input profile
+    QString inputProfile = resources.filePath("sRGB2014.icc");  // built-in Qt input profile
     transform->setInputProfile(inputProfile);
     profile();
     d.ui.reset(new Ui_Usdviewer());
@@ -115,11 +115,9 @@ ViewerPrivate::init()
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
-    connect(d.ui->asComplexityMedium, &QAction::triggered, this,
-            &ViewerPrivate::asComplexityMedium);
+    connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
-    connect(d.ui->asComplexityVeryHigh, &QAction::triggered, this,
-            &ViewerPrivate::asComplexityVeryHigh);
+    connect(d.ui->asComplexityVeryHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityVeryHigh);
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
@@ -143,24 +141,20 @@ ViewerPrivate::init()
     connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
     connect(d.ui->aovs, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget,
-            &ImagingGLWidget::updateSelection);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget,
-            &OutlinerWidget::updateSelection);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget, &ImagingGLWidget::updateSelection);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget, &OutlinerWidget::updateSelection);
     // stylesheet
     stylesheet();
-    // debug
-    #ifdef QT_DEBUG
-        QMenu* menu = d.ui->menubar->addMenu("Debug");
-        {
-            QAction* action = new QAction("Reload stylesheet...", this);
-            action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
-            menu->addAction(action);
-            connect(action, &QAction::triggered, [&]() {
-                this->stylesheet();
-            });
-        }
-    #endif
+// debug
+#ifdef QT_DEBUG
+    QMenu* menu = d.ui->menubar->addMenu("Debug");
+    {
+        QAction* action = new QAction("Reload stylesheet...", this);
+        action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+        menu->addAction(action);
+        connect(action, &QAction::triggered, [&]() { this->stylesheet(); });
+    }
+#endif
 }
 
 void
@@ -240,10 +234,7 @@ ViewerPrivate::stylesheet()
     while (i.hasNext()) {
         QRegularExpressionMatch match = i.next();
         if (match.hasMatch()) {
-            if (!match.captured(1).isEmpty() &&
-                !match.captured(2).isEmpty() &&
-                !match.captured(3).isEmpty())
-            {
+            if (!match.captured(1).isEmpty() && !match.captured(2).isEmpty() && !match.captured(3).isEmpty()) {
                 int h = match.captured(1).toInt();
                 int s = match.captured(2).toInt();
                 int l = match.captured(3).toInt();
@@ -252,10 +243,10 @@ ViewerPrivate::stylesheet()
                 ICCTransform* transform = ICCTransform::instance();
                 color = transform->map(color.rgb());
                 QString hsl = QString("hsl(%1, %2%, %3%)")
-                                .arg(color.hue() == -1 ? 0 : color.hue())
-                                .arg(static_cast<int>(color.hslSaturationF() * 100))
-                                .arg(static_cast<int>(color.lightnessF() * 100));
-                
+                                  .arg(color.hue() == -1 ? 0 : color.hue())
+                                  .arg(static_cast<int>(color.hslSaturationF() * 100))
+                                  .arg(static_cast<int>(color.lightnessF() * 100));
+
                 transformqss.replace(match.captured(0), hsl);
             }
         }
@@ -272,8 +263,7 @@ ViewerPrivate::open()
         filters.append("*" + ext);
     }
     QString filter = "USD Files (*.usd *.usda *.usdz)";
-    QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir,
-                                                    filter);
+    QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
         Stage stage(filename);
         if (stage.isValid()) {
@@ -343,8 +333,7 @@ ViewerPrivate::exportImage()
     QString filter = filters.join(";;");
     QString exportName = exportImageDir + "/image." + defaultFormat;
 
-    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export Image", exportName,
-                                                    filter);
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export Image", exportName, filter);
     if (!filename.isEmpty()) {
         QString extension = QFileInfo(filename).suffix().toLower();
         if (extension.isEmpty()) {
@@ -422,8 +411,7 @@ ViewerPrivate::asComplexityVeryHigh()
 void
 ViewerPrivate::openGithubReadme()
 {
-    QDesktopServices::openUrl(
-        QUrl("https://github.com/mikaelsundell/usdviewer/blob/master/README.md"));
+    QDesktopServices::openUrl(QUrl("https://github.com/mikaelsundell/usdviewer/blob/master/README.md"));
 }
 
 void

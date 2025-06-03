@@ -6,14 +6,14 @@
 #include <QObject>
 
 class MouseEvent : public QObject {
-        Q_OBJECT
-    public:
-        MouseEvent(QObject* object = nullptr);
-        virtual ~MouseEvent();
+    Q_OBJECT
+public:
+    MouseEvent(QObject* object = nullptr);
+    virtual ~MouseEvent();
 
-    Q_SIGNALS:
-        void pressed();
+Q_SIGNALS:
+    void pressed();
 
-    protected:
-        bool eventFilter(QObject* obj, QEvent* event) override;
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
 };

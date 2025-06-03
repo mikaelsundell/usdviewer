@@ -26,42 +26,42 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
 class ImagingGLWidgetPrivate {
-    public:
-        void init();
-        void initGL();
-        void initCamera();
-        void initStage(const Stage& stage);
-        void paintGL();
-        void mousePressEvent(QMouseEvent* event);
-        void mouseMoveEvent(QMouseEvent* event);
-        void mouseReleaseEvent(QMouseEvent* event);
-        void wheelEvent(QWheelEvent* event);
-        void pickEvent(QMouseEvent* event);
-        void updateSelection();
-        double complexityRefinement(ImagingGLWidget::Complexity complexity);
-        QPoint deviceRatio(QPoint value) const;
-        double deviceRatio(double value) const;
-        double widgetAspectRatio() const;
-        GfVec2i widgetSize() const;
-        GfVec4d widgetViewport() const;
-        void cleanUp();
-        struct Data {
-                QString aov;
-                QColor clearColor;
-                size_t count;
-                qint64 frame;
-                bool drag;
-                QPoint mousepos;
-                Stage stage;
-                ViewCamera viewCamera;
-                GfBBox3d selectionBBox;
-                ImagingGLWidget::Complexity complexity = ImagingGLWidget::Low;
-                UsdImagingGLRenderParams params;
-                QScopedPointer<UsdImagingGLEngine> glEngine;
-                QPointer<Selection> selection;
-                QPointer<ImagingGLWidget> widget;
-        };
-        Data d;
+public:
+    void init();
+    void initGL();
+    void initCamera();
+    void initStage(const Stage& stage);
+    void paintGL();
+    void mousePressEvent(QMouseEvent* event);
+    void mouseMoveEvent(QMouseEvent* event);
+    void mouseReleaseEvent(QMouseEvent* event);
+    void wheelEvent(QWheelEvent* event);
+    void pickEvent(QMouseEvent* event);
+    void updateSelection();
+    double complexityRefinement(ImagingGLWidget::Complexity complexity);
+    QPoint deviceRatio(QPoint value) const;
+    double deviceRatio(double value) const;
+    double widgetAspectRatio() const;
+    GfVec2i widgetSize() const;
+    GfVec4d widgetViewport() const;
+    void cleanUp();
+    struct Data {
+        QString aov;
+        QColor clearColor;
+        size_t count;
+        qint64 frame;
+        bool drag;
+        QPoint mousepos;
+        Stage stage;
+        ViewCamera viewCamera;
+        GfBBox3d selectionBBox;
+        ImagingGLWidget::Complexity complexity = ImagingGLWidget::Low;
+        UsdImagingGLRenderParams params;
+        QScopedPointer<UsdImagingGLEngine> glEngine;
+        QPointer<Selection> selection;
+        QPointer<ImagingGLWidget> widget;
+    };
+    Data d;
 };
 
 void
@@ -125,8 +125,7 @@ ImagingGLWidgetPrivate::initStage(const Stage& stage)
 void
 ImagingGLWidgetPrivate::paintGL()
 {
-    glClearColor(d.clearColor.redF(), d.clearColor.greenF(), d.clearColor.blueF(),
-                 d.clearColor.alphaF());
+    glClearColor(d.clearColor.redF(), d.clearColor.greenF(), d.clearColor.blueF(), d.clearColor.alphaF());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (d.stage.isValid()) {
@@ -137,8 +136,8 @@ ImagingGLWidgetPrivate::paintGL()
             GfVec4d viewport = widgetViewport();
 
             d.glEngine->SetRenderBufferSize(widgetSize());
-            d.glEngine->SetFraming(CameraUtilFraming(GfRange2f(GfVec2i(), widgetSize()),
-                                                     GfRect2i(GfVec2i(), widgetSize())));
+            d.glEngine->SetFraming(
+                CameraUtilFraming(GfRange2f(GfVec2i(), widgetSize()), GfRect2i(GfVec2i(), widgetSize())));
             d.glEngine->SetWindowPolicy(CameraUtilMatchVertically);
             d.glEngine->SetRenderViewport(viewport);
 
@@ -159,8 +158,7 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.clearColor = QColor_GfVec4f(d.clearColor);
             d.params.complexity = complexityRefinement(d.complexity);
             d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
-            d.params.drawMode = UsdImagingGLDrawMode::
-                DRAW_WIREFRAME_ON_SURFACE;  // todo: changed to DRAW_SHADED_SMOOTH;
+            d.params.drawMode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE;  // todo: changed to DRAW_SHADED_SMOOTH;
             d.params.forceRefresh = true;
             d.params.enableLighting = false;
             d.params.enableSampleAlphaToCoverage = false;
@@ -191,7 +189,7 @@ ImagingGLWidgetPrivate::paintGL()
         }
     }
     else {
-        qWarning() << "stage not set, render pass will be skipped";
+        // stage not set, this can happen and is ok
     }
 }
 
@@ -271,10 +269,9 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
     GfFrustum pickfrustum = frustum.ComputeNarrowedFrustum(pos, size);
     GfVec3d hitPoint, hitNormal;
     SdfPath hitPrimPath, hitInstancerPath;
-    if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(),
-                                     pickfrustum.ComputeProjectionMatrix(),
-                                     d.stage.stagePtr()->GetPseudoRoot(), d.params, &hitPoint,
-                                     &hitNormal, &hitPrimPath, &hitInstancerPath)) {
+    if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(), pickfrustum.ComputeProjectionMatrix(),
+                                     d.stage.stagePtr()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal, &hitPrimPath,
+                                     &hitInstancerPath)) {
         d.selection->replacePaths(QList<SdfPath>() << hitPrimPath);
     }
     else {

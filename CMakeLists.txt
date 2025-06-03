@@ -33,16 +33,15 @@ list (FILTER project_sources EXCLUDE REGEX "_")
 file (GLOB project_resources
     "resources/*.icc"
     "resources/*.css"
-    "resources/*.icns"
 )
 
 # source groups
 source_group ("Icon Files" FILES ${project_icons})
 source_group ("Resource Files" FILES ${project_resources})
 
-set (project_copyright "Copyright 2025-present Contributors to the ${app_name} project")
+set (project_copyright "Copyright 2025-present Contributors to the ${project_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
-set (project_long_version "1.2.0")
+set (project_long_version "1.2.1")
 set (project_short_version "1.2")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
@@ -50,6 +49,7 @@ if (APPLE)
     set (project_bundle
         "${CMAKE_SOURCE_DIR}/resources/MacOSXBundle.plist.in"
     )
+    list (APPEND project_resources "resources/AppIcon.icns")
     set (MACOSX_BUNDLE_EXECUTABLE_NAME ${project_name})
     set (MACOSX_BUNDLE_INFO_STRING ${project_name})
     set (MACOSX_BUNDLE_BUNDLE_NAME ${project_name})
@@ -63,17 +63,14 @@ if (APPLE)
     set_source_files_properties(${project_resources} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     list (APPEND project_sources platform_mac.mm)
     add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_resources})
-
     set_target_properties (${project_name} PROPERTIES
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${project_identifier}"
         XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${MACOSX_DEPLOYMENT_TARGET}"
         MACOSX_BUNDLE_INFO_PLIST "${project_bundle}"
     )
-
     set_target_properties (${project_name} PROPERTIES
         OUTPUT_NAME ${project_name}
     )
-
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python
@@ -86,6 +83,7 @@ if (APPLE)
 elseif (WIN32)
     list (APPEND project_sources platform_win.cpp)
     add_executable (${project_name} WIN32 ${project_sources} ${project_resources})
+    target_link_options(${project_name} PRIVATE "/SUBSYSTEM:CONSOLE")
     target_compile_definitions (${project_name} PRIVATE 
         WIN32
         WINVER=0x0A00
@@ -103,21 +101,21 @@ elseif (WIN32)
         "Gdi32.lib"
         "Shell32.lib"
     )
-    set (app_icon "${CMAKE_SOURCE_DIR}/resources/resources.rc")
-    target_sources (${project_name} PRIVATE ${app_icon})
+    set (project_icon "${CMAKE_SOURCE_DIR}/resources/resources.rc")
+    target_sources (${project_name} PRIVATE ${project_icon})
 
-    set (app_debug ${CMAKE_BINARY_DIR}/Debug)
-    set (app_release ${CMAKE_BINARY_DIR}/Release)
-    foreach(resource_file ${app_resources})
+    set (project_debug ${CMAKE_BINARY_DIR}/Debug)
+    set (project_release ${CMAKE_BINARY_DIR}/Release)
+    foreach(resource_file ${project_resources})
         get_filename_component(resource_name ${resource_file} NAME)
         add_custom_command(TARGET ${project_name} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory
-                $<$<CONFIG:Debug>:${app_release}/Resources>
-                $<$<CONFIG:Release>:${app_release}/Resources>
+                $<$<CONFIG:Debug>:${project_release}/resources>
+                $<$<CONFIG:Release>:${project_release}/resources>
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${resource_file}
-                $<$<CONFIG:Debug>:${app_debug}/Resources/${resource_name}>
-                $<$<CONFIG:Release>:${app_release}/Resources/${resource_name}>
+                $<$<CONFIG:Debug>:${project_debug}/resources/${resource_name}>
+                $<$<CONFIG:Release>:${project_release}/resources/${resource_name}>
         )
     endforeach ()
 else ()

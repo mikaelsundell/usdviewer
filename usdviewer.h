@@ -10,16 +10,16 @@
 namespace usd {
 class ViewerPrivate;
 class Viewer : public QMainWindow {
-    public:
-        Viewer(QWidget* parent = nullptr);
-        virtual ~Viewer();
-        void setArguments(const QStringList& arguments);
+public:
+    Viewer(QWidget* parent = nullptr);
+    virtual ~Viewer();
+    void setArguments(const QStringList& arguments);
 
-    protected:
-        void dragEnterEvent(QDragEnterEvent* event) override;
-        void dropEvent(QDropEvent* event) override;
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
-    private:
-        QScopedPointer<ViewerPrivate> p;
+private:
+    QScopedPointer<ViewerPrivate> p;
 };
 }  // namespace usd

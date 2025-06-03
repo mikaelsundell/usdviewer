@@ -7,14 +7,14 @@
 
 namespace usd {
 class StagePrivate : public QSharedData {
-    public:
-        StagePrivate();
-        ~StagePrivate();
-        struct Data {
-                UsdStageRefPtr stageptr;
-                bool updated = false;
-        };
-        Data d;
+public:
+    StagePrivate();
+    ~StagePrivate();
+    struct Data {
+        UsdStageRefPtr stageptr;
+        bool updated = false;
+    };
+    Data d;
 };
 
 StagePrivate::StagePrivate() {}

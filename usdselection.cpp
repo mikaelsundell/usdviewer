@@ -8,13 +8,13 @@
 
 namespace usd {
 class SelectionPrivate {
-    public:
-        SelectionPrivate();
-        ~SelectionPrivate();
-        struct Data {
-                QList<SdfPath> paths;
-        };
-        Data d;
+public:
+    SelectionPrivate();
+    ~SelectionPrivate();
+    struct Data {
+        QList<SdfPath> paths;
+    };
+    Data d;
 };
 
 SelectionPrivate::SelectionPrivate() {}

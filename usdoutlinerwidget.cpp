@@ -15,26 +15,25 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
 class OutlinerWidgetPrivate : public QObject {
-    public:
-        void init();
-        void initStage(const Stage& stage);
-        void addItem(const UsdPrim& prim, OutlinerItem* parent);
-        void addChildren(const UsdPrim& prim, OutlinerItem* parent);
-        void selectionChanged();
-        void updateSelection();
-        struct Data {
-                Stage stage;
-                QPointer<Selection> selection;
-                QPointer<OutlinerWidget> widget;
-        };
-        Data d;
+public:
+    void init();
+    void initStage(const Stage& stage);
+    void addItem(const UsdPrim& prim, OutlinerItem* parent);
+    void addChildren(const UsdPrim& prim, OutlinerItem* parent);
+    void selectionChanged();
+    void updateSelection();
+    struct Data {
+        Stage stage;
+        QPointer<Selection> selection;
+        QPointer<OutlinerWidget> widget;
+    };
+    Data d;
 };
 
 void
 OutlinerWidgetPrivate::init()
 {
-    connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this,
-            &OutlinerWidgetPrivate::selectionChanged);
+    connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
 }
 
 void

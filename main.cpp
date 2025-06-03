@@ -2,6 +2,7 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
+#include "platform.h"
 #include "test.h"
 #include "usdviewer.h"
 #include <QApplication>
@@ -16,15 +17,15 @@ main(int argc, char* argv[])
 {
     pxr::PlugRegistry& instance = pxr::PlugRegistry::GetInstance();
     pxr::PlugPluginPtrVector plugins = instance.GetAllPlugins();
-    std::cout << "LIST PLUGINS: START";
+#if defined(_DEBUG)
+    platform::console("plugins");
     for (const auto& plugin : plugins) {
-        std::cout << "  Path: " << plugin->GetPath() << std::endl;
+        platform::console(QString::fromStdString(plugin->GetPath()));
     }
-    std::cout << "LIST PLUGINS: END";
-
     if (0) {
         test();
     }
+#endif
     QApplication app(argc, argv);
     usd::Viewer viewer;
     viewer.setArguments(QCoreApplication::arguments());

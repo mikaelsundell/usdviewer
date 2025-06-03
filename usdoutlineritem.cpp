@@ -11,13 +11,13 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
 class OutlinerItemPrivate {
-    public:
-        void init();
-        struct Data {
-                UsdPrim prim;
-                OutlinerItem* item;
-        };
-        Data d;
+public:
+    void init();
+    struct Data {
+        UsdPrim prim;
+        OutlinerItem* item;
+    };
+    Data d;
 };
 
 void

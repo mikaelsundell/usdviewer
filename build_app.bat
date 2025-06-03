@@ -142,7 +142,7 @@ REM extract version from CMakeLists.txt
 set "version_file=%app_dir%CMakeLists.txt"
 set "version="
 
-for /f "usebackq tokens=3 delims=() " %%A in (`findstr /c:"set (app_long_version" "%version_file%"`) do (
+for /f "usebackq tokens=3 delims=() " %%A in (`findstr /c:"set (project_long_version" "%version_file%"`) do (
     set "version=%%A"
     set "version=!version:~1,-1!" 
 )

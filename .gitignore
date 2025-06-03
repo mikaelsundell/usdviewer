@@ -2,4 +2,6 @@
 .vscode
 build
 build.*
+deploy.*
 usdviewer_*
+plugin*

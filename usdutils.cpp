@@ -75,8 +75,7 @@ DebugBoundingBoxes(const UsdStageRefPtr& stage)
             GfBBox3d bbox = bboxCache.ComputeWorldBound(prim);
             GfRange3d range = bbox.ComputeAlignedBox();
             if (!range.IsEmpty()) {
-                qDebug() << prim.GetPath() << " bounds: Min(" << range.GetMin() << ") Max("
-                         << range.GetMax() << ")";
+                qDebug() << prim.GetPath() << " bounds: Min(" << range.GetMin() << ") Max(" << range.GetMax() << ")";
             }
             else {
                 qDebug() << prim.GetPath() << " has no valid bounding box!";
@@ -119,8 +118,8 @@ QDebug
 operator<<(QDebug debug, const GfRange2d& range)
 {
     QDebugStateSaver saver(debug);
-    debug.nospace() << "GfRange2d(Min: [" << range.GetMin()[0] << ", " << range.GetMin()[1]
-                    << "] Max: [" << range.GetMax()[0] << ", " << range.GetMax()[1] << "])";
+    debug.nospace() << "GfRange2d(Min: [" << range.GetMin()[0] << ", " << range.GetMin()[1] << "] Max: ["
+                    << range.GetMax()[0] << ", " << range.GetMax()[1] << "])";
     return debug;
 }
 
@@ -162,8 +161,7 @@ QDebug
 operator<<(QDebug debug, const GfVec4d& vec)
 {
     QDebugStateSaver saver(debug);
-    debug.nospace() << "GfVec4d(" << vec[0] << ", " << vec[1] << ", " << vec[2] << ", " << vec[3]
-                    << ")";
+    debug.nospace() << "GfVec4d(" << vec[0] << ", " << vec[1] << ", " << vec[2] << ", " << vec[3] << ")";
     return debug;
 }
 
@@ -171,8 +169,7 @@ QDebug
 operator<<(QDebug debug, const GfVec4f& vec)
 {
     QDebugStateSaver saver(debug);
-    debug.nospace() << "GfVec4f(" << vec[0] << ", " << vec[1] << ", " << vec[2] << ", " << vec[3]
-                    << ")";
+    debug.nospace() << "GfVec4f(" << vec[0] << ", " << vec[1] << ", " << vec[2] << ", " << vec[3] << ")";
     return debug;
 }
 
@@ -208,8 +205,7 @@ operator<<(QDebug debug, const GfCamera& camera)
     debug.nospace() << "GfCamera(\n";
     debug.nospace() << "  transform = " << camera.GetTransform() << ",\n";
     auto projection = camera.GetProjection();
-    QString projType = (projection == GfCamera::Projection::Perspective) ? "Perspective"
-                                                                         : "Orthographic";
+    QString projType = (projection == GfCamera::Projection::Perspective) ? "Perspective" : "Orthographic";
     debug.nospace() << "  projection = " << projType << ",\n";
     debug.nospace() << "  horizontalAperture = " << camera.GetHorizontalAperture() << ",\n";
     debug.nospace() << "  verticalAperture = " << camera.GetVerticalAperture() << ",\n";
@@ -231,8 +227,7 @@ operator<<(QDebug debug, const GfFrustum& frustum)
     debug.nospace() << "  nearFar = " << frustum.GetNearFar() << ",\n";
     debug.nospace() << "  viewDistance = " << frustum.GetViewDistance() << ",\n";
     auto projectionType = frustum.GetProjectionType();
-    QString projType = (projectionType == GfFrustum::ProjectionType::Perspective) ? "Perspective"
-                                                                                  : "Orthographic";
+    QString projType = (projectionType == GfFrustum::ProjectionType::Perspective) ? "Perspective" : "Orthographic";
     debug.nospace() << "  projection = " << projType << ",\n";
     debug.nospace() << "  viewMatrix = " << frustum.ComputeViewMatrix() << ",\n";
     debug.nospace() << "  projectionMatrix = " << frustum.ComputeProjectionMatrix() << ",\n";
@@ -253,9 +248,8 @@ operator<<(QDebug debug, const CameraUtilFraming& framing)
     QDebugStateSaver saver(debug);
     debug.nospace() << "CameraUtilFraming(\n"
                     << "  Display Window: " << framing.displayWindow << "\n"
-                    << "  Data Window: [" << framing.dataWindow.GetMinX() << ", "
-                    << framing.dataWindow.GetMinY() << ", " << framing.dataWindow.GetMaxX() << ", "
-                    << framing.dataWindow.GetMaxY() << "]\n"
+                    << "  Data Window: [" << framing.dataWindow.GetMinX() << ", " << framing.dataWindow.GetMinY()
+                    << ", " << framing.dataWindow.GetMaxX() << ", " << framing.dataWindow.GetMaxY() << "]\n"
                     << "  Pixel Aspect Ratio: " << framing.pixelAspectRatio << "\n)";
     return debug;
 }
@@ -366,8 +360,7 @@ operator<<(QDebug debug, const VtValue& value)
             }
         }
         else {
-            debug << "<unsupported array type: " << QString::fromStdString(array.GetTypeName())
-                  << ">";
+            debug << "<unsupported array type: " << QString::fromStdString(array.GetTypeName()) << ">";
         }
         debug << "]";
     }
@@ -405,9 +398,7 @@ operator<<(QDebug debug, UsdImagingGLDrawMode drawMode)
     switch (drawMode) {
     case UsdImagingGLDrawMode::DRAW_POINTS: debug.nospace() << "DRAW_POINTS"; break;
     case UsdImagingGLDrawMode::DRAW_WIREFRAME: debug.nospace() << "DRAW_WIREFRAME"; break;
-    case UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE:
-        debug.nospace() << "DRAW_WIREFRAME_ON_SURFACE";
-        break;
+    case UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE: debug.nospace() << "DRAW_WIREFRAME_ON_SURFACE"; break;
     case UsdImagingGLDrawMode::DRAW_SHADED_FLAT: debug.nospace() << "DRAW_SHADED_FLAT"; break;
     case UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH: debug.nospace() << "DRAW_SHADED_SMOOTH"; break;
     case UsdImagingGLDrawMode::DRAW_GEOM_ONLY: debug.nospace() << "DRAW_GEOM_ONLY"; break;
@@ -425,9 +416,7 @@ operator<<(QDebug debug, UsdImagingGLCullStyle cullStyle)
     QDebugStateSaver saver(debug);
     debug.nospace() << "UsdImagingGLCullStyle(";
     switch (cullStyle) {
-    case UsdImagingGLCullStyle::CULL_STYLE_NO_OPINION:
-        debug.nospace() << "CULL_STYLE_NO_OPINION";
-        break;
+    case UsdImagingGLCullStyle::CULL_STYLE_NO_OPINION: debug.nospace() << "CULL_STYLE_NO_OPINION"; break;
     case UsdImagingGLCullStyle::CULL_STYLE_NOTHING: debug.nospace() << "CULL_STYLE_NOTHING"; break;
     case UsdImagingGLCullStyle::CULL_STYLE_BACK: debug.nospace() << "CULL_STYLE_BACK"; break;
     case UsdImagingGLCullStyle::CULL_STYLE_FRONT: debug.nospace() << "CULL_STYLE_FRONT"; break;
@@ -447,31 +436,22 @@ operator<<(QDebug debug, const UsdImagingGLRenderParams& params)
     QDebugStateSaver saver(debug);
     debug.nospace() << "UsdImagingGLRenderParams("
                     << "\n  frame: " << params.frame << "\n  complexity: " << params.complexity
-                    << "\n  drawMode: " << params.drawMode
-                    << "\n  showGuides: " << params.showGuides
-                    << "\n  showProxy: " << params.showProxy
-                    << "\n  showRender: " << params.showRender
-                    << "\n  forceRefresh: " << params.forceRefresh
-                    << "\n  flipFrontFacing: " << params.flipFrontFacing
-                    << "\n  cullStyle: " << params.cullStyle
-                    << "\n  enableLighting: " << params.enableLighting
+                    << "\n  drawMode: " << params.drawMode << "\n  showGuides: " << params.showGuides
+                    << "\n  showProxy: " << params.showProxy << "\n  showRender: " << params.showRender
+                    << "\n  forceRefresh: " << params.forceRefresh << "\n  flipFrontFacing: " << params.flipFrontFacing
+                    << "\n  cullStyle: " << params.cullStyle << "\n  enableLighting: " << params.enableLighting
                     << "\n  enableSampleAlphaToCoverage: " << params.enableSampleAlphaToCoverage
                     << "\n  applyRenderState: " << params.applyRenderState
-                    << "\n  gammaCorrectColors: " << params.gammaCorrectColors
-                    << "\n  highlight: " << params.highlight
-                    << "\n  overrideColor: " << params.overrideColor
-                    << "\n  wireframeColor: " << params.wireframeColor
-                    << "\n  alphaThreshold: " << params.alphaThreshold
-                    << "\n  clipPlanes: " << params.clipPlanes
+                    << "\n  gammaCorrectColors: " << params.gammaCorrectColors << "\n  highlight: " << params.highlight
+                    << "\n  overrideColor: " << params.overrideColor << "\n  wireframeColor: " << params.wireframeColor
+                    << "\n  alphaThreshold: " << params.alphaThreshold << "\n  clipPlanes: " << params.clipPlanes
                     << "\n  enableSceneMaterials: " << params.enableSceneMaterials
                     << "\n  enableSceneLights: " << params.enableSceneLights
                     << "\n  enableUsdDrawModes: " << params.enableUsdDrawModes
                     << "\n  clearColor: " << params.clearColor
                     << "\n  colorCorrectionMode: " << params.colorCorrectionMode
-                    << "\n  lut3dSizeOCIO: " << params.lut3dSizeOCIO
-                    << "\n  ocioDisplay: " << params.ocioDisplay
-                    << "\n  ocioView: " << params.ocioView
-                    << "\n  ocioColorSpace: " << params.ocioColorSpace
+                    << "\n  lut3dSizeOCIO: " << params.lut3dSizeOCIO << "\n  ocioDisplay: " << params.ocioDisplay
+                    << "\n  ocioView: " << params.ocioView << "\n  ocioColorSpace: " << params.ocioColorSpace
                     << "\n  ocioLook: " << params.ocioLook << "\n  bboxes: " << params.bboxes
                     << "\n  bboxLineColor: " << params.bboxLineColor
                     << "\n  bboxLineDashSize: " << params.bboxLineDashSize << "\n)";
@@ -486,9 +466,9 @@ operator<<(QDebug debug, const UsdImagingGLRenderParams::BBoxVector& bboxes)
 
     for (const auto& bbox : bboxes) {
         const GfRange3d& range = bbox.GetRange();
-        debug.nospace() << "[Min: (" << range.GetMin()[0] << ", " << range.GetMin()[1] << ", "
-                        << range.GetMin()[2] << ") Max: (" << range.GetMax()[0] << ", "
-                        << range.GetMax()[1] << ", " << range.GetMax()[2] << ")], ";
+        debug.nospace() << "[Min: (" << range.GetMin()[0] << ", " << range.GetMin()[1] << ", " << range.GetMin()[2]
+                        << ") Max: (" << range.GetMax()[0] << ", " << range.GetMax()[1] << ", " << range.GetMax()[2]
+                        << ")], ";
     }
     debug.nospace() << " }";
     return debug;
@@ -502,8 +482,8 @@ operator<<(QDebug debug, const UsdImagingGLRenderParams::ClipPlanesVector& clipP
 
     for (size_t i = 0; i < clipPlanes.size(); ++i) {
         const GfVec4d& plane = clipPlanes[i];
-        debug.nospace() << " Plane" << i << " (" << plane[0] << ", " << plane[1] << ", " << plane[2]
-                        << ", " << plane[3] << ")";
+        debug.nospace() << " Plane" << i << " (" << plane[0] << ", " << plane[1] << ", " << plane[2] << ", " << plane[3]
+                        << ")";
 
         if (i < clipPlanes.size() - 1) {
             debug.nospace() << ", ";

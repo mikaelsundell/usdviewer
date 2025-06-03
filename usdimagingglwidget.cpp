@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: BSD-3-Clause
+﻿// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
+#include "platform.h"
 #include "usdimagingglwidget.h"
 #include "usdutils.h"
 #include "usdviewcamera.h"
@@ -145,6 +146,9 @@ ImagingGLWidgetPrivate::paintGL()
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
+            glDepthFunc(GL_LESS);
+
+
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 #endif
 
@@ -257,25 +261,39 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
 void
 ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
 {
-    QPoint mousepos = deviceRatio(event->pos());
-    GfVec4d viewport = widgetViewport();
-    GfVec2d pos = GfVec2d((mousepos.x() - viewport[0]) / static_cast<double>(viewport[2]),
-                          (mousepos.y() - viewport[1]) / static_cast<double>(viewport[3]));
-    pos[0] = (pos[0] * 2.0 - 1.0);
-    pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
-    GfVec2d size(1.0 / static_cast<double>(viewport[2]), 1.0 / static_cast<double>(viewport[3]));
-    GfCamera camera = d.viewCamera.camera();
-    GfFrustum frustum = camera.GetFrustum();
-    GfFrustum pickfrustum = frustum.ComputeNarrowedFrustum(pos, size);
-    GfVec3d hitPoint, hitNormal;
-    SdfPath hitPrimPath, hitInstancerPath;
-    if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(), pickfrustum.ComputeProjectionMatrix(),
-                                     d.stage.stagePtr()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal, &hitPrimPath,
-                                     &hitInstancerPath)) {
-        d.selection->replacePaths(QList<SdfPath>() << hitPrimPath);
+    d.widget->makeCurrent();
+    if (d.stage.isValid()) {
+        if (d.glEngine) {
+#ifdef WIN32
+            glDepthMask(GL_TRUE); // needed on windows
+#endif
+            QPoint mousepos = deviceRatio(event->pos());
+            GfVec4d viewport = widgetViewport();
+            GfVec2d pos = GfVec2d((mousepos.x() - viewport[0]) / static_cast<double>(viewport[2]),
+                                  (mousepos.y() - viewport[1]) / static_cast<double>(viewport[3]));
+            pos[0] = (pos[0] * 2.0 - 1.0);
+            pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
+            GfVec2d size(1.0 / static_cast<double>(viewport[2]), 1.0 / static_cast<double>(viewport[3]));
+            GfCamera camera = d.viewCamera.camera();
+            GfFrustum frustum = camera.GetFrustum();
+            GfFrustum pickfrustum = frustum.ComputeNarrowedFrustum(pos, size);
+            GfVec3d hitPoint, hitNormal;
+            SdfPath hitPrimPath, hitInstancerPath;
+            if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(), pickfrustum.ComputeProjectionMatrix(),
+                                             d.stage.stagePtr()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
+                                             &hitPrimPath, &hitInstancerPath)) {
+                d.selection->replacePaths(QList<SdfPath>() << hitPrimPath);
+            }
+            else {
+                d.selection->clear();
+            }
+        }
+        else {
+            qWarning() << "gl engine is not inititialized, render pass will be skipped";
+        }
     }
     else {
-        d.selection->clear();
+        // stage not set, this can happen and is ok
     }
 }
 

@@ -6,15 +6,37 @@
 #include "test.h"
 #include "usdviewer.h"
 #include <QApplication>
-
+#include <QDir>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
+#include <pxr/base/tf/setenv.h>
 
 #include <iostream>
 
 int
 main(int argc, char* argv[])
 {
+    QApplication app(argc, argv);
+#ifdef NDEBUG
+    QStringList plugindirs;
+    QString pluginusddir = platform::getApplicationPath() + "/plugin/usd";
+    if (QDir(pluginusddir).exists()) {
+        plugindirs << pluginusddir;
+    }
+    QString usddir = platform::getApplicationPath() + "/usd";
+    if (QDir(usddir).exists()) {
+        plugindirs << usddir;
+    }
+    if (!plugindirs.isEmpty()) {
+        pxr::TfSetenv("PXR_DISABLE_STANDARD_PLUG_SEARCH_PATH", "1");
+        std::vector<std::string> pluginPaths;
+        for (const QString& dir : plugindirs) {
+            pluginPaths.push_back(dir.toStdString());
+        }
+        pxr::PlugRegistry& registry = pxr::PlugRegistry::GetInstance();
+        registry.RegisterPlugins(pluginPaths);
+    }
+#endif
     pxr::PlugRegistry& instance = pxr::PlugRegistry::GetInstance();
     pxr::PlugPluginPtrVector plugins = instance.GetAllPlugins();
 #if defined(_DEBUG)
@@ -26,7 +48,6 @@ main(int argc, char* argv[])
         test();
     }
 #endif
-    QApplication app(argc, argv);
     usd::Viewer viewer;
     viewer.setArguments(QCoreApplication::arguments());
     viewer.show();

@@ -41,7 +41,7 @@ source_group ("Resource Files" FILES ${project_resources})
 
 set (project_copyright "Copyright 2025-present Contributors to the ${project_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
-set (project_long_version "1.2.1")
+set (project_long_version "1.2.2")
 set (project_short_version "1.2")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
@@ -83,7 +83,6 @@ if (APPLE)
 elseif (WIN32)
     list (APPEND project_sources platform_win.cpp)
     add_executable (${project_name} WIN32 ${project_sources} ${project_resources})
-    target_link_options(${project_name} PRIVATE "/SUBSYSTEM:CONSOLE")
     target_compile_definitions (${project_name} PRIVATE 
         WIN32
         WINVER=0x0A00

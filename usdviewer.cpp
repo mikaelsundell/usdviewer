@@ -19,6 +19,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QSettings>
+#include <QToolButton>
 
 // generated files
 #include "ui_usdviewer.h"
@@ -51,6 +52,11 @@ public Q_SLOTS:
     void frameAll();
     void frameSelected();
     void resetView();
+    void filterChanged(const QString& filter);
+    void defaultCameraLightEnabled(bool checked);
+    void sceneLightsEnabled(bool checked);
+    void sceneMaterialsEnabled(bool checked);
+    void drawModeChanged(int index);
     void aovChanged(int index);
     void asComplexityLow();
     void asComplexityMedium();
@@ -103,7 +109,7 @@ ViewerPrivate::init()
     outliner()->setHeaderLabels(QStringList() << "Name"
                                               << "Type"
                                               << "Visibility");
-    outliner()->setColumnWidth(OutlinerItem::Name, 100);
+    outliner()->setColumnWidth(OutlinerItem::Name, 200);
     outliner()->setColumnWidth(OutlinerItem::Type, 80);
     outliner()->setColumnWidth(OutlinerItem::Visible, 80);
     outliner()->setSelection(d.selection.data());
@@ -139,10 +145,27 @@ ViewerPrivate::init()
     connect(d.ui->frameAll, &QPushButton::clicked, this, &ViewerPrivate::frameAll);
     connect(d.ui->frameSelected, &QPushButton::clicked, this, &ViewerPrivate::frameSelected);
     connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
-    connect(d.ui->aovs, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
+    connect(d.ui->filter, &QLineEdit::textChanged, this, &ViewerPrivate::filterChanged);
+    connect(d.ui->enableDefaultCameraLight, &QCheckBox::toggled, this, &ViewerPrivate::defaultCameraLightEnabled);
+    connect(d.ui->enableSceneLights, &QCheckBox::toggled, this, &ViewerPrivate::sceneLightsEnabled);
+    connect(d.ui->enableSceneMaterials, &QCheckBox::toggled, this, &ViewerPrivate::sceneMaterialsEnabled);
+    connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
+    connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
     connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget, &ImagingGLWidget::updateSelection);
     connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget, &OutlinerWidget::updateSelection);
+    // draw modes
+    {
+        d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
+        d.ui->drawMode->addItem("Wireframe", QVariant::fromValue(ImagingGLWidget::Wireframe));
+        d.ui->drawMode->addItem("Wireframe On Surface", QVariant::fromValue(ImagingGLWidget::WireframeOnSurface));
+        d.ui->drawMode->addItem("Shaded Flat", QVariant::fromValue(ImagingGLWidget::ShadedFlat));
+        d.ui->drawMode->addItem("Shaded Smooth", QVariant::fromValue(ImagingGLWidget::ShadedSmooth));
+        d.ui->drawMode->addItem("Geom Only", QVariant::fromValue(ImagingGLWidget::GeomOnly));
+        d.ui->drawMode->addItem("Geom Flat", QVariant::fromValue(ImagingGLWidget::GeomFlat));
+        d.ui->drawMode->addItem("Geom Smooth", QVariant::fromValue(ImagingGLWidget::GeomSmooth));
+        d.ui->drawMode->setCurrentIndex(d.ui->drawMode->findData(QVariant::fromValue(ImagingGLWidget::ShadedSmooth)));
+    }
     // stylesheet
     stylesheet();
 // debug
@@ -278,7 +301,7 @@ void
 ViewerPrivate::ready()
 {
     for (QString aov : d.ui->imagingglwidget->rendererAovs()) {
-        d.ui->aovs->addItem(aov, QVariant::fromValue(aov));
+        d.ui->aov->addItem(aov, QVariant::fromValue(aov));  // can only be requested after renderer is ready
     }
 }
 
@@ -378,34 +401,66 @@ ViewerPrivate::resetView()
 }
 
 void
+ViewerPrivate::filterChanged(const QString& filter)
+{
+    outliner()->setFilter(filter);
+}
+
+void
+ViewerPrivate::defaultCameraLightEnabled(bool checked)
+{
+    renderer()->setDefaultCameraLightEnabled(checked);
+}
+
+void
+ViewerPrivate::sceneLightsEnabled(bool checked)
+{
+    renderer()->setSceneLightsEnabled(checked);
+}
+
+void
+ViewerPrivate::sceneMaterialsEnabled(bool checked)
+{
+    renderer()->setSceneMaterialsEnabled(checked);
+}
+
+void
+ViewerPrivate::drawModeChanged(int index)
+{
+    QVariant data = d.ui->drawMode->itemData(index);
+    ImagingGLWidget::DrawMode mode = static_cast<ImagingGLWidget::DrawMode>(data.toInt());
+    renderer()->setDrawMode(mode);
+}
+
+void
 ViewerPrivate::aovChanged(int index)
 {
-    QString aov = d.ui->aovs->itemData(index, Qt::UserRole).value<QString>();
-    d.ui->imagingglwidget->setRendererAov(aov);
+    QString aov = d.ui->aov->itemData(index, Qt::UserRole).value<QString>();
+    renderer()->setRendererAov(aov);
 }
 
 void
 ViewerPrivate::asComplexityLow()
 {
-    d.ui->imagingglwidget->setComplexity(ImagingGLWidget::Low);
+    renderer()->setComplexity(ImagingGLWidget::Low);
 }
 
 void
 ViewerPrivate::asComplexityMedium()
 {
-    d.ui->imagingglwidget->setComplexity(ImagingGLWidget::Medium);
+    renderer()->setComplexity(ImagingGLWidget::Medium);
 }
 
 void
 ViewerPrivate::asComplexityHigh()
 {
-    d.ui->imagingglwidget->setComplexity(ImagingGLWidget::High);
+    renderer()->setComplexity(ImagingGLWidget::High);
 }
 
 void
 ViewerPrivate::asComplexityVeryHigh()
 {
-    d.ui->imagingglwidget->setComplexity(ImagingGLWidget::VeryHigh);
+    renderer()->setComplexity(ImagingGLWidget::VeryHigh);
 }
 
 void

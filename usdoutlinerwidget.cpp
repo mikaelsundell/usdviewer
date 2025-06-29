@@ -20,10 +20,13 @@ public:
     void initStage(const Stage& stage);
     void addItem(const UsdPrim& prim, OutlinerItem* parent);
     void addChildren(const UsdPrim& prim, OutlinerItem* parent);
+    void toggleVisible(OutlinerItem* item);
+    void updateFilter();
     void selectionChanged();
     void updateSelection();
     struct Data {
         Stage stage;
+        QString filter;
         QPointer<Selection> selection;
         QPointer<OutlinerWidget> widget;
     };
@@ -43,6 +46,10 @@ OutlinerWidgetPrivate::initStage(const Stage& stage)
     UsdPrim prim = stage.stagePtr()->GetPseudoRoot();
     OutlinerItem* item = new OutlinerItem(d.widget.data(), prim);
     addChildren(prim, item);
+    d.widget->expandItem(item);
+    for (int i = 0; i < item->childCount(); ++i) {
+        d.widget->expandItem(item->child(i));
+    }
 }
 
 void
@@ -59,6 +66,41 @@ OutlinerWidgetPrivate::addChildren(const UsdPrim& prim, OutlinerItem* parent)
     UsdPrimSiblingRange children = prim.GetAllChildren();  // todo: add filters for children
     for (const UsdPrim& child : children) {
         addItem(child, parent);
+    }
+}
+
+void
+OutlinerWidgetPrivate::toggleVisible(OutlinerItem* parent)
+{
+    parent->setVisible(!parent->isVisible());
+    d.selection->selectionChanged();
+}
+
+void
+OutlinerWidgetPrivate::updateFilter()
+{
+    std::function<bool(QTreeWidgetItem*)> matchfilter = [&](QTreeWidgetItem* item) -> bool {
+        bool matches = false;
+        for (int col = 0; col < d.widget->columnCount(); ++col) {
+            if (item->text(col).contains(d.filter, Qt::CaseInsensitive)) {
+                matches = true;
+                break;
+            }
+        }
+        bool childMatches = false;
+        for (int i = 0; i < item->childCount(); ++i) {
+            QTreeWidgetItem* child = item->child(i);
+            if (matchfilter(child)) {
+                childMatches = true;
+            }
+        }
+
+        bool visible = matches || childMatches;
+        item->setHidden(!visible);
+        return visible;
+    };
+    for (int i = 0; i < d.widget->topLevelItemCount(); ++i) {
+        matchfilter(d.widget->topLevelItem(i));
     }
 }
 
@@ -104,9 +146,6 @@ OutlinerWidgetPrivate::updateSelection()
     }
 }
 
-// todo: not yet in use
-// #include "usdoutlinerwidget.moc"
-
 OutlinerWidget::OutlinerWidget(QWidget* parent)
     : QTreeWidget(parent)
     , p(new OutlinerWidgetPrivate())
@@ -147,6 +186,21 @@ OutlinerWidget::setStage(const Stage& stage)
     return true;
 }
 
+QString
+OutlinerWidget::filter() const
+{
+    return p->d.filter;
+}
+
+void
+OutlinerWidget::setFilter(const QString& filter)
+{
+    if (filter != p->d.filter) {
+        p->d.filter = filter;
+        p->updateFilter();
+    }
+}
+
 void
 OutlinerWidget::updateSelection()
 {
@@ -170,10 +224,24 @@ OutlinerWidget::keyPressEvent(QKeyEvent* event)
 void
 OutlinerWidget::mousePressEvent(QMouseEvent* event)
 {
-    QTreeWidget::mousePressEvent(event);
-    if (itemAt(event->pos()) == nullptr) {
+    QTreeWidgetItem* item = itemAt(event->pos());
+    int column = columnAt(event->pos().x());
+    if (!item) {
         clearSelection();
         itemSelectionChanged();
+        return;
     }
+    if (column == OutlinerItem::Visible) {
+        p->toggleVisible(static_cast<OutlinerItem*>(item));  // no qobject inheritance
+        event->accept();
+        return;
+    }
+    QTreeWidget::mousePressEvent(event);
+}
+
+void
+OutlinerWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    event->accept();  // avoid drag selection
 }
 }  // namespace usd

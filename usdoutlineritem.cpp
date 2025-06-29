@@ -6,6 +6,8 @@
 #include "usdselection.h"
 #include <QPointer>
 #include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usdGeom/imageable.h>
+#include <pxr/usd/usdGeom/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -30,6 +32,7 @@ OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdPrim& prim)
 {
     p->d.item = this;
     p->d.prim = prim;
+    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
     p->init();
 }
 
@@ -39,6 +42,7 @@ OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim)
 {
     p->d.item = this;
     p->d.prim = prim;
+    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
     p->init();
 }
 
@@ -49,15 +53,52 @@ OutlinerItem::data(int column, int role) const
 {
     if (role == Qt::DisplayRole || role == Qt::ToolTipRole) {
         switch (column) {
-        case OutlinerItem::Name: return QString::fromStdString(p->d.prim.GetName().GetString());
-        case OutlinerItem::Type: return QString::fromStdString(p->d.prim.GetTypeName().GetString());
-        case OutlinerItem::Visible: return p->d.prim.IsActive() ? "Visible" : "Hidden";
+        case Name: return QString::fromStdString(p->d.prim.GetName().GetString());
+        case Type: return QString::fromStdString(p->d.prim.GetTypeName().GetString());
+        case Visible: {
+            UsdGeomImageable imageable(p->d.prim);
+            if (imageable && p->d.prim.IsActive()) {
+                TfToken vis;
+                imageable.GetVisibilityAttr().Get(&vis);
+                return (vis == UsdGeomTokens->invisible) ? "I" : "V";
+            }
+            return "";
+        }
         default: break;
         }
     }
     else if (role == Qt::UserRole) {
-        return QString::fromStdString(p->d.prim.GetPath().GetText());
+        return QString::fromStdString(p->d.prim.GetPath().GetString());
     }
+
     return QTreeWidgetItem::data(column, role);
 }
+
+bool
+OutlinerItem::isVisible() const
+{
+    UsdGeomImageable imageable(p->d.prim);
+    if (imageable && p->d.prim.IsActive()) {
+        TfToken vis;
+        imageable.GetVisibilityAttr().Get(&vis);
+        return vis != UsdGeomTokens->invisible;
+    }
+    return false;
+}
+
+void
+OutlinerItem::setVisible(bool visible)
+{
+    UsdGeomImageable imageable(p->d.prim);
+    if (imageable && p->d.prim.IsActive()) {
+        if (visible) {
+            imageable.MakeVisible();
+        }
+        else {
+            imageable.MakeInvisible();
+        }
+        emitDataChanged();
+    }
+}
+
 }  // namespace usd

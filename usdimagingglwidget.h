@@ -16,6 +16,9 @@ class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     Q_OBJECT
 public:
     enum Complexity { Low, Medium, High, VeryHigh };
+    enum DrawMode { Points, Wireframe, WireframeOnSurface, ShadedFlat, ShadedSmooth, GeomOnly, GeomFlat, GeomSmooth };
+
+public:
     ImagingGLWidget(QWidget* parent = nullptr);
     virtual ~ImagingGLWidget();
     ViewCamera viewCamera() const;
@@ -24,8 +27,20 @@ public:
     ImagingGLWidget::Complexity complexity() const;
     void setComplexity(ImagingGLWidget::Complexity complexity);
 
+    DrawMode drawMode() const;
+    void setDrawMode(ImagingGLWidget::DrawMode drawMode);
+
     QColor clearColor() const;
     void setClearColor(const QColor& color);
+
+    bool defaultCameraLightEnabled() const;
+    void setDefaultCameraLightEnabled(bool enabled);
+
+    bool sceneLightsEnabled() const;
+    void setSceneLightsEnabled(bool enabled);
+
+    bool sceneMaterialsEnabled() const;
+    void setSceneMaterialsEnabled(bool enabled);
 
     QList<QString> rendererAovs() const;
     void setRendererAov(const QString& aov);

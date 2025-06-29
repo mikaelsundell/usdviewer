@@ -25,12 +25,16 @@ public:
     Stage stage() const;
     bool setStage(const Stage& stage);
 
+    QString filter() const;
+    void setFilter(const QString& filter);
+
 public Q_SLOTS:
     void updateSelection();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
 
 private:
     QScopedPointer<OutlinerWidgetPrivate> p;

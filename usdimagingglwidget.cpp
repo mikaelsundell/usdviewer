@@ -1,9 +1,9 @@
-﻿// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "platform.h"
 #include "usdimagingglwidget.h"
+#include "platform.h"
 #include "usdutils.h"
 #include "usdviewcamera.h"
 #include <QColor>
@@ -47,16 +47,23 @@ public:
     GfVec4d widgetViewport() const;
     void cleanUp();
     struct Data {
-        QString aov;
-        QColor clearColor;
         size_t count;
         qint64 frame;
+        QString aov;
+        QColor clearColor;
+        float defaultAmbient;
+        float defaultSpecular;
+        float defaultShininess;
+        bool defaultCameraLightEnabled;
+        bool sceneLightsEnabled;
+        bool sceneMaterialsEnabled;
         bool drag;
         QPoint mousepos;
         Stage stage;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
-        ImagingGLWidget::Complexity complexity = ImagingGLWidget::Low;
+        ImagingGLWidget::Complexity complexity;
+        ImagingGLWidget::DrawMode drawMode;
         UsdImagingGLRenderParams params;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<Selection> selection;
@@ -71,10 +78,18 @@ ImagingGLWidgetPrivate::init()
     QSurfaceFormat format;
     format.setSamples(4);
     d.widget->setFormat(format);
-    d.aov = "color";
     d.count = 0;
     d.frame = 0;
+    d.aov = "color";
+    d.defaultAmbient = 0.4f;
+    d.defaultSpecular = 0.5f;
+    d.defaultShininess = 32.0f;
+    d.defaultCameraLightEnabled = true;
+    d.sceneLightsEnabled = true;
+    d.sceneMaterialsEnabled = true;
     d.drag = false;
+    d.complexity = ImagingGLWidget::Low;
+    d.drawMode = ImagingGLWidget::ShadedSmooth;
 }
 
 void
@@ -141,40 +156,70 @@ ImagingGLWidgetPrivate::paintGL()
                 CameraUtilFraming(GfRange2f(GfVec2i(), widgetSize()), GfRect2i(GfVec2i(), widgetSize())));
             d.glEngine->SetWindowPolicy(CameraUtilMatchVertically);
             d.glEngine->SetRenderViewport(viewport);
-
 #ifdef WIN32
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_LESS);
-
-
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 #endif
-
             d.viewCamera.setAspectRatio(widgetAspectRatio());
             GfCamera camera = d.viewCamera.camera();
             GfFrustum frustum = camera.GetFrustum();
             GfMatrix4d viewModel = frustum.ComputeViewMatrix();
             GfMatrix4d projectionMatrix = frustum.ComputeProjectionMatrix();
             d.glEngine->SetCameraState(viewModel, projectionMatrix);
-
             d.params.clearColor = QColor_GfVec4f(d.clearColor);
             d.params.complexity = complexityRefinement(d.complexity);
+            // drawmode
+            {
+                UsdImagingGLDrawMode mode;
+                switch (d.drawMode) {
+                case ImagingGLWidget::Points: mode = UsdImagingGLDrawMode::DRAW_POINTS; break;
+                case ImagingGLWidget::Wireframe: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME; break;
+                case ImagingGLWidget::WireframeOnSurface: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE; break;
+                case ImagingGLWidget::ShadedFlat: mode = UsdImagingGLDrawMode::DRAW_SHADED_FLAT; break;
+                case ImagingGLWidget::ShadedSmooth: mode = UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH; break;
+                case ImagingGLWidget::GeomOnly: mode = UsdImagingGLDrawMode::DRAW_GEOM_ONLY; break;
+                case ImagingGLWidget::GeomFlat: mode = UsdImagingGLDrawMode::DRAW_GEOM_FLAT; break;
+                case ImagingGLWidget::GeomSmooth: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH; break;
+                default: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH;
+                }
+                d.params.drawMode = mode;
+            }
             d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
-            d.params.drawMode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE;  // todo: changed to DRAW_SHADED_SMOOTH;
             d.params.forceRefresh = true;
-            d.params.enableLighting = false;
-            d.params.enableSampleAlphaToCoverage = false;
-            d.params.enableSceneMaterials = false;
-            d.params.enableSceneLights = true;
+            d.params.enableLighting = true;
+            // defaults
+            {
+                std::vector<GlfSimpleLight> lights;
+                if (d.defaultCameraLightEnabled) {
+                    GfCamera camera = d.viewCamera.camera();
+                    GfMatrix4d viewInverse = camera.GetTransform();
+                    GfVec3d camPos = viewInverse.ExtractTranslation();
+
+                    GlfSimpleLight light;
+                    light.SetAmbient(GfVec4f(0, 0, 0, 0));
+                    light.SetPosition(GfVec4f(camPos[0], camPos[1], camPos[2], 1.0f));
+                    light.SetTransform(viewInverse);
+                    lights.push_back(light);
+                }
+                GfVec4f defaultAmbient(d.defaultAmbient, d.defaultAmbient, d.defaultAmbient, 1.0f);
+                GlfSimpleMaterial material;
+                material.SetAmbient(defaultAmbient);
+                material.SetSpecular(GfVec4f(d.defaultSpecular, d.defaultSpecular, d.defaultSpecular, 1.0f));
+                material.SetShininess(d.defaultShininess);
+                d.glEngine->SetLightingState(lights, material, defaultAmbient);
+            }
+            d.params.enableSampleAlphaToCoverage = true;
+            d.params.enableSceneLights = d.sceneLightsEnabled;
+            d.params.enableSceneMaterials = d.sceneMaterialsEnabled;
             d.params.flipFrontFacing = true;
             d.params.gammaCorrectColors = false;
             d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;
             d.params.showRender = true;
-
             TfErrorMark mark;
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
@@ -265,7 +310,7 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
     if (d.stage.isValid()) {
         if (d.glEngine) {
 #ifdef WIN32
-            glDepthMask(GL_TRUE); // needed on windows
+            glDepthMask(GL_TRUE);  // needed on windows
 #endif
             QPoint mousepos = deviceRatio(event->pos());
             GfVec4d viewport = widgetViewport();
@@ -400,6 +445,21 @@ ImagingGLWidget::setComplexity(ImagingGLWidget::Complexity complexity)
     }
 }
 
+ImagingGLWidget::DrawMode
+ImagingGLWidget::drawMode() const
+{
+    return p->d.drawMode;
+}
+
+void
+ImagingGLWidget::setDrawMode(DrawMode drawMode)
+{
+    if (drawMode != p->d.drawMode) {
+        p->d.drawMode = drawMode;
+        update();
+    }
+}
+
 QColor
 ImagingGLWidget::clearColor() const
 {
@@ -411,6 +471,51 @@ ImagingGLWidget::setClearColor(const QColor& color)
 {
     if (color != p->d.clearColor) {
         p->d.clearColor = color;
+        update();
+    }
+}
+
+bool
+ImagingGLWidget::defaultCameraLightEnabled() const
+{
+    return p->d.defaultCameraLightEnabled;
+}
+
+void
+ImagingGLWidget::setDefaultCameraLightEnabled(bool enabled)
+{
+    if (enabled != p->d.defaultCameraLightEnabled) {
+        p->d.defaultCameraLightEnabled = enabled;
+        update();
+    }
+}
+
+bool
+ImagingGLWidget::sceneLightsEnabled() const
+{
+    return p->d.sceneLightsEnabled;
+}
+
+void
+ImagingGLWidget::setSceneLightsEnabled(bool enabled)
+{
+    if (enabled != p->d.defaultCameraLightEnabled) {
+        p->d.defaultCameraLightEnabled = enabled;
+        update();
+    }
+}
+
+bool
+ImagingGLWidget::sceneMaterialsEnabled() const
+{
+    return p->d.sceneMaterialsEnabled;
+}
+
+void
+ImagingGLWidget::setSceneMaterialsEnabled(bool enabled)
+{
+    if (enabled != p->d.sceneMaterialsEnabled) {
+        p->d.sceneMaterialsEnabled = enabled;
         update();
     }
 }

@@ -178,6 +178,7 @@ ViewerPrivate::init()
         connect(action, &QAction::triggered, [&]() { this->stylesheet(); });
     }
 #endif
+    d.viewer->setFocusPolicy(Qt::ClickFocus);
 }
 
 void
@@ -334,6 +335,7 @@ ViewerPrivate::exportAll()
 void
 ViewerPrivate::exportSelected()
 {
+    QString exportImageDir = settingsValue("exportSelectionDir", QDir::homePath()).toString();
     qDebug() << "todo: export selected";
 }
 
@@ -388,9 +390,11 @@ ViewerPrivate::frameAll()
 void
 ViewerPrivate::frameSelected()
 {
-    camera().setBoundingBox(d.stage.boundingBox(selection()->paths()));
-    camera().frameAll();
-    renderer()->update();
+    if (selection()->paths().size()) {
+        camera().setBoundingBox(d.stage.boundingBox(selection()->paths()));
+        camera().frameAll();
+        renderer()->update();
+    }
 }
 
 void

@@ -51,6 +51,11 @@ Stage::loadFromFile(const QString& filename)
 }
 
 bool
+Stage::saveFromPaths(const QList<SdfPath>& paths)
+{
+}
+
+bool
 Stage::isValid() const
 {
     return p->d.stageptr != nullptr;

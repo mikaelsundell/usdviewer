@@ -20,6 +20,7 @@ public:
     Stage(const Stage& other);
     ~Stage();
     bool loadFromFile(const QString& filename);
+    bool saveFromPaths(const QList<SdfPath>& paths);
     bool isValid() const;
     GfBBox3d boundingBox() const;
     GfBBox3d boundingBox(const QList<SdfPath> paths) const;

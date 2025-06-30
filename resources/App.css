@@ -381,14 +381,14 @@ QToolButton#toggleLog
 /* QScrollBar widgets */
 QScrollBar:horizontal {
     background: hsl(220, 8%, 15%);
-    height: 10px;
+    height: 6px;
     margin: 0;
     border: none;
 }
 
 QScrollBar::handle:horizontal {
     background: hsl(0, 0%, 80%);
-    min-width: 20px;
+    min-width: 6px;
     border-radius: 5px;
 }
 
@@ -416,14 +416,14 @@ QScrollBar::sub-page:horizontal {
 
 QScrollBar:vertical {
     background: hsl(220, 8%, 15%);
-    width: 10px;
+    width: 6px;
     margin: 0;
     border: none;
 }
 
 QScrollBar::handle:vertical {
     background: hsl(0, 0%, 80%);
-    min-height: 20px;
+    min-height: 6px;
     border-radius: 5px;
 }
 

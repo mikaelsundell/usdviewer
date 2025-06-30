@@ -52,7 +52,7 @@
         <number>12</number>
        </property>
        <property name="topMargin">
-        <number>12</number>
+        <number>0</number>
        </property>
        <property name="rightMargin">
         <number>12</number>
@@ -418,7 +418,7 @@
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QDockWidget" name="dockWidget_2">
+  <widget class="usd::DockWidget" name="dockWidget_2">
    <property name="minimumSize">
     <size>
      <width>400</width>
@@ -712,6 +712,12 @@
   </action>
  </widget>
  <customwidgets>
+  <customwidget>
+   <class>usd::DockWidget</class>
+   <extends>QDockWidget</extends>
+   <header>../../../sources/usddockwidget.h</header>
+   <container>1</container>
+  </customwidget>
   <customwidget>
    <class>usd::ImagingGLWidget</class>
    <extends>QOpenGLWidget</extends>

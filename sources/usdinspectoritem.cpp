@@ -20,16 +20,14 @@ InspectorItemPrivate::init()
 {}
 
 InspectorItem::InspectorItem(QTreeWidget* parent)
-: QTreeWidgetItem(parent)
-, p(new InspectorItemPrivate())
-{
-}
+    : QTreeWidgetItem(parent)
+    , p(new InspectorItemPrivate())
+{}
 
 InspectorItem::InspectorItem(QTreeWidgetItem* parent)
-: QTreeWidgetItem(parent)
-, p(new InspectorItemPrivate())
-{
-}
+    : QTreeWidgetItem(parent)
+    , p(new InspectorItemPrivate())
+{}
 
 InspectorItem::~InspectorItem() {}
 

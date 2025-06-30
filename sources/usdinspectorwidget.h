@@ -21,7 +21,7 @@ public:
 
     Selection* selection();
     void setSelection(Selection* selection);
-    
+
     Stage stage() const;
     bool setStage(const Stage& stage);
 

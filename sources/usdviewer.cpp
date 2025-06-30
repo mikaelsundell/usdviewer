@@ -208,7 +208,7 @@ ViewerPrivate::renderer()
 {
     return d.ui->imagingglWidget;
 }
-                                
+
 InspectorWidget*
 ViewerPrivate::inspector()
 {

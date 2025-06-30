@@ -26,8 +26,7 @@ public:
 
 void
 InspectorWidgetPrivate::init()
-{
-}
+{}
 
 void
 InspectorWidgetPrivate::initStage(const Stage& stage)
@@ -41,7 +40,7 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
     metersItem->setText(InspectorItem::Key, "metersPerUnit");
     metersItem->setText(InspectorItem::Value, QString::number(metersPerUnit));
     d.widget->addTopLevelItem(metersItem);
-    
+
     // upAxis
     TfToken upAxis = UsdGeomGetStageUpAxis(stageptr);
     InspectorItem* upAxisItem = new InspectorItem(d.widget.data());
@@ -95,9 +94,7 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
 
 void
 InspectorWidgetPrivate::updateSelection()
-{
-    
-}
+{}
 
 InspectorWidget::InspectorWidget(QWidget* parent)
     : QTreeWidget(parent)

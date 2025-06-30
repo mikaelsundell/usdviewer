@@ -47,7 +47,8 @@ Stage::loadFromFile(const QString& filename)
     p->d.stageptr = UsdStage::Open(filename.toStdString());
     if (p->d.stageptr) {
         p->d.metadata.clear();
-        p->d.metadata["metersPerUnit"] = UsdGeomGetStageMetersPerUnit(p->d.stageptr);;
+        p->d.metadata["metersPerUnit"] = UsdGeomGetStageMetersPerUnit(p->d.stageptr);
+        ;
         p->d.metadata["upAxis"] = QString::fromStdString(UsdGeomGetStageUpAxis(p->d.stageptr).GetString());
         p->d.metadata["hasAuthoredTimeCodeRange"] = p->d.stageptr->HasAuthoredTimeCodeRange();
         p->d.metadata["startTimeCode"] = p->d.stageptr->GetStartTimeCode();

@@ -14,7 +14,7 @@ public:
     InspectorItem(QTreeWidget* parent);
     InspectorItem(QTreeWidgetItem* parent);
     virtual ~InspectorItem();
-    
+
 private:
     QScopedPointer<InspectorItemPrivate> p;
 };

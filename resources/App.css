@@ -5,9 +5,15 @@
 
 /* Top-level widgets */
 QMainWindow,
-QDialog
+QDialog,
+QDockWidget
 {
     background-color: hsl(220, 30%, 6%);
+}
+
+QMainWindow::separator {
+    background: transparent;
+    width: 6px;
 }
 
 /* QCheckBox widgets */
@@ -315,9 +321,10 @@ QTreeView QHeaderView:section
     color: hsl(0, 0%, 80%);
     font-size: 10px;
     font-weight: normal;
-    border: 1px solid hsl(220, 0%, 10%);
+    border: 0px solid hsl(220, 0%, 10%);
     background-color: hsl(220, 30%, 12%);
     padding: 4px;
+    padding-left: 14px;
 }
 
 /* QToolButton widgets */
@@ -478,13 +485,12 @@ QSlider::handle:horizontal
     border-radius: 6px;
 }
 
-/* Custom widgets */
-Filedrop {
-    border: 2px solid hsl(220, 30%, 6%);
-    background-color: hsl(220, 30%, 6%);
-}
-
-Filedrop[dragging="true"] {
-    border: 2px dashed hsl(225, 3%, 29%);
-    background-color: hsl(220, 30%, 6%);
+/* QWidgets widgets */
+QWidget#filterWidget,
+QWidget#renderWidget,
+QWidget#outlinerWidget,
+QWidget#inspectorWidget
+{
+    background-color: hsl(220, 30%, 8%);
+    border-radius: 10px;
 }

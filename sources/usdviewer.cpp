@@ -6,6 +6,7 @@
 #include "icctransform.h"
 #include "mouseevent.h"
 #include "platform.h"
+#include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
 #include "usdstage.h"
 #include <QActionGroup>
@@ -33,6 +34,7 @@ public:
     void initStage(const Stage& stage);
     ViewCamera camera();
     ImagingGLWidget* renderer();
+    InspectorWidget* inspector();
     OutlinerWidget* outliner();
     Selection* selection();
     QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
@@ -105,16 +107,21 @@ ViewerPrivate::init()
     // renderer
     renderer()->setClearColor(d.clearColor);
     renderer()->setSelection(d.selection.data());
+    // metadata
+    inspector()->setHeaderLabels(QStringList() << "Key"
+                                               << "Value");
+    inspector()->setColumnWidth(InspectorItem::Key, 180);
+    inspector()->setColumnWidth(InspectorItem::Value, 80);
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
                                               << "Type"
                                               << "Visibility");
-    outliner()->setColumnWidth(OutlinerItem::Name, 200);
+    outliner()->setColumnWidth(OutlinerItem::Name, 180);
     outliner()->setColumnWidth(OutlinerItem::Type, 80);
     outliner()->setColumnWidth(OutlinerItem::Visible, 80);
     outliner()->setSelection(d.selection.data());
     // connect
-    connect(d.ui->imagingglwidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
+    connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->fileExportAll, &QAction::triggered, this, &ViewerPrivate::exportAll);
     connect(d.ui->fileExportSelected, &QAction::triggered, this, &ViewerPrivate::exportSelected);
@@ -152,8 +159,8 @@ ViewerPrivate::init()
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglwidget, &ImagingGLWidget::updateSelection);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerwidget, &OutlinerWidget::updateSelection);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglWidget, &ImagingGLWidget::updateSelection);
+    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerWidget, &OutlinerWidget::updateSelection);
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -178,13 +185,13 @@ ViewerPrivate::init()
         connect(action, &QAction::triggered, [&]() { this->stylesheet(); });
     }
 #endif
-    d.viewer->setFocusPolicy(Qt::ClickFocus);
 }
 
 void
 ViewerPrivate::initStage(const Stage& stage)
 {
     renderer()->setStage(stage);
+    inspector()->setStage(stage);
     outliner()->setStage(stage);
     d.stage = stage;
 }
@@ -192,19 +199,26 @@ ViewerPrivate::initStage(const Stage& stage)
 ViewCamera
 ViewerPrivate::camera()
 {
-    return d.ui->imagingglwidget->viewCamera();
+    return d.ui->imagingglWidget->viewCamera();
 }
+
 
 ImagingGLWidget*
 ViewerPrivate::renderer()
 {
-    return d.ui->imagingglwidget;
+    return d.ui->imagingglWidget;
+}
+                                
+InspectorWidget*
+ViewerPrivate::inspector()
+{
+    return d.ui->inspectorWidget;
 }
 
 OutlinerWidget*
 ViewerPrivate::outliner()
 {
-    return d.ui->outlinerwidget;
+    return d.ui->outlinerWidget;
 }
 
 Selection*
@@ -301,7 +315,7 @@ ViewerPrivate::open()
 void
 ViewerPrivate::ready()
 {
-    for (QString aov : d.ui->imagingglwidget->rendererAovs()) {
+    for (QString aov : renderer()->rendererAovs()) {
         d.ui->aov->addItem(aov, QVariant::fromValue(aov));  // can only be requested after renderer is ready
     }
 }
@@ -309,7 +323,7 @@ ViewerPrivate::ready()
 void
 ViewerPrivate::copyImage()
 {
-    QImage image = d.ui->imagingglwidget->image();
+    QImage image = renderer()->image();
     QClipboard* clipboard = QGuiApplication::clipboard();
     clipboard->setImage(image);
 }
@@ -319,7 +333,7 @@ ViewerPrivate::clearColor()
 {
     QColor color = QColorDialog::getColor(d.clearColor, d.viewer.data(), "Select color");
     if (color.isValid()) {
-        d.ui->imagingglwidget->setClearColor(color);
+        renderer()->setClearColor(color);
         d.ui->clearcolor->setStyleSheet("background-color: " + color.name() + ";");
         setSettingsValue("clearColor", color.name());
         d.clearColor = color;
@@ -329,21 +343,44 @@ ViewerPrivate::clearColor()
 void
 ViewerPrivate::exportAll()
 {
-    qDebug() << "todo: export all";
+    QString exportDir = settingsValue("exportDir", QDir::homePath()).toString();
+    QString defaultFormat = "usd";
+    QString exportName = exportDir + "/all." + defaultFormat;
+    QString filter = "USD Files (*.usd *.usda *.usdz)";
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
+    if (!filename.isEmpty()) {
+        if (d.stage.exportToFile(filename)) {
+            setSettingsValue("exportDir", QFileInfo(filename).absolutePath());
+        }
+        else {
+            qWarning() << "Failed to export stage to:" << filename;
+        }
+    }
 }
 
 void
 ViewerPrivate::exportSelected()
 {
-    QString exportImageDir = settingsValue("exportSelectionDir", QDir::homePath()).toString();
-    qDebug() << "todo: export selected";
+    QString exportSelectedDir = settingsValue("exportSelectedDir", QDir::homePath()).toString();
+    QString defaultFormat = "usd";
+    QString exportName = exportSelectedDir + "/selected." + defaultFormat;
+    QString filter = "USD Files (*.usd *.usda *.usdz)";
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
+    if (!filename.isEmpty()) {
+        if (d.stage.exportPathsToFile(d.selection->paths(), filename)) {
+            setSettingsValue("exportSelectedDir", QFileInfo(filename).absolutePath());
+        }
+        else {
+            qWarning() << "Failed to export stage to:" << filename;
+        }
+    }
 }
 
 void
 ViewerPrivate::exportImage()
 {
     QString exportImageDir = settingsValue("exportImageDir", QDir::homePath()).toString();
-    QImage image = d.ui->imagingglwidget->image();
+    QImage image = renderer()->image();
     QStringList filters;
     QList<QByteArray> formats = QImageWriter::supportedImageFormats();
     QString defaultFormat = "png";
@@ -357,7 +394,6 @@ ViewerPrivate::exportImage()
     filters.append("All Files (*)");
     QString filter = filters.join(";;");
     QString exportName = exportImageDir + "/image." + defaultFormat;
-
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export Image", exportName, filter);
     if (!filename.isEmpty()) {
         QString extension = QFileInfo(filename).suffix().toLower();

@@ -24,10 +24,10 @@ if (WIN32)
 endif ()
 
 file (GLOB project_sources
-    "*.h"
-    "*.cpp"
-    "*.qrc"
-    "*.ui"
+    "sources/*.h"
+    "sources/*.cpp"
+    "sources/*.qrc"
+    "sources/*.ui"
 )
 list (FILTER project_sources EXCLUDE REGEX "_")
 
@@ -42,7 +42,7 @@ source_group ("Resource Files" FILES ${project_resources})
 
 set (project_copyright "Copyright 2025-present Contributors to the ${project_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
-set (project_long_version "1.2.3")
+set (project_long_version "1.2.4")
 set (project_short_version "1.2")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
@@ -62,7 +62,7 @@ if (APPLE)
     set (MACOSX_BUNDLE_COPYRIGHT ${project_copyright})
     set (MACOSX_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
     set_source_files_properties(${project_resources} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-    list (APPEND project_sources platform_mac.mm)
+    list (APPEND project_sources "sources/platform_mac.mm")
     add_executable (${project_name} MACOSX_BUNDLE ${project_sources} ${project_resources})
     set_target_properties (${project_name} PROPERTIES
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${project_identifier}"
@@ -82,7 +82,7 @@ if (APPLE)
         "-framework AppKit")
 
 elseif (WIN32)
-    list (APPEND project_sources platform_win.cpp)
+    list (APPEND project_sources "sources/platform_win.cpp")
     add_executable (${project_name} WIN32 ${project_sources} ${project_resources})
     target_compile_definitions (${project_name} PRIVATE 
         WIN32

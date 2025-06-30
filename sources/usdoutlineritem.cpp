@@ -3,7 +3,6 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdoutlineritem.h"
-#include "usdselection.h"
 #include <QPointer>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/imageable.h>

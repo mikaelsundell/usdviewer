@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "usdcontroller.h"
 #include "usdselection.h"
 #include "usdstage.h"
 #include <QTreeWidget>
@@ -18,6 +19,9 @@ class OutlinerWidget : public QTreeWidget {
 public:
     OutlinerWidget(QWidget* parent = nullptr);
     virtual ~OutlinerWidget();
+    
+    Controller* controller();
+    void setController(Controller* controller);
 
     Selection* selection();
     void setSelection(Selection* selection);
@@ -27,9 +31,6 @@ public:
 
     QString filter() const;
     void setFilter(const QString& filter);
-
-public Q_SLOTS:
-    void updateSelection();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;

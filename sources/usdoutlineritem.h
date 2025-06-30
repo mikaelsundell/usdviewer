@@ -18,9 +18,7 @@ public:
     OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim);
     virtual ~OutlinerItem();
     QVariant data(int column, int role) const override;
-
     bool isVisible() const;
-    void setVisible(bool visible);
 
 private:
     QScopedPointer<OutlinerItemPrivate> p;

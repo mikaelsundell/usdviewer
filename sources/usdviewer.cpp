@@ -6,6 +6,7 @@
 #include "icctransform.h"
 #include "mouseevent.h"
 #include "platform.h"
+#include "usdcontroller.h"
 #include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
 #include "usdstage.h"
@@ -36,6 +37,7 @@ public:
     ImagingGLWidget* renderer();
     InspectorWidget* inspector();
     OutlinerWidget* outliner();
+    Controller* controller();
     Selection* selection();
     QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
     void setSettingsValue(const QString& key, const QVariant& value);
@@ -51,6 +53,9 @@ public Q_SLOTS:
     void exportAll();
     void exportSelected();
     void exportImage();
+    void showSelected();
+    void hideSelected();
+    void deleteSelected();
     void frameAll();
     void frameSelected();
     void resetView();
@@ -74,6 +79,7 @@ public:
         QStringList extensions;
         QColor clearColor;
         QScopedPointer<MouseEvent> clearColorFilter;
+        QScopedPointer<Controller> controller;
         QScopedPointer<Selection> selection;
         QScopedPointer<Ui_Usdviewer> ui;
         QPointer<Viewer> viewer;
@@ -102,10 +108,13 @@ ViewerPrivate::init()
     d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
     // event filter
     d.viewer->installEventFilter(this);
+    // controller
+    d.controller.reset(new Controller());
     // selection
     d.selection.reset(new Selection());
     // renderer
     renderer()->setClearColor(d.clearColor);
+    renderer()->setController(d.controller.data());
     renderer()->setSelection(d.selection.data());
     // metadata
     inspector()->setHeaderLabels(QStringList() << "Key"
@@ -119,6 +128,7 @@ ViewerPrivate::init()
     outliner()->setColumnWidth(OutlinerItem::Name, 180);
     outliner()->setColumnWidth(OutlinerItem::Type, 80);
     outliner()->setColumnWidth(OutlinerItem::Visible, 80);
+    outliner()->setController(d.controller.data());
     outliner()->setSelection(d.selection.data());
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
@@ -127,6 +137,9 @@ ViewerPrivate::init()
     connect(d.ui->fileExportSelected, &QAction::triggered, this, &ViewerPrivate::exportSelected);
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
+    connect(d.ui->editShow, &QAction::triggered, this, &ViewerPrivate::showSelected);
+    connect(d.ui->editHide, &QAction::triggered, this, &ViewerPrivate::hideSelected);
+    connect(d.ui->editDelete, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
     connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
@@ -158,9 +171,7 @@ ViewerPrivate::init()
     connect(d.ui->enableSceneMaterials, &QCheckBox::toggled, this, &ViewerPrivate::sceneMaterialsEnabled);
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
-    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->imagingglWidget, &ImagingGLWidget::updateSelection);
-    connect(d.selection.data(), &Selection::selectionChanged, d.ui->outlinerWidget, &OutlinerWidget::updateSelection);
+    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);    
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -190,6 +201,7 @@ ViewerPrivate::init()
 void
 ViewerPrivate::initStage(const Stage& stage)
 {
+    controller()->setStage(stage);
     renderer()->setStage(stage);
     inspector()->setStage(stage);
     outliner()->setStage(stage);
@@ -219,6 +231,12 @@ OutlinerWidget*
 ViewerPrivate::outliner()
 {
     return d.ui->outlinerWidget;
+}
+
+Controller*
+ViewerPrivate::controller()
+{
+    return d.controller.data();
 }
 
 Selection*
@@ -412,6 +430,30 @@ ViewerPrivate::exportImage()
         else {
             qWarning() << "failed to save image: " << filename;
         }
+    }
+}
+
+void
+ViewerPrivate::showSelected()
+{
+    if (selection()->paths().size()) {
+        d.controller->visiblePaths(d.selection->paths(), true);
+    }
+}
+
+void
+ViewerPrivate::hideSelected()
+{
+    if (selection()->paths().size()) {
+        d.controller->visiblePaths(d.selection->paths(), false);
+    }
+}
+
+void
+ViewerPrivate::deleteSelected()
+{
+    if (selection()->paths().size()) {
+        d.controller->removePaths(d.selection->paths());
     }
 }
 

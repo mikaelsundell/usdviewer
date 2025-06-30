@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "usdcontroller.h"
 #include "usdselection.h"
 #include "usdstage.h"
 #include "usdviewcamera.h"
@@ -45,15 +46,15 @@ public:
     QList<QString> rendererAovs() const;
     void setRendererAov(const QString& aov);
 
+    Controller* controller();
+    void setController(Controller* controller);
+    
     Selection* selection();
     void setSelection(Selection* selection);
 
     Stage stage() const;
     bool setStage(const Stage& stage);
-
-public Q_SLOTS:
-    void updateSelection();
-
+    
 Q_SIGNALS:
     void rendererReady();
 

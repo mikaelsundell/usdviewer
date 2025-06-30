@@ -25,9 +25,6 @@ public:
     Stage stage() const;
     bool setStage(const Stage& stage);
 
-public Q_SLOTS:
-    void updateSelection();
-
 private:
     QScopedPointer<InspectorWidgetPrivate> p;
 };

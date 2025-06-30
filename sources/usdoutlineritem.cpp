@@ -59,7 +59,7 @@ OutlinerItem::data(int column, int role) const
             if (imageable && p->d.prim.IsActive()) {
                 TfToken vis;
                 imageable.GetVisibilityAttr().Get(&vis);
-                return (vis == UsdGeomTokens->invisible) ? "I" : "V";
+                return (vis == UsdGeomTokens->invisible) ? "H" : "V";
             }
             return "";
         }
@@ -83,21 +83,6 @@ OutlinerItem::isVisible() const
         return vis != UsdGeomTokens->invisible;
     }
     return false;
-}
-
-void
-OutlinerItem::setVisible(bool visible)
-{
-    UsdGeomImageable imageable(p->d.prim);
-    if (imageable && p->d.prim.IsActive()) {
-        if (visible) {
-            imageable.MakeVisible();
-        }
-        else {
-            imageable.MakeInvisible();
-        }
-        emitDataChanged();
-    }
 }
 
 }  // namespace usd

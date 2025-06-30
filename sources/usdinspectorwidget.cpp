@@ -5,6 +5,7 @@
 #include "usdinspectorwidget.h"
 #include "usdinspectoritem.h"
 #include "usdselection.h"
+#include <QFileInfo>
 #include <QPointer>
 #include <pxr/usd/usdGeom/metrics.h>
 
@@ -33,7 +34,6 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
 {
     d.widget->clear();
 
-    // meters per unit
     UsdStageRefPtr stageptr = stage.stagePtr();
     double metersPerUnit = UsdGeomGetStageMetersPerUnit(stageptr);
     InspectorItem* metersItem = new InspectorItem(d.widget.data());
@@ -41,35 +41,30 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
     metersItem->setText(InspectorItem::Value, QString::number(metersPerUnit));
     d.widget->addTopLevelItem(metersItem);
 
-    // upAxis
     TfToken upAxis = UsdGeomGetStageUpAxis(stageptr);
     InspectorItem* upAxisItem = new InspectorItem(d.widget.data());
     upAxisItem->setText(InspectorItem::Key, "upAxis");
     upAxisItem->setText(InspectorItem::Value, QString::fromStdString(upAxis.GetString()));
     d.widget->addTopLevelItem(upAxisItem);
 
-    // timeCodesPerSecond
     double tcps = stageptr->GetTimeCodesPerSecond();
     InspectorItem* tcpsItem = new InspectorItem(d.widget.data());
     tcpsItem->setText(InspectorItem::Key, "timeCodesPerSecond");
     tcpsItem->setText(InspectorItem::Value, QString::number(tcps));
     d.widget->addTopLevelItem(tcpsItem);
 
-    // startTimeCode
     double startTime = stageptr->GetStartTimeCode();
     InspectorItem* startTimeItem = new InspectorItem(d.widget.data());
     startTimeItem->setText(InspectorItem::Key, "startTimeCode");
     startTimeItem->setText(InspectorItem::Value, QString::number(startTime));
     d.widget->addTopLevelItem(startTimeItem);
 
-    // endTimeCode
     double endTime = stageptr->GetEndTimeCode();
     InspectorItem* endTimeItem = new InspectorItem(d.widget.data());
     endTimeItem->setText(InspectorItem::Key, "endTimeCode");
     endTimeItem->setText(InspectorItem::Value, QString::number(endTime));
     d.widget->addTopLevelItem(endTimeItem);
 
-    // comment
     std::string comment = stageptr->GetRootLayer()->GetComment();
     if (!comment.empty()) {
         InspectorItem* commentItem = new InspectorItem(d.widget.data());
@@ -78,14 +73,12 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
         d.widget->addTopLevelItem(commentItem);
     }
 
-    // filePath
     std::string filePath = stageptr->GetRootLayer()->GetRealPath();
     InspectorItem* filePathItem = new InspectorItem(d.widget.data());
     filePathItem->setText(InspectorItem::Key, "filePath");
-    filePathItem->setText(InspectorItem::Value, QString::fromStdString(filePath));
+    filePathItem->setText(InspectorItem::Value, QFileInfo(QString::fromStdString(filePath)).fileName());
     d.widget->addTopLevelItem(filePathItem);
 
-    // Disable editing
     for (int i = 0; i < d.widget->topLevelItemCount(); ++i) {
         QTreeWidgetItem* item = d.widget->topLevelItem(i);
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
@@ -134,11 +127,5 @@ InspectorWidget::setStage(const Stage& stage)
     p->initStage(stage);
     update();
     return true;
-}
-
-void
-InspectorWidget::updateSelection()
-{
-    p->updateSelection();
 }
 }  // namespace usd

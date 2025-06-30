@@ -17,16 +17,20 @@ namespace usd {
 class OutlinerWidgetPrivate : public QObject {
 public:
     void init();
+    void initController();
+    void initSelection();
     void initStage(const Stage& stage);
     void addItem(const UsdPrim& prim, OutlinerItem* parent);
     void addChildren(const UsdPrim& prim, OutlinerItem* parent);
     void toggleVisible(OutlinerItem* item);
     void updateFilter();
-    void selectionChanged();
     void updateSelection();
+    void dataChanged(const QList<SdfPath>& paths);
+    void selectionChanged();
     struct Data {
         Stage stage;
         QString filter;
+        QPointer<Controller> controller;
         QPointer<Selection> selection;
         QPointer<OutlinerWidget> widget;
     };
@@ -36,7 +40,19 @@ public:
 void
 OutlinerWidgetPrivate::init()
 {
-    connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
+    connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::updateSelection);
+}
+
+void
+OutlinerWidgetPrivate::initController()
+{
+    connect(d.controller.data(), &Controller::dataChanged, this, &OutlinerWidgetPrivate::dataChanged);
+}
+
+void
+OutlinerWidgetPrivate::initSelection()
+{
+    connect(d.selection.data(), &Selection::selectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
 }
 
 void
@@ -70,10 +86,14 @@ OutlinerWidgetPrivate::addChildren(const UsdPrim& prim, OutlinerItem* parent)
 }
 
 void
-OutlinerWidgetPrivate::toggleVisible(OutlinerItem* parent)
+OutlinerWidgetPrivate::toggleVisible(OutlinerItem* item)
 {
-    parent->setVisible(!parent->isVisible());
-    d.selection->selectionChanged();
+    QList<SdfPath> paths;
+    QString pathString = item->data(0, Qt::UserRole).toString();
+    if (!pathString.isEmpty()) {
+        paths.append(SdfPath(pathString.toStdString()));
+    }
+    d.controller->visiblePaths(paths, !item->isVisible());
 }
 
 void
@@ -105,7 +125,7 @@ OutlinerWidgetPrivate::updateFilter()
 }
 
 void
-OutlinerWidgetPrivate::selectionChanged()
+OutlinerWidgetPrivate::updateSelection()
 {
     QList<SdfPath> paths;
     QList<QTreeWidgetItem*> selectedpaths = d.widget->selectedItems();
@@ -119,7 +139,13 @@ OutlinerWidgetPrivate::selectionChanged()
 }
 
 void
-OutlinerWidgetPrivate::updateSelection()
+OutlinerWidgetPrivate::dataChanged(const QList<SdfPath>& paths)
+{
+    d.widget->update();
+}
+
+void
+OutlinerWidgetPrivate::selectionChanged()
 {
     QList<SdfPath> selectedPaths = d.selection->paths();
     std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
@@ -156,6 +182,22 @@ OutlinerWidget::OutlinerWidget(QWidget* parent)
 
 OutlinerWidget::~OutlinerWidget() {}
 
+Controller*
+OutlinerWidget::controller()
+{
+    return p->d.controller;
+}
+
+void
+OutlinerWidget::setController(Controller* controller)
+{
+    if (p->d.controller != controller) {
+        p->d.controller = controller;
+        p->initController();
+        update();
+    }
+}
+
 Selection*
 OutlinerWidget::selection()
 {
@@ -167,6 +209,7 @@ OutlinerWidget::setSelection(Selection* selection)
 {
     if (p->d.selection != selection) {
         p->d.selection = selection;
+        p->initSelection();
         update();
     }
 }
@@ -199,12 +242,6 @@ OutlinerWidget::setFilter(const QString& filter)
         p->d.filter = filter;
         p->updateFilter();
     }
-}
-
-void
-OutlinerWidget::updateSelection()
-{
-    p->updateSelection();
 }
 
 void

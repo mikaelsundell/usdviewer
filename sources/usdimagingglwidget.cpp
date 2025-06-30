@@ -26,11 +26,13 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class ImagingGLWidgetPrivate {
+class ImagingGLWidgetPrivate : public QObject {
 public:
     void init();
     void initGL();
     void initCamera();
+    void initController();
+    void initSelection();
     void initStage(const Stage& stage);
     void paintGL();
     void mousePressEvent(QMouseEvent* event);
@@ -38,7 +40,8 @@ public:
     void mouseReleaseEvent(QMouseEvent* event);
     void wheelEvent(QWheelEvent* event);
     void pickEvent(QMouseEvent* event);
-    void updateSelection();
+    void dataChanged(const QList<SdfPath>& paths);
+    void selectionChanged();
     double complexityRefinement(ImagingGLWidget::Complexity complexity);
     QPoint deviceRatio(QPoint value) const;
     double deviceRatio(double value) const;
@@ -66,6 +69,7 @@ public:
         ImagingGLWidget::DrawMode drawMode;
         UsdImagingGLRenderParams params;
         QScopedPointer<UsdImagingGLEngine> glEngine;
+        QPointer<Controller> controller;
         QPointer<Selection> selection;
         QPointer<ImagingGLWidget> widget;
     };
@@ -127,6 +131,18 @@ ImagingGLWidgetPrivate::initCamera()
         d.viewCamera.setCameraUp(ViewCamera::Z);
     }
     d.viewCamera.frameAll();
+}
+
+void
+ImagingGLWidgetPrivate::initController()
+{
+    connect(d.controller.data(), &Controller::dataChanged, this, &ImagingGLWidgetPrivate::dataChanged);
+}
+
+void
+ImagingGLWidgetPrivate::initSelection()
+{
+    connect(d.selection.data(), &Selection::selectionChanged, this, &ImagingGLWidgetPrivate::selectionChanged);
 }
 
 void
@@ -343,7 +359,13 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
 }
 
 void
-ImagingGLWidgetPrivate::updateSelection()
+ImagingGLWidgetPrivate::dataChanged(const QList<SdfPath>& paths)
+{
+    d.widget->update();
+}
+
+void
+ImagingGLWidgetPrivate::selectionChanged()
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
     d.glEngine->ClearSelected();
@@ -536,6 +558,22 @@ ImagingGLWidget::setRendererAov(const QString& aov)
     }
 }
 
+Controller*
+ImagingGLWidget::controller()
+{
+    return p->d.controller;
+}
+
+void
+ImagingGLWidget::setController(Controller* controller)
+{
+    if (p->d.controller != controller) {
+        p->d.controller = controller;
+        p->initController();
+        update();
+    }
+}
+
 Selection*
 ImagingGLWidget::selection()
 {
@@ -547,6 +585,7 @@ ImagingGLWidget::setSelection(Selection* selection)
 {
     if (p->d.selection != selection) {
         p->d.selection = selection;
+        p->initSelection();
         update();
     }
 }
@@ -564,12 +603,6 @@ ImagingGLWidget::setStage(const Stage& stage)
     p->initStage(stage);
     update();
     return true;
-}
-
-void
-ImagingGLWidget::updateSelection()
-{
-    p->updateSelection();
 }
 
 void

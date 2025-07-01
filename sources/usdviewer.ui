@@ -524,7 +524,7 @@
           </property>
           <property name="icon">
            <iconset resource="usdviewer.qrc">
-            <normaloff>:/icons/resources/Expand.png</normaloff>:/icons/resources/Expand.png</iconset>
+            <normaloff>:/icons/resources/ExpandDisabled.png</normaloff>:/icons/resources/ExpandDisabled.png</iconset>
           </property>
          </widget>
         </item>

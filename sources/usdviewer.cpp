@@ -128,10 +128,16 @@ ViewerPrivate::init()
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
                                               << "Type"
-                                              << "Visibility");
-    outliner()->setColumnWidth(OutlinerItem::Name, 180);
-    outliner()->setColumnWidth(OutlinerItem::Type, 80);
-    outliner()->setColumnWidth(OutlinerItem::Visible, 80);
+                                              << "Vis");
+    outliner()->setColumnWidth(OutlinerItem::Type,  60);
+    outliner()->setColumnWidth(OutlinerItem::Visible, 60);
+    {
+        QHeaderView* header = outliner()->header();
+        header->setStretchLastSection(false);
+        header->setSectionResizeMode(OutlinerItem::Name, QHeaderView::Stretch);
+        header->setSectionResizeMode(OutlinerItem::Type, QHeaderView::Fixed);
+        header->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Fixed);
+    }
     outliner()->setController(d.controller.data());
     outliner()->setSelection(d.selection.data());
     // connect

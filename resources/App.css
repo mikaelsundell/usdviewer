@@ -326,6 +326,7 @@ QTreeView QHeaderView:section
     border: 1px solid hsl(220, 0%, 10%);
     background: hsl(220, 30%, 12%);
     padding: 4px;
+    padding-left: 10px;
 }
 
 QTreeView::branch:has-children:!has-siblings:closed,

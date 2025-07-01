@@ -91,7 +91,7 @@ public:
     Data d;
 };
 
-ViewerPrivate::ViewerPrivate() { d.extensions = { ".usd", ".usda", ".usdc", ".usdz" }; }
+ViewerPrivate::ViewerPrivate() { d.extensions = { "usd", "usda", "usdc", "usdz" }; }
 
 void
 ViewerPrivate::init()
@@ -333,7 +333,7 @@ ViewerPrivate::open()
     QString openDir = settingsValue("openDir", QDir::homePath()).toString();
     QStringList filters;
     for (const QString& ext : d.extensions) {
-        filters.append("*" + ext);
+        filters.append("*." + ext);
     }
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
@@ -383,7 +383,7 @@ ViewerPrivate::exportAll()
     QString exportName = exportDir + "/all." + defaultFormat;
     QStringList filters;
     for (const QString& ext : d.extensions) {
-        filters.append("*" + ext);
+        filters.append("*." + ext);
     }
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
@@ -405,7 +405,7 @@ ViewerPrivate::exportSelected()
     QString exportName = exportSelectedDir + "/selected." + defaultFormat;
     QStringList filters;
     for (const QString& ext : d.extensions) {
-        filters.append("*" + ext);
+        filters.append("*." + ext);
     }
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
@@ -666,9 +666,6 @@ Viewer::setArguments(const QStringList& arguments)
             }
         }
     }
-
-
-
 }
 
 void
@@ -679,7 +676,7 @@ Viewer::dragEnterEvent(QDragEnterEvent* event)
         if (urls.size() == 1) {
             QString filename = urls.first().toLocalFile();
             QString extension = QFileInfo(filename).suffix().toLower();
-            if (p->d.extensions.contains("." + extension)) {
+            if (p->d.extensions.contains(extension)) {
                 event->acceptProposedAction();
                 return;
             }
@@ -695,7 +692,7 @@ Viewer::dropEvent(QDropEvent* event)
     if (urls.size() == 1) {
         QString filename = urls.first().toLocalFile();
         QString extension = QFileInfo(filename).suffix().toLower();
-        if (p->d.extensions.contains("." + extension)) {
+        if (p->d.extensions.contains(extension)) {
             Stage stage(filename);
             if (stage.isValid()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));

@@ -516,7 +516,9 @@ ViewerPrivate::clear()
 void
 ViewerPrivate::expand()
 {
-    outliner()->expand();
+    if (selection()->paths().size()) {
+        outliner()->expand();
+    }
 }
 
 void

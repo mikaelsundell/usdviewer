@@ -261,6 +261,7 @@ OutlinerWidgetPrivate::selectionChanged()
     for (int i = 0; i < d.widget->topLevelItemCount(); ++i) {
         selectItems(d.widget->topLevelItem(i));
     }
+    d.widget->update();
 }
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)

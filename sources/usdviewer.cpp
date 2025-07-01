@@ -625,17 +625,35 @@ Viewer::setArguments(const QStringList& arguments)
         }
     }
     if (arguments.size() == 2) {
-        QString filename = arguments[1];
+        QString arg = arguments[1];
+        const QString protocolPrefix = "usdviewer://";
+        if (arg.startsWith(protocolPrefix, Qt::CaseInsensitive)) {
+            QString path = arg.mid(protocolPrefix.length());
+            QUrl url = QUrl::fromPercentEncoding(path.toUtf8());
+#ifdef Q_OS_WIN
+            path = QDir::fromNativeSeparators(url);
+#endif
+            QFileInfo fileInfo(path);
+            if (fileInfo.suffix().compare("usd", Qt::CaseInsensitive) == 0 ||
+                fileInfo.suffix().compare("usda", Qt::CaseInsensitive) == 0 ||
+                fileInfo.suffix().compare("usdz", Qt::CaseInsensitive) == 0) {
+                
+                Stage stage(path);
+                if (stage.isValid()) {
+                    setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(path));
+                    p->initStage(stage);
+                }
+            }
+            return;
+        }
+        QString filename = arg;
         if (filename.endsWith(".usd", Qt::CaseInsensitive) ||
             filename.endsWith(".usda", Qt::CaseInsensitive) ||
             filename.endsWith(".usdz", Qt::CaseInsensitive)) {
-            
             Stage stage(filename);
             if (stage.isValid()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
                 p->initStage(stage);
-            } else {
-                qWarning() << "could not load stage from filename: " << filename;
             }
         }
     }

@@ -20,10 +20,10 @@ class Controller : public QObject {
 public:
     Controller(QObject* parent = nullptr);
     ~Controller();
-    
+
     Stage stage() const;
     bool setStage(const Stage& stage);
-    
+
     void visiblePaths(const QList<SdfPath>& paths, bool visible);
     void removePaths(const QList<SdfPath>& paths);
 

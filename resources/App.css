@@ -293,13 +293,15 @@ QTreeView
     font-weight: normal;
     color: hsl(0, 0%, 80%);
     border: 0px;
-    background: hsl(220, 30%, 6%);
     outline: none;
-    selection-background-color: hsl(216, 82%, 80%);
+    selection-background-color: transparent;
+    background-color: hsl(220, 30%, 6%);
+    alternate-background-color: hsl(220, 30%, 6%);
+
 }
 
 QTreeView::item {
-    height: 20px;
+    height: 24px;
     background: hsl(220, 30%, 8%);
 }
 
@@ -321,10 +323,21 @@ QTreeView QHeaderView:section
     color: hsl(0, 0%, 80%);
     font-size: 10px;
     font-weight: normal;
-    border: 0px solid hsl(220, 0%, 10%);
-    background-color: hsl(220, 30%, 12%);
+    border: 1px solid hsl(220, 0%, 10%);
+    background: hsl(220, 30%, 12%);
     padding: 4px;
-    padding-left: 14px;
+}
+
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:has-children:has-siblings:closed {
+    image: url(":/icons/resources/Closed.png");
+    background: transparent;    
+}
+
+QTreeView::branch:has-children:!has-siblings:open,
+QTreeView::branch:has-children:has-siblings:open {
+    image: url(":/icons/resources/Open.png");
+    background: transparent;    
 }
 
 /* QToolButton widgets */

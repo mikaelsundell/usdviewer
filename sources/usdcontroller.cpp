@@ -53,7 +53,8 @@ Controller::visiblePaths(const QList<SdfPath>& paths, bool visible)
         UsdGeomImageable imageable(prim);
         if (visible) {
             imageable.MakeVisible();
-        } else {
+        }
+        else {
             imageable.MakeInvisible();
         }
     }

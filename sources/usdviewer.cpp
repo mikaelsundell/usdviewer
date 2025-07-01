@@ -42,6 +42,7 @@ public:
     QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
     void setSettingsValue(const QString& key, const QVariant& value);
     bool eventFilter(QObject* object, QEvent* event);
+    void enable(bool enable);
     void profile();
     void stylesheet();
 
@@ -59,6 +60,9 @@ public Q_SLOTS:
     void frameAll();
     void frameSelected();
     void resetView();
+    void clear();
+    void expand();
+    void collapse();
     void filterChanged(const QString& filter);
     void defaultCameraLightEnabled(bool checked);
     void sceneLightsEnabled(bool checked);
@@ -157,6 +161,8 @@ ViewerPrivate::init()
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
     connect(d.ui->displayFrameSelected, &QAction::triggered, this, &ViewerPrivate::frameSelected);
     connect(d.ui->displayResetView, &QAction::triggered, this, &ViewerPrivate::resetView);
+    connect(d.ui->displayCollapse, &QAction::triggered, this, &ViewerPrivate::collapse);
+    connect(d.ui->displayExpand, &QAction::triggered, this, &ViewerPrivate::expand);
     connect(d.ui->helpGithubReadme, &QAction::triggered, this, &ViewerPrivate::openGithubReadme);
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
     connect(d.ui->open, &QPushButton::clicked, this, &ViewerPrivate::open);
@@ -166,12 +172,15 @@ ViewerPrivate::init()
     connect(d.ui->frameSelected, &QPushButton::clicked, this, &ViewerPrivate::frameSelected);
     connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
     connect(d.ui->filter, &QLineEdit::textChanged, this, &ViewerPrivate::filterChanged);
+    connect(d.ui->clear, &QPushButton::pressed, this, &ViewerPrivate::clear);
+    connect(d.ui->collapse, &QPushButton::pressed, this, &ViewerPrivate::collapse);
+    connect(d.ui->expand, &QPushButton::pressed, this, &ViewerPrivate::expand);
     connect(d.ui->enableDefaultCameraLight, &QCheckBox::toggled, this, &ViewerPrivate::defaultCameraLightEnabled);
     connect(d.ui->enableSceneLights, &QCheckBox::toggled, this, &ViewerPrivate::sceneLightsEnabled);
     connect(d.ui->enableSceneMaterials, &QCheckBox::toggled, this, &ViewerPrivate::sceneMaterialsEnabled);
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
-    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);    
+    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -206,6 +215,7 @@ ViewerPrivate::initStage(const Stage& stage)
     inspector()->setStage(stage);
     outliner()->setStage(stage);
     d.stage = stage;
+    enable(true);
 }
 
 ViewCamera
@@ -267,6 +277,13 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
         stylesheet();
     }
     return QObject::eventFilter(object, event);
+}
+
+void
+ViewerPrivate::enable(bool enable)
+{
+    d.ui->collapse->setEnabled(enable);
+    d.ui->expand->setEnabled(enable);
 }
 
 void
@@ -483,9 +500,28 @@ ViewerPrivate::resetView()
 }
 
 void
+ViewerPrivate::clear()
+{
+    d.ui->clear->setText(QString());
+}
+
+void
+ViewerPrivate::expand()
+{
+    outliner()->expand();
+}
+
+void
+ViewerPrivate::collapse()
+{
+    outliner()->collapse();
+}
+
+void
 ViewerPrivate::filterChanged(const QString& filter)
 {
     outliner()->setFilter(filter);
+    d.ui->filter->setEnabled(filter.size());
 }
 
 void

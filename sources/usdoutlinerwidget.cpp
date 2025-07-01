@@ -9,6 +9,7 @@
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QPointer>
+#include <QStyledItemDelegate>
 #include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -20,6 +21,9 @@ public:
     void initController();
     void initSelection();
     void initStage(const Stage& stage);
+    void initTree();
+    void collapse();
+    void expand();
     void addItem(const UsdPrim& prim, OutlinerItem* parent);
     void addChildren(const UsdPrim& prim, OutlinerItem* parent);
     void toggleVisible(OutlinerItem* item);
@@ -27,6 +31,50 @@ public:
     void updateSelection();
     void dataChanged(const QList<SdfPath>& paths);
     void selectionChanged();
+
+    class ItemDelegate : public QStyledItemDelegate {
+    public:
+        ItemDelegate(QObject* parent = nullptr)
+            : QStyledItemDelegate(parent)
+        {}
+        QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
+        {
+            QSize size = QStyledItemDelegate::sizeHint(option, index);
+            size.setHeight(30);
+            return size;
+        }
+        void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+        {
+            QStyleOptionViewItem opt(option);
+            initStyleOption(&opt, index);
+            QTreeWidgetItem* item = static_cast<const QTreeWidget*>(opt.widget)->itemFromIndex(index);
+            std::function<bool(QTreeWidgetItem*)> hasSelectedChildren = [&](QTreeWidgetItem* parentItem) -> bool {
+                for (int i = 0; i < parentItem->childCount(); ++i) {
+                    QTreeWidgetItem* child = parentItem->child(i);
+                    if (child->isSelected() || hasSelectedChildren(child)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            if (hasSelectedChildren(item)) {
+                opt.font.setBold(true);
+                opt.font.setItalic(true);
+            }
+            QStyledItemDelegate::paint(painter, opt, index);
+        }
+        bool hasSelectedChildren(QTreeWidgetItem* item) const
+        {
+            for (int i = 0; i < item->childCount(); ++i) {
+                QTreeWidgetItem* child = item->child(i);
+                if (child->isSelected() || hasSelectedChildren(child)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
     struct Data {
         Stage stage;
         QString filter;
@@ -40,6 +88,8 @@ public:
 void
 OutlinerWidgetPrivate::init()
 {
+    ItemDelegate* delegate = new ItemDelegate(d.widget.data());
+    d.widget->setItemDelegate(delegate);
     connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::updateSelection);
 }
 
@@ -62,10 +112,51 @@ OutlinerWidgetPrivate::initStage(const Stage& stage)
     UsdPrim prim = stage.stagePtr()->GetPseudoRoot();
     OutlinerItem* item = new OutlinerItem(d.widget.data(), prim);
     addChildren(prim, item);
-    d.widget->expandItem(item);
-    for (int i = 0; i < item->childCount(); ++i) {
-        d.widget->expandItem(item->child(i));
+    initTree();
+}
+
+void
+OutlinerWidgetPrivate::initTree()
+{
+    int topLevelCount = d.widget->topLevelItemCount();
+    for (int i = 0; i < topLevelCount; ++i) {
+        QTreeWidgetItem* topItem = d.widget->topLevelItem(i);
+        d.widget->expandItem(topItem);
+        for (int j = 0; j < topItem->childCount(); ++j) {
+            d.widget->expandItem(topItem->child(j));
+        }
     }
+}
+
+void
+OutlinerWidgetPrivate::collapse()
+{
+    std::function<void(QTreeWidgetItem*)> collapseItems = [&](QTreeWidgetItem* item) {
+        item->setExpanded(false);
+        for (int i = 0; i < item->childCount(); ++i) {
+            collapseItems(item->child(i));
+        }
+    };
+    for (int i = 0; i < d.widget->topLevelItemCount(); ++i) {
+        collapseItems(d.widget->topLevelItem(i));
+    }
+    initTree();
+}
+
+void
+OutlinerWidgetPrivate::expand()
+{
+    collapse();
+    const QList<QTreeWidgetItem*> selected = d.widget->selectedItems();
+    for (QTreeWidgetItem* item : selected) {
+        item->setExpanded(true);
+        QTreeWidgetItem* parent = item->parent();
+        while (parent) {
+            parent->setExpanded(true);
+            parent = parent->parent();
+        }
+    }
+    d.widget->scrollToItem(selected.first(), QAbstractItemView::PositionAtCenter);
 }
 
 void
@@ -182,6 +273,18 @@ OutlinerWidget::OutlinerWidget(QWidget* parent)
 
 OutlinerWidget::~OutlinerWidget() {}
 
+void
+OutlinerWidget::collapse()
+{
+    p->collapse();
+}
+
+void
+OutlinerWidget::expand()
+{
+    p->expand();
+}
+
 Controller*
 OutlinerWidget::controller()
 {
@@ -251,6 +354,19 @@ OutlinerWidget::keyPressEvent(QKeyEvent* event)
         for (int i = 0; i < topLevelItemCount(); ++i) {
             QTreeWidgetItem* item = topLevelItem(i);
             item->setSelected(true);
+        }
+    }
+    else if (event->key() == Qt::Key_A && (event->modifiers() & Qt::ControlModifier)) {
+        QTreeWidgetItem* top = topLevelItem(0);
+        QTreeWidgetItem* end = topLevelItem(topLevelItemCount() - 1);
+        if (top && end) {
+            setCurrentItem(top);
+            scrollToItem(end);
+            QItemSelectionModel* sel = selectionModel();
+            QModelIndex topLeft = indexFromItem(top);
+            QModelIndex bottomRight = indexFromItem(end);
+            QItemSelection selection(topLeft, bottomRight);
+            sel->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         }
     }
     else {

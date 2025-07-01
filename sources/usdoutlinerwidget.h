@@ -19,7 +19,9 @@ class OutlinerWidget : public QTreeWidget {
 public:
     OutlinerWidget(QWidget* parent = nullptr);
     virtual ~OutlinerWidget();
-    
+    void collapse();
+    void expand();
+
     Controller* controller();
     void setController(Controller* controller);
 

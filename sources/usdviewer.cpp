@@ -91,7 +91,7 @@ public:
     Data d;
 };
 
-ViewerPrivate::ViewerPrivate() { d.extensions = { ".usd", ".usda", ".usdz" }; }
+ViewerPrivate::ViewerPrivate() { d.extensions = { ".usd", ".usda", ".usdc", ".usdz" }; }
 
 void
 ViewerPrivate::init()
@@ -335,7 +335,7 @@ ViewerPrivate::open()
     for (const QString& ext : d.extensions) {
         filters.append("*" + ext);
     }
-    QString filter = "USD Files (*.usd *.usda *.usdz)";
+    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
         Stage stage(filename);
@@ -381,7 +381,11 @@ ViewerPrivate::exportAll()
     QString exportDir = settingsValue("exportDir", QDir::homePath()).toString();
     QString defaultFormat = "usd";
     QString exportName = exportDir + "/all." + defaultFormat;
-    QString filter = "USD Files (*.usd *.usda *.usdz)";
+    QStringList filters;
+    for (const QString& ext : d.extensions) {
+        filters.append("*" + ext);
+    }
+    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
     if (!filename.isEmpty()) {
         if (d.stage.exportToFile(filename)) {
@@ -399,7 +403,11 @@ ViewerPrivate::exportSelected()
     QString exportSelectedDir = settingsValue("exportSelectedDir", QDir::homePath()).toString();
     QString defaultFormat = "usd";
     QString exportName = exportSelectedDir + "/selected." + defaultFormat;
-    QString filter = "USD Files (*.usd *.usda *.usdz)";
+    QStringList filters;
+    for (const QString& ext : d.extensions) {
+        filters.append("*" + ext);
+    }
+    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
         if (d.stage.exportPathsToFile(d.selection->paths(), filename)) {
@@ -613,50 +621,54 @@ Viewer::setArguments(const QStringList& arguments)
         if (arguments[i] == "--open" && i + 1 < arguments.size()) {
             QString filename = arguments[i + 1];
             if (!filename.isEmpty()) {
-                Stage stage(filename);
-                if (stage.isValid()) {
-                    setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-                    p->initStage(stage);
-                } else {
-                    qWarning() << "could not load stage from filename: " << filename;
+                QFileInfo fileInfo(filename);
+                if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
+                    Stage stage(filename);
+                    if (stage.isValid()) {
+                        setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
+                        p->initStage(stage);
+                    }
+                    else {
+                        qWarning() << "Could not load stage from filename: " << filename;
+                    }
+                    return;
                 }
             }
-            return;
         }
     }
     if (arguments.size() == 2) {
         QString arg = arguments[1];
         const QString protocolPrefix = "usdviewer://";
+
         if (arg.startsWith(protocolPrefix, Qt::CaseInsensitive)) {
-            QString path = arg.mid(protocolPrefix.length());
-            QUrl url = QUrl::fromPercentEncoding(path.toUtf8());
+            QString pathEncoded = arg.mid(protocolPrefix.length());
+            QString decodedPath = QUrl::fromPercentEncoding(pathEncoded.toUtf8());
 #ifdef Q_OS_WIN
-            path = QDir::fromNativeSeparators(url);
+            decodedPath = QDir::fromNativeSeparators(decodedPath);
 #endif
-            QFileInfo fileInfo(path);
-            if (fileInfo.suffix().compare("usd", Qt::CaseInsensitive) == 0 ||
-                fileInfo.suffix().compare("usda", Qt::CaseInsensitive) == 0 ||
-                fileInfo.suffix().compare("usdz", Qt::CaseInsensitive) == 0) {
-                
-                Stage stage(path);
+            QFileInfo fileInfo(decodedPath);
+            if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
+                Stage stage(decodedPath);
                 if (stage.isValid()) {
-                    setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(path));
+                    setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(decodedPath));
                     p->initStage(stage);
                 }
             }
             return;
         }
-        QString filename = arg;
-        if (filename.endsWith(".usd", Qt::CaseInsensitive) ||
-            filename.endsWith(".usda", Qt::CaseInsensitive) ||
-            filename.endsWith(".usdz", Qt::CaseInsensitive)) {
-            Stage stage(filename);
+
+        QFileInfo fileInfo(arg);
+        if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
+            Stage stage(arg);
             if (stage.isValid()) {
-                setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
+                setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(arg));
                 p->initStage(stage);
             }
         }
     }
+
+
+
 }
 
 void

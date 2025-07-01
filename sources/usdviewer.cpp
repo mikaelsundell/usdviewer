@@ -617,12 +617,26 @@ Viewer::setArguments(const QStringList& arguments)
                 if (stage.isValid()) {
                     setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
                     p->initStage(stage);
-                }
-                else {
+                } else {
                     qWarning() << "could not load stage from filename: " << filename;
                 }
             }
-            break;
+            return;
+        }
+    }
+    if (arguments.size() == 2) {
+        QString filename = arguments[1];
+        if (filename.endsWith(".usd", Qt::CaseInsensitive) ||
+            filename.endsWith(".usda", Qt::CaseInsensitive) ||
+            filename.endsWith(".usdz", Qt::CaseInsensitive)) {
+            
+            Stage stage(filename);
+            if (stage.isValid()) {
+                setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
+                p->initStage(stage);
+            } else {
+                qWarning() << "could not load stage from filename: " << filename;
+            }
         }
     }
 }

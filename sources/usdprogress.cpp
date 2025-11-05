@@ -42,11 +42,13 @@ ProgressPrivate::init()
     d.ui->status->setHeaderLabels(QStringList() << "Name"
                                                 << "Status"
                                                 << "Path");
-    d.ui->status->setColumnWidth(0, 300);
-    d.ui->status->setColumnWidth(1, 60);
+    d.ui->status->setColumnWidth(0, 400);
+    d.ui->status->setColumnWidth(1, 80);
     d.ui->status->header()->setSectionResizeMode(2, QHeaderView::Stretch);
     d.ui->progress->setValue(0);
     d.ui->label->setText("");
+    // dialog
+    d.dialog->setWindowFlags(Qt::Tool | Qt::WindowStaysOnTopHint);
     // connect
     connect(d.ui->close, &QPushButton::clicked, this, [=]() { d.dialog->accept(); });
 }
@@ -67,7 +69,9 @@ ProgressPrivate::loadPathsSubmitted(const QList<SdfPath>& paths)
         item->setText(1, "Queued");
         item->setText(2, QString::fromStdString(path.GetString()));
     }
-    d.dialog->show();
+    if (!d.dialog->isVisible()) {
+        d.dialog->show();
+    }
 }
 
 void

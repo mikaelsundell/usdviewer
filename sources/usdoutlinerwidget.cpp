@@ -108,7 +108,7 @@ OutlinerWidgetPrivate::init()
             OutlinerItem* outlinerItem = static_cast<OutlinerItem*>(item);
             checkStateChanged(outlinerItem);
         }
-    });
+    });   
 }
 
 void
@@ -280,13 +280,9 @@ OutlinerWidgetPrivate::checkStateChanged(OutlinerItem* item)
 
     if (state == Qt::Checked) {
         d.load.append(path);
-
-        qDebug() << "Checked load for path: " << path;
     }
     else if (state == Qt::Unchecked) {
         d.unload.append(path);
-
-        qDebug() << "Unchecked unload for path: " << path;
     }
 
     d.pending++;

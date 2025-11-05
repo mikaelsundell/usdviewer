@@ -24,6 +24,8 @@
 #include <QSettings>
 #include <QToolButton>
 
+#include <pxr/usd/usd/stage.h>
+
 // generated files
 #include "ui_usdviewer.h"
 
@@ -215,6 +217,19 @@ ViewerPrivate::init()
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this,
             [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
+    // progress
+    connect(d.ui->viewProgress, &QAction::toggled, this, [=](bool checked) {
+        if (checked) {
+            d.progress->show();
+            d.progress->raise();
+        } else {
+            if (d.progress)
+                d.progress->hide();
+        }
+    });
+    connect(d.progress, &Progress::finished, this, [=]() {
+        d.ui->viewProgress->setChecked(false);
+    });
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));

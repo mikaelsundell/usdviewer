@@ -27,6 +27,7 @@ DataModelPrivate::DataModelPrivate()
 {
     d.loadType = DataModel::load_type::load_none;
     d.pool.setMaxThreadCount(4 /*QThread::idealThreadCount()*/);
+    d.pool.setThreadPriority(QThread::HighPriority);
 }
 
 DataModelPrivate::~DataModelPrivate() {}

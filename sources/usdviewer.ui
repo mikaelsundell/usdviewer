@@ -646,6 +646,7 @@
     <addaction name="menuTheme"/>
     <addaction name="separator"/>
     <addaction name="viewOutliner"/>
+    <addaction name="viewProgress"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -882,6 +883,14 @@
   <action name="fileClose">
    <property name="text">
     <string>Close</string>
+   </property>
+  </action>
+  <action name="viewProgress">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Progress</string>
    </property>
   </action>
  </widget>

@@ -24,8 +24,6 @@
 #include <QSettings>
 #include <QToolButton>
 
-#include <pxr/usd/usd/stage.h>
-
 // generated files
 #include "ui_usdviewer.h"
 

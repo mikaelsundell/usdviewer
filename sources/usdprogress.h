@@ -19,8 +19,9 @@ public:
 
 public Q_SLOTS:
     void loadPathsSubmitted(const QList<SdfPath>& paths);
-    void loadPathsCompleted(const QList<SdfPath>& loaded);
-    void onCancel();
+    void loadPathFailed(const SdfPath& paths);
+    void loadPathCompleted(const SdfPath& paths);
+    void cancel();
 
 Q_SIGNALS:
     void cancelRequested();

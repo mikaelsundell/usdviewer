@@ -29,7 +29,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QTreeWidget" name="treeWidget">
+    <widget class="QTreeWidget" name="status">
      <column>
       <property name="text">
        <string notr="true">1</string>
@@ -54,9 +54,9 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="cancel">
+       <widget class="QPushButton" name="close">
         <property name="text">
-         <string>Cancel</string>
+         <string>Close</string>
         </property>
        </widget>
       </item>

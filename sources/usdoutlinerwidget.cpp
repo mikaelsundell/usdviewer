@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QPointer>
 #include <QStyledItemDelegate>
+#include <QTimer>
 #include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -17,24 +18,26 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace usd {
 class OutlinerWidgetPrivate : public QObject {
 public:
+    OutlinerWidgetPrivate();
     void init();
     void initController();
+    void initDataModel();
     void initSelection();
-    void initStage(const Stage& stage);
     void initTree();
     void initCheckState(QTreeWidgetItem* item, bool enable);
     void collapse();
     void expand();
-    void addItem(const UsdPrim& prim, OutlinerItem* parent);
-    void addChildren(const UsdPrim& prim, OutlinerItem* parent);
+    void addItem(OutlinerItem* parent, const SdfPath& parentPath);
+    void addChildren(OutlinerItem* parent, const SdfPath& parentPath);
     void toggleVisible(OutlinerItem* item);
     void updateFilter();
 
 public Q_SLOTS:
     void updateSelection();
-    void dataChanged(const QList<SdfPath>& paths);
     void checkStateChanged(OutlinerItem* item);
     void selectionChanged();
+    void primsChanged(const QList<SdfPath>& paths);
+    void stageChanged();
 
 public:
     class ItemDelegate : public QStyledItemDelegate {
@@ -81,14 +84,18 @@ public:
     };
 
     struct Data {
-        Stage stage;
+        int pending;
+        QList<SdfPath> load;
+        QList<SdfPath> unload;
         QString filter;
-        QPointer<Controller> controller;
+        QPointer<DataModel> dataModel;
         QPointer<Selection> selection;
         QPointer<OutlinerWidget> widget;
     };
     Data d;
 };
+
+OutlinerWidgetPrivate::OutlinerWidgetPrivate() { d.pending = 0; }
 
 void
 OutlinerWidgetPrivate::init()
@@ -96,7 +103,6 @@ OutlinerWidgetPrivate::init()
     ItemDelegate* delegate = new ItemDelegate(d.widget.data());
     d.widget->setItemDelegate(delegate);
     connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::updateSelection);
-
     connect(d.widget.data(), &OutlinerWidget::itemChanged, this, [this](QTreeWidgetItem* item, int column) {
         if (column == OutlinerItem::Name) {  // assuming checkboxes are in Name column
             OutlinerItem* outlinerItem = static_cast<OutlinerItem*>(item);
@@ -106,33 +112,16 @@ OutlinerWidgetPrivate::init()
 }
 
 void
-OutlinerWidgetPrivate::initController()
+OutlinerWidgetPrivate::initDataModel()
 {
-    connect(d.controller.data(), &Controller::dataChanged, this, &OutlinerWidgetPrivate::dataChanged);
+    connect(d.dataModel.data(), &DataModel::stageChanged, this, &OutlinerWidgetPrivate::stageChanged);
+    connect(d.dataModel.data(), &DataModel::primsChanged, this, &OutlinerWidgetPrivate::primsChanged);
 }
 
 void
 OutlinerWidgetPrivate::initSelection()
 {
     connect(d.selection.data(), &Selection::selectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
-}
-
-void
-OutlinerWidgetPrivate::initStage(const Stage& stage)
-{
-    d.widget->clear();
-    d.stage = stage;
-
-    if (!stage.isValid())
-        return;
-
-    UsdPrim prim = stage.stagePtr()->GetPseudoRoot();
-    OutlinerItem* rootItem = new OutlinerItem(d.widget.data(), prim);
-    addChildren(prim, rootItem);
-    initTree();
-
-    bool enable = (stage.loadType() == Stage::load_structure);
-    initCheckState(rootItem, enable);
 }
 
 void
@@ -156,7 +145,8 @@ OutlinerWidgetPrivate::initCheckState(QTreeWidgetItem* item, bool enable)
         f |= Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
         if (item->childCount() > 0)
             f |= Qt::ItemIsAutoTristate;
-    } else {
+    }
+    else {
         f &= ~(Qt::ItemIsUserCheckable | Qt::ItemIsAutoTristate);
     }
     item->setFlags(f);
@@ -197,19 +187,20 @@ OutlinerWidgetPrivate::expand()
 }
 
 void
-OutlinerWidgetPrivate::addItem(const UsdPrim& prim, OutlinerItem* parent)
+OutlinerWidgetPrivate::addItem(OutlinerItem* parent, const SdfPath& path)
 {
-    OutlinerItem* item = new OutlinerItem(parent, prim);
+    OutlinerItem* item = new OutlinerItem(parent, d.dataModel->stage(), path);
     parent->addChild(item);
-    addChildren(prim, item);
+    addChildren(item, path);
 }
 
 void
-OutlinerWidgetPrivate::addChildren(const UsdPrim& prim, OutlinerItem* parent)
+OutlinerWidgetPrivate::addChildren(OutlinerItem* parent, const SdfPath& path)
 {
-    UsdPrimSiblingRange children = prim.GetAllChildren();
-    for (const UsdPrim& child : children) {
-        addItem(child, parent);
+    UsdStageRefPtr stage = d.dataModel->stage();
+    UsdPrim prim = stage->GetPrimAtPath(path);
+    for (const UsdPrim& child : prim.GetAllChildren()) {
+        addItem(parent, child.GetPath());
     }
 }
 
@@ -221,7 +212,7 @@ OutlinerWidgetPrivate::toggleVisible(OutlinerItem* item)
     if (!pathString.isEmpty()) {
         paths.append(SdfPath(pathString.toStdString()));
     }
-    d.controller->visiblePaths(paths, !item->isVisible());
+    d.dataModel->visibleFromPaths(paths, !item->isVisible());
 }
 
 void
@@ -266,28 +257,54 @@ OutlinerWidgetPrivate::updateSelection()
 }
 
 void
-OutlinerWidgetPrivate::dataChanged(const QList<SdfPath>& paths)
-{
-    d.widget->update();
-}
-
-void
 OutlinerWidgetPrivate::checkStateChanged(OutlinerItem* item)
 {
-    if (!d.stage.isValid())
+    QString pathString = item->data(0, Qt::UserRole).toString();
+    if (pathString.isEmpty())
         return;
 
-    Stage stage = d.stage;
-    UsdStageRefPtr stageptr = stage.stagePtr();
+    SdfPath path(pathString.toStdString());
+    UsdStageRefPtr stage = d.dataModel->stage();
+    UsdPrim prim = stage->GetPrimAtPath(path);
+    if (!prim)
+        return;
+
+    if (!prim.HasPayload())
+        return;
+
+    bool isLoaded = prim.IsLoaded();
     Qt::CheckState state = item->checkState(OutlinerItem::Name);
-    QString pathString = item->data(0, Qt::UserRole).toString();
+
+    if ((state == Qt::Checked && isLoaded) || (state == Qt::Unchecked && !isLoaded))
+        return;
+
     if (state == Qt::Checked) {
-        d.stage.loadFromPath({ SdfPath(pathString.toStdString()) });
+        d.load.append(path);
+
+        qDebug() << "Checked load for path: " << path;
     }
     else if (state == Qt::Unchecked) {
-        d.stage.unloadFromPath({ SdfPath(pathString.toStdString()) });
+        d.unload.append(path);
+
+        qDebug() << "Unchecked unload for path: " << path;
     }
+
+    d.pending++;
+    QTimer::singleShot(0, d.widget, [this]() {
+        if (--d.pending <= 0) {
+            if (!d.load.isEmpty()) {
+                d.dataModel->loadFromPaths(d.load);
+                d.load.clear();
+            }
+            if (!d.unload.isEmpty()) {
+                d.dataModel->unloadFromPath(d.unload);
+                d.unload.clear();
+            }
+            d.pending = 0;
+        }
+    });
 }
+
 
 void
 OutlinerWidgetPrivate::selectionChanged()
@@ -298,12 +315,12 @@ OutlinerWidgetPrivate::selectionChanged()
         if (!pathString.isEmpty()) {
             SdfPath path(pathString.toStdString());
             if (selectedPaths.contains(path)) {
-                if (!item->isSelected()) {  // todo: needed, handled in setSelected()?
+                if (!item->isSelected()) {
                     item->setSelected(true);
                 }
             }
             else {
-                if (item->isSelected()) {  // todo: needed, handled in setSelected()?
+                if (item->isSelected()) {
                     item->setSelected(false);
                 }
             }
@@ -317,6 +334,26 @@ OutlinerWidgetPrivate::selectionChanged()
     }
     d.widget->update();
 }
+
+void
+OutlinerWidgetPrivate::primsChanged(const QList<SdfPath>& paths)
+{
+    d.widget->update();
+}
+
+void
+OutlinerWidgetPrivate::stageChanged()
+{
+    d.widget->clear();
+    UsdPrim prim = d.dataModel->stage()->GetPseudoRoot();
+    OutlinerItem* rootItem = new OutlinerItem(d.widget.data(), d.dataModel->stage(), prim.GetPath());
+    addChildren(rootItem, prim.GetPath());
+    initTree();
+    bool enable = (d.dataModel->loadType() == DataModel::load_structure);
+    initCheckState(rootItem, enable);
+}
+
+
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)
     : QTreeWidget(parent)
@@ -340,21 +377,6 @@ OutlinerWidget::expand()
     p->expand();
 }
 
-Controller*
-OutlinerWidget::controller()
-{
-    return p->d.controller;
-}
-
-void
-OutlinerWidget::setController(Controller* controller)
-{
-    if (p->d.controller != controller) {
-        p->d.controller = controller;
-        p->initController();
-        update();
-    }
-}
 
 Selection*
 OutlinerWidget::selection()
@@ -372,19 +394,20 @@ OutlinerWidget::setSelection(Selection* selection)
     }
 }
 
-Stage
-OutlinerWidget::stage() const
+DataModel*
+OutlinerWidget::dataModel() const
 {
-    Q_ASSERT("stage is not set" && p->d.stage.isValid());
-    return p->d.stage;
+    return p->d.dataModel;
 }
 
-bool
-OutlinerWidget::setStage(const Stage& stage)
+void
+OutlinerWidget::setDataModel(DataModel* dataModel)
 {
-    p->initStage(stage);
-    update();
-    return true;
+    if (p->d.dataModel != dataModel) {
+        p->d.dataModel = dataModel;
+        p->initDataModel();
+        update();
+    }
 }
 
 QString

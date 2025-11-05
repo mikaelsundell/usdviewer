@@ -14,8 +14,8 @@ class OutlinerItemPrivate;
 class OutlinerItem : public QTreeWidgetItem {
 public:
     enum Column { Name = 0, Type = 1, Visible = 2 };
-    OutlinerItem(QTreeWidget* parent, const UsdPrim& prim);
-    OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim);
+    OutlinerItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path);
+    OutlinerItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path);
     virtual ~OutlinerItem();
     QVariant data(int column, int role) const override;
     bool isVisible() const;

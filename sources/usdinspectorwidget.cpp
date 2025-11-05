@@ -7,30 +7,21 @@
 #include "usdselection.h"
 #include <QFileInfo>
 #include <QPointer>
-#include <pxr/usd/usdGeom/metrics.h>
-
-
-// Core USD
-#include <pxr/usd/usd/attribute.h>
-#include <pxr/usd/usd/modelAPI.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/stage.h>
-
-// Geometry (for transforms, bounds, visibility)
-#include <pxr/usd/usdGeom/bboxCache.h>
-#include <pxr/usd/usdGeom/imageable.h>
-#include <pxr/usd/usdGeom/tokens.h>
-#include <pxr/usd/usdGeom/xformable.h>
-
-// Math / Types
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/range3d.h>
 #include <pxr/base/gf/vec3d.h>
-
-// Utilities
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/value.h>
+#include <pxr/usd/usd/attribute.h>
+#include <pxr/usd/usd/modelAPI.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
+#include <pxr/usd/usdGeom/imageable.h>
+#include <pxr/usd/usdGeom/metrics.h>
+#include <pxr/usd/usdGeom/tokens.h>
+#include <pxr/usd/usdGeom/xformable.h>
 
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -39,18 +30,16 @@ namespace usd {
 class InspectorWidgetPrivate : public QObject {
 public:
     void init();
-    void initController();
-    void initStage(const Stage& stage);
+    void initDataModel();
     void initSelection();
 
 public Q_SLOTS:
-    void dataChanged(const QList<SdfPath>& paths);
     void selectionChanged();
+    void stageChanged();
 
 public:
     struct Data {
-        Stage stage;
-        QPointer<Controller> controller;
+        QPointer<DataModel> dataModel;
         QPointer<Selection> selection;
         QPointer<InspectorWidget> widget;
     };
@@ -62,9 +51,9 @@ InspectorWidgetPrivate::init()
 {}
 
 void
-InspectorWidgetPrivate::initController()
+InspectorWidgetPrivate::initDataModel()
 {
-    connect(d.controller.data(), &Controller::dataChanged, this, &InspectorWidgetPrivate::dataChanged);
+    connect(d.dataModel.data(), &DataModel::stageChanged, this, &InspectorWidgetPrivate::stageChanged);
 }
 
 void
@@ -74,13 +63,11 @@ InspectorWidgetPrivate::initSelection()
 }
 
 void
-InspectorWidgetPrivate::initStage(const Stage& stage)
+InspectorWidgetPrivate::stageChanged()
 {
     d.widget->clear();
-    if (stage.isValid()) {
-        d.stage = stage;
-
-        UsdStageRefPtr stageptr = stage.stagePtr();
+    if (d.dataModel->isLoaded()) {
+        UsdStageRefPtr stage = d.dataModel->stage();
         InspectorItem* stageItem = new InspectorItem(d.widget.data());
         stageItem->setText(InspectorItem::Key, "Stage");
         d.widget->addTopLevelItem(stageItem);
@@ -93,27 +80,20 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
         };
 
-        addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stageptr)));
-        addChild("upAxis", QString::fromStdString(UsdGeomGetStageUpAxis(stageptr).GetString()));
-        addChild("timeCodesPerSecond", QString::number(stageptr->GetTimeCodesPerSecond()));
-        addChild("startTimeCode", QString::number(stageptr->GetStartTimeCode()));
-        addChild("endTimeCode", QString::number(stageptr->GetEndTimeCode()));
+        addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stage)));
+        addChild("upAxis", QString::fromStdString(UsdGeomGetStageUpAxis(stage).GetString()));
+        addChild("timeCodesPerSecond", QString::number(stage->GetTimeCodesPerSecond()));
+        addChild("startTimeCode", QString::number(stage->GetStartTimeCode()));
+        addChild("endTimeCode", QString::number(stage->GetEndTimeCode()));
 
-        std::string comment = stageptr->GetRootLayer()->GetComment();
+        std::string comment = stage->GetRootLayer()->GetComment();
         if (!comment.empty())
             addChild("comment", QString::fromStdString(comment));
 
-        std::string filePath = stageptr->GetRootLayer()->GetRealPath();
+        std::string filePath = stage->GetRootLayer()->GetRealPath();
         addChild("filePath", QFileInfo(QString::fromStdString(filePath)).fileName());
     }
 }
-
-void
-InspectorWidgetPrivate::dataChanged(const QList<SdfPath>& paths)
-{
-    d.widget->update();
-}
-
 
 static std::string
 GfMatrixToString(const GfMatrix4d& m)
@@ -141,12 +121,11 @@ InspectorWidgetPrivate::selectionChanged()
     QList<SdfPath> selectedPaths = d.selection->paths();
     d.widget->clear();
 
-    if (!d.stage.isValid()) {
+    if (!d.dataModel->isLoaded()) {
         return;
     }
 
     if (selectedPaths.isEmpty()) {
-        initStage(d.stage);
         return;
     }
 
@@ -159,8 +138,8 @@ InspectorWidgetPrivate::selectionChanged()
     }
 
     SdfPath path = selectedPaths.first();
-    UsdStageRefPtr stageptr = d.stage.stagePtr();
-    UsdPrim prim = stageptr->GetPrimAtPath(path);
+    UsdStageRefPtr stage = d.dataModel->stage();
+    UsdPrim prim = stage->GetPrimAtPath(path);
     if (!prim)
         return;
 
@@ -218,18 +197,18 @@ InspectorWidget::InspectorWidget(QWidget* parent)
 
 InspectorWidget::~InspectorWidget() {}
 
-Controller*
-InspectorWidget::controller()
+DataModel*
+InspectorWidget::dataModel() const
 {
-    return p->d.controller;
+    return p->d.dataModel;
 }
 
 void
-InspectorWidget::setController(Controller* controller)
+InspectorWidget::setDataModel(DataModel* dataModel)
 {
-    if (p->d.controller != controller) {
-        p->d.controller = controller;
-        p->initController();
+    if (p->d.dataModel != dataModel) {
+        p->d.dataModel = dataModel;
+        p->initDataModel();
         update();
     }
 }
@@ -248,20 +227,5 @@ InspectorWidget::setSelection(Selection* selection)
         p->initSelection();
         update();
     }
-}
-
-Stage
-InspectorWidget::stage() const
-{
-    Q_ASSERT("stage is not set" && p->d.stage.isValid());
-    return p->d.stage;
-}
-
-bool
-InspectorWidget::setStage(const Stage& stage)
-{
-    p->initStage(stage);
-    update();
-    return true;
 }
 }  // namespace usd

@@ -15,7 +15,8 @@ class OutlinerItemPrivate {
 public:
     void init();
     struct Data {
-        UsdPrim prim;
+        UsdStageRefPtr stage;
+        SdfPath path;
         OutlinerItem* item;
     };
     Data d;
@@ -25,23 +26,25 @@ void
 OutlinerItemPrivate::init()
 {}
 
-OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdPrim& prim)
+OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path)
     : QTreeWidgetItem(parent)
     , p(new OutlinerItemPrivate())
 {
     p->d.item = this;
-    p->d.prim = prim;
+    p->d.stage = stage;
+    p->d.path = path;
     setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
     setCheckState(0, Qt::Unchecked);
     p->init();
 }
 
-OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim)
+OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path)
     : QTreeWidgetItem(parent)
     , p(new OutlinerItemPrivate())
 {
     p->d.item = this;
-    p->d.prim = prim;
+    p->d.stage = stage;
+    p->d.path = path;
     setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
     setCheckState(0, Qt::Unchecked);
     p->init();
@@ -51,39 +54,59 @@ OutlinerItem::~OutlinerItem() {}
 QVariant
 OutlinerItem::data(int column, int role) const
 {
+    if (!p->d.stage)
+        return QVariant();
+
+    UsdPrim prim = p->d.stage->GetPrimAtPath(p->d.path);
     if (role == Qt::DisplayRole || role == Qt::ToolTipRole) {
         switch (column) {
-        case Name: return QString::fromStdString(p->d.prim.GetName().GetString());
-        case Type: return QString::fromStdString(p->d.prim.GetTypeName().GetString());
+        case Name:
+            if (prim)
+                return QString::fromStdString(prim.GetName().GetString());
+            else
+                return QString::fromStdString(p->d.path.GetName());
+        case Type:
+            if (prim)
+                return QString::fromStdString(prim.GetTypeName().GetString());
+            else
+                return QString();
         case Visible: {
-            UsdGeomImageable imageable(p->d.prim);
-            if (imageable && p->d.prim.IsActive()) {
-                TfToken vis;
-                imageable.GetVisibilityAttr().Get(&vis);
-                return (vis == UsdGeomTokens->invisible) ? "H" : "V";
+            if (prim && prim.IsActive()) {
+                UsdGeomImageable imageable(prim);
+                if (imageable) {
+                    //TfToken vis;
+                    //imageable.GetVisibilityAttr().Get(&vis);
+                    //return (vis == UsdGeomTokens->invisible) ? "H" : "V";
+
+                    return "V";
+                }
             }
-            return "";
         }
         default: break;
         }
     }
     else if (role == Qt::UserRole) {
-        return QString::fromStdString(p->d.prim.GetPath().GetString());
+        return QString::fromStdString(p->d.path.GetString());
     }
-
     return QTreeWidgetItem::data(column, role);
 }
 
 bool
 OutlinerItem::isVisible() const
 {
-    UsdGeomImageable imageable(p->d.prim);
-    if (imageable && p->d.prim.IsActive()) {
-        TfToken vis;
-        imageable.GetVisibilityAttr().Get(&vis);
-        return vis != UsdGeomTokens->invisible;
-    }
-    return false;
-}
+    if (!p->d.stage)
+        return false;
 
+    UsdPrim prim = p->d.stage->GetPrimAtPath(p->d.path);
+    if (!prim || !prim.IsActive())
+        return false;
+
+    UsdGeomImageable imageable(prim);
+    if (!imageable)
+        return false;
+
+    TfToken vis;
+    imageable.GetVisibilityAttr().Get(&vis);
+    return vis != UsdGeomTokens->invisible;
+}
 }  // namespace usd

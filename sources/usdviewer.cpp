@@ -7,10 +7,10 @@
 #include "mouseevent.h"
 #include "platform.h"
 #include "stylesheet.h"
-#include "usdcontroller.h"
+#include "usddatamodel.h"
 #include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
-#include "usdstage.h"
+#include "usdprogress.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
@@ -33,13 +33,12 @@ class ViewerPrivate : public QObject {
 public:
     ViewerPrivate();
     void init();
-    void initStage(const Stage& stage);
     void initSettings();
     ViewCamera camera();
     ImagingGLWidget* renderer();
     InspectorWidget* inspector();
     OutlinerWidget* outliner();
-    Controller* controller();
+    DataModel* dataModel();
     Selection* selection();
     QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
     void setSettingsValue(const QString& key, const QVariant& value);
@@ -60,7 +59,6 @@ public Q_SLOTS:
     void exportImage();
     void showSelected();
     void hideSelected();
-    void deleteSelected();
     void frameAll();
     void frameSelected();
     void resetView();
@@ -84,15 +82,15 @@ public Q_SLOTS:
 
 public:
     struct Data {
-        Stage stage;
-        Stage::load_type loadType;
+        DataModel::load_type loadType;
         QStringList arguments;
         QStringList extensions;
         QColor clearColor;
         QScopedPointer<MouseEvent> clearColorFilter;
-        QScopedPointer<Controller> controller;
+        QScopedPointer<DataModel> dataModel;
         QScopedPointer<Selection> selection;
         QScopedPointer<Ui_Usdviewer> ui;
+        QPointer<Progress> progress;
         QPointer<Viewer> viewer;
     };
     Data d;
@@ -100,7 +98,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadType = Stage::load_type::load_all;
+    d.loadType = DataModel::load_type::load_all;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
 
@@ -123,13 +121,12 @@ ViewerPrivate::init()
     d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
     // event filter
     d.viewer->installEventFilter(this);
-    // controller
-    d.controller.reset(new Controller());
-    // selection
+    // containers
+    d.dataModel.reset(new DataModel());
     d.selection.reset(new Selection());
     // renderer
     renderer()->setClearColor(d.clearColor);
-    renderer()->setController(d.controller.data());
+    renderer()->setDataModel(d.dataModel.data());
     renderer()->setSelection(d.selection.data());
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
@@ -138,24 +135,26 @@ ViewerPrivate::init()
     outliner()->setColumnWidth(OutlinerItem::Name, 180);
     outliner()->setColumnWidth(OutlinerItem::Type, 60);
     outliner()->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
-    outliner()->setController(d.controller.data());
+    outliner()->setDataModel(d.dataModel.data());
     outliner()->setSelection(d.selection.data());
     // inspector
     inspector()->setHeaderLabels(QStringList() << "Key"
                                                << "Value");
     inspector()->setColumnWidth(InspectorItem::Key, 180);
     inspector()->header()->setSectionResizeMode(InspectorItem::Value, QHeaderView::Stretch);
-    inspector()->setController(d.controller.data());
+    inspector()->setDataModel(d.dataModel.data());
     inspector()->setSelection(d.selection.data());
+    // progress
+    d.progress = new Progress(d.viewer);
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->fileFull, &QAction::triggered, this, [this]() {
-        d.loadType = Stage::load_all;
+        d.loadType = DataModel::load_all;
         setSettingsValue("loadType", "all");
     });
     connect(d.ui->fileStructure, &QAction::triggered, this, [this]() {
-        d.loadType = Stage::load_structure;
+        d.loadType = DataModel::load_structure;
         setSettingsValue("loadType", "structure");
     });
     {
@@ -174,7 +173,6 @@ ViewerPrivate::init()
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->editShow, &QAction::triggered, this, &ViewerPrivate::showSelected);
     connect(d.ui->editHide, &QAction::triggered, this, &ViewerPrivate::hideSelected);
-    connect(d.ui->editDelete, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
     connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
@@ -239,6 +237,11 @@ ViewerPrivate::init()
             actions->addAction(d.ui->themeDark);
         }
     }
+    connect(d.dataModel.data(), &DataModel::loadPathsSubmitted, d.progress, &Progress::loadPathsSubmitted);
+    connect(d.dataModel.data(), &DataModel::loadPathFailed, d.progress, &Progress::loadPathFailed);
+    connect(d.dataModel.data(), &DataModel::loadPathCompleted, d.progress, &Progress::loadPathCompleted);
+    connect(d.dataModel.data(), &DataModel::stageChanged, this, [=]() { enable(true); });
+    connect(d.progress, &Progress::cancelRequested, [&]() { qWarning() << "user canceled loading."; });
     // settings
     initSettings();
     enable(false);
@@ -255,26 +258,15 @@ ViewerPrivate::init()
 }
 
 void
-ViewerPrivate::initStage(const Stage& stage)
-{
-    controller()->setStage(stage);
-    renderer()->setStage(stage);
-    inspector()->setStage(stage);
-    outliner()->setStage(stage);
-    d.stage = stage;
-    enable(true);
-}
-
-void
 ViewerPrivate::initSettings()
 {
     QString loadType = settingsValue("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadType = Stage::load_all;
+        d.loadType = DataModel::load_all;
         d.ui->fileFull->setChecked(true);
     }
     else {
-        d.loadType = Stage::load_structure;
+        d.loadType = DataModel::load_structure;
         d.ui->fileStructure->setChecked(true);
     }
     QString theme = settingsValue("theme", "dark").toString();
@@ -313,10 +305,10 @@ ViewerPrivate::outliner()
     return d.ui->outlinerWidget;
 }
 
-Controller*
-ViewerPrivate::controller()
+DataModel*
+ViewerPrivate::dataModel()
 {
-    return d.controller.data();
+    return d.dataModel.data();
 }
 
 Selection*
@@ -393,10 +385,9 @@ ViewerPrivate::open()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
-        Stage stage(filename, d.loadType);
-        if (stage.isValid()) {
+        d.dataModel->loadFromFile(filename, d.loadType);
+        if (d.dataModel->isLoaded()) {
             d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-            initStage(stage);
         }
         setSettingsValue("openDir", QFileInfo(filename).absolutePath());
     }
@@ -405,18 +396,16 @@ ViewerPrivate::open()
 void
 ViewerPrivate::reload()
 {
-    if (d.stage.isValid()) {
-        d.stage.reload();
-        initStage(d.stage);
+    if (d.dataModel->isLoaded()) {
+        d.dataModel->reload();
     }
 }
 
 void
 ViewerPrivate::close()
 {
-    if (d.stage.isValid()) {
-        d.stage.close();
-        initStage(d.stage);
+    if (d.dataModel->isLoaded()) {
+        d.dataModel->close();
     }
 }
 
@@ -461,7 +450,7 @@ ViewerPrivate::exportAll()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.stage.exportToFile(filename)) {
+        if (d.dataModel->exportToFile(filename)) {
             setSettingsValue("exportDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -483,7 +472,7 @@ ViewerPrivate::exportSelected()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.stage.exportPathsToFile(d.selection->paths(), filename)) {
+        if (d.dataModel->exportPathsToFile(d.selection->paths(), filename)) {
             setSettingsValue("exportSelectedDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -535,7 +524,7 @@ void
 ViewerPrivate::showSelected()
 {
     if (selection()->paths().size()) {
-        d.controller->visiblePaths(d.selection->paths(), true);
+        d.dataModel->visibleFromPaths(d.selection->paths(), true);
     }
 }
 
@@ -543,22 +532,14 @@ void
 ViewerPrivate::hideSelected()
 {
     if (selection()->paths().size()) {
-        d.controller->visiblePaths(d.selection->paths(), false);
-    }
-}
-
-void
-ViewerPrivate::deleteSelected()
-{
-    if (selection()->paths().size()) {
-        d.controller->removePaths(d.selection->paths());
+        d.dataModel->visibleFromPaths(d.selection->paths(), false);
     }
 }
 
 void
 ViewerPrivate::frameAll()
 {
-    camera().setBoundingBox(d.stage.boundingBox());
+    camera().setBoundingBox(d.dataModel->boundingBox());
     camera().frameAll();
     renderer()->update();
 }
@@ -567,7 +548,7 @@ void
 ViewerPrivate::frameSelected()
 {
     if (selection()->paths().size()) {
-        camera().setBoundingBox(d.stage.boundingBox(selection()->paths()));
+        camera().setBoundingBox(d.dataModel->boundingBox(selection()->paths()));
         camera().frameAll();
         renderer()->update();
     }
@@ -714,10 +695,9 @@ Viewer::setArguments(const QStringList& arguments)
             if (!filename.isEmpty()) {
                 QFileInfo fileInfo(filename);
                 if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                    Stage stage(filename, p->d.loadType);
-                    if (stage.isValid()) {
+                    p->d.dataModel->loadFromFile(filename, p->d.loadType);
+                    if (p->d.dataModel->isLoaded()) {
                         setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-                        p->initStage(stage);
                     }
                     else {
                         qWarning() << "Could not load stage from filename: " << filename;
@@ -739,10 +719,9 @@ Viewer::setArguments(const QStringList& arguments)
 #endif
             QFileInfo fileInfo(decodedPath);
             if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                Stage stage(decodedPath, p->d.loadType);
-                if (stage.isValid()) {
+                p->d.dataModel->loadFromFile(decodedPath, p->d.loadType);
+                if (p->d.dataModel->isLoaded()) {
                     setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(decodedPath));
-                    p->initStage(stage);
                 }
             }
             return;
@@ -750,10 +729,9 @@ Viewer::setArguments(const QStringList& arguments)
 
         QFileInfo fileInfo(arg);
         if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-            Stage stage(arg, p->d.loadType);
-            if (stage.isValid()) {
+            p->d.dataModel->loadFromFile(arg, p->d.loadType);
+            if (p->d.dataModel->isLoaded()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(arg));
-                p->initStage(stage);
             }
         }
     }
@@ -784,10 +762,9 @@ Viewer::dropEvent(QDropEvent* event)
         QString filename = urls.first().toLocalFile();
         QString extension = QFileInfo(filename).suffix().toLower();
         if (p->d.extensions.contains(extension)) {
-            Stage stage(filename, p->d.loadType);
-            if (stage.isValid()) {
+            p->d.dataModel->loadFromFile(filename, p->d.loadType);
+            if (p->d.dataModel->isLoaded()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-                p->initStage(stage);
             }
             else {
                 qWarning() << "Could not load stage from filename: " << filename;

@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include "usdcontroller.h"
+#include "usddatamodel.h"
 #include "usdselection.h"
-#include "usdstage.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -22,14 +21,11 @@ public:
     void collapse();
     void expand();
 
-    Controller* controller();
-    void setController(Controller* controller);
+    DataModel* dataModel() const;
+    void setDataModel(DataModel* dataModel);
 
     Selection* selection();
     void setSelection(Selection* selection);
-
-    Stage stage() const;
-    bool setStage(const Stage& stage);
 
     QString filter() const;
     void setFilter(const QString& filter);

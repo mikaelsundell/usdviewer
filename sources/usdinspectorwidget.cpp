@@ -11,22 +11,22 @@
 
 
 // Core USD
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/attribute.h>
 #include <pxr/usd/usd/modelAPI.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/stage.h>
 
 // Geometry (for transforms, bounds, visibility)
-#include <pxr/usd/usdGeom/imageable.h>
-#include <pxr/usd/usdGeom/xformable.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
+#include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
+#include <pxr/usd/usdGeom/xformable.h>
 
 // Math / Types
-#include <pxr/base/gf/matrix4d.h>
-#include <pxr/base/gf/vec3d.h>
-#include <pxr/base/gf/range3d.h>
 #include <pxr/base/gf/bbox3d.h>
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/range3d.h>
+#include <pxr/base/gf/vec3d.h>
 
 // Utilities
 #include <pxr/base/tf/token.h>
@@ -42,11 +42,11 @@ public:
     void initController();
     void initStage(const Stage& stage);
     void initSelection();
-    
+
 public Q_SLOTS:
     void dataChanged(const QList<SdfPath>& paths);
     void selectionChanged();
-    
+
 public:
     struct Data {
         Stage stage;
@@ -79,30 +79,30 @@ InspectorWidgetPrivate::initStage(const Stage& stage)
     d.widget->clear();
     if (stage.isValid()) {
         d.stage = stage;
-        
+
         UsdStageRefPtr stageptr = stage.stagePtr();
         InspectorItem* stageItem = new InspectorItem(d.widget.data());
         stageItem->setText(InspectorItem::Key, "Stage");
         d.widget->addTopLevelItem(stageItem);
         stageItem->setExpanded(true);
-        
+
         auto addChild = [&](const QString& key, const QString& value) {
             InspectorItem* item = new InspectorItem(stageItem);
             item->setText(InspectorItem::Key, key);
             item->setText(InspectorItem::Value, value);
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
         };
-        
+
         addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stageptr)));
         addChild("upAxis", QString::fromStdString(UsdGeomGetStageUpAxis(stageptr).GetString()));
         addChild("timeCodesPerSecond", QString::number(stageptr->GetTimeCodesPerSecond()));
         addChild("startTimeCode", QString::number(stageptr->GetStartTimeCode()));
         addChild("endTimeCode", QString::number(stageptr->GetEndTimeCode()));
-        
+
         std::string comment = stageptr->GetRootLayer()->GetComment();
         if (!comment.empty())
             addChild("comment", QString::fromStdString(comment));
-        
+
         std::string filePath = stageptr->GetRootLayer()->GetRealPath();
         addChild("filePath", QFileInfo(QString::fromStdString(filePath)).fileName());
     }
@@ -115,7 +115,8 @@ InspectorWidgetPrivate::dataChanged(const QList<SdfPath>& paths)
 }
 
 
-static std::string GfMatrixToString(const GfMatrix4d& m)
+static std::string
+GfMatrixToString(const GfMatrix4d& m)
 {
     std::ostringstream ss;
     ss << "(";
@@ -123,10 +124,12 @@ static std::string GfMatrixToString(const GfMatrix4d& m)
         ss << "(";
         for (int c = 0; c < 4; ++c) {
             ss << m[r][c];
-            if (c < 3) ss << ", ";
+            if (c < 3)
+                ss << ", ";
         }
         ss << ")";
-        if (r < 3) ss << ", ";
+        if (r < 3)
+            ss << ", ";
     }
     ss << ")";
     return ss.str();
@@ -175,8 +178,9 @@ InspectorWidgetPrivate::selectionChanged()
 
     addChild("Type", QString::fromStdString(prim.GetTypeName().GetString()));
     addChild("Active", prim.IsActive() ? "true" : "false");
-    addChild("Visibility", QString::fromStdString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
-    
+    addChild("Visibility",
+             QString::fromStdString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
+
     /*addChild("Kind", QString::fromStdString(UsdModelAPI(prim).GetKind()));
 
     if (prim.IsA<UsdGeomXformable>()) {
@@ -192,7 +196,7 @@ InspectorWidgetPrivate::selectionChanged()
         addChild("WorldBoundingBox", bboxString);
     }
     */
-    
+
     for (const UsdAttribute& attr : prim.GetAttributes()) {
         std::string name = attr.GetName().GetString();
         VtValue value;

@@ -135,8 +135,8 @@ ViewerPrivate::init()
     outliner()->setHeaderLabels(QStringList() << "Name"
                                               << "Type"
                                               << "Vis");
-    outliner()->setColumnWidth(OutlinerItem::Name,  180);
-    outliner()->setColumnWidth(OutlinerItem::Type,  60);
+    outliner()->setColumnWidth(OutlinerItem::Name, 180);
+    outliner()->setColumnWidth(OutlinerItem::Type, 60);
     outliner()->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
     outliner()->setController(d.controller.data());
     outliner()->setSelection(d.selection.data());
@@ -213,12 +213,10 @@ ViewerPrivate::init()
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
     // docks
-    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this, [=](bool visible) {
-        d.ui->viewOutliner->setChecked(visible);
-    });
-    connect(d.ui->viewOutliner, &QAction::toggled, this, [=](bool checked) {
-        d.ui->outlinerDock->setVisible(checked);
-    });
+    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
+    connect(d.ui->viewOutliner, &QAction::toggled, this,
+            [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -272,15 +270,19 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settingsValue("loadType", "all").toString();
     if (loadType == "all") {
+        d.loadType = Stage::load_all;
         d.ui->fileFull->setChecked(true);
-    } else {
+    }
+    else {
+        d.loadType = Stage::load_structure;
         d.ui->fileStructure->setChecked(true);
     }
     QString theme = settingsValue("theme", "dark").toString();
     if (theme == "dark") {
         dark();
         d.ui->themeDark->setChecked(true);
-    } else {
+    }
+    else {
         light();
         d.ui->themeLight->setChecked(true);
     }

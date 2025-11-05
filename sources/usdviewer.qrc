@@ -1,6 +1,6 @@
 <RCC>
   <qresource prefix="icons">
-    <file>../resources/Checkbox.png</file>
+    <file>../resources/Checked.png</file>
     <file>../resources/Clear.png</file>
     <file>../resources/ClearDisabled.png</file>
     <file>../resources/Collapse.png</file>
@@ -8,6 +8,7 @@
     <file>../resources/Expand.png</file>
     <file>../resources/ExpandDisabled.png</file>
     <file>../resources/Open.png</file>
+    <file>../resources/PartiallyChecked.png</file>
     <file>../resources/Closed.png</file>
   </qresource>
 </RCC>

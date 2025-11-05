@@ -140,33 +140,34 @@ Stylesheet::setTheme(Theme theme)
     };
 
     if (theme == Dark) {
-        map(Base,       QColor::fromHsl(220, 76, 6));
-        map(BaseAlt,    QColor::fromHsl(220, 30, 12));
-        map(Accent,     QColor::fromHsl(220, 6, 20));
-        map(AccentAlt,  QColor::fromHsl(220, 6, 24));
-        map(Text,       QColor::fromHsl(0,   0, 180));
+        map(Base, QColor::fromHsl(220, 76, 6));
+        map(BaseAlt, QColor::fromHsl(220, 30, 12));
+        map(Accent, QColor::fromHsl(220, 6, 20));
+        map(AccentAlt, QColor::fromHsl(220, 6, 24));
+        map(Text, QColor::fromHsl(0, 0, 180));
         map(TextDisabled, QColor::fromHsl(0, 0, 40));
-        map(Highlight,  QColor::fromHsl(216, 82, 40));
-        map(Border,     QColor::fromHsl(220, 3, 32));
-        map(BorderAlt,  QColor::fromHsl(220, 3, 64));
-        map(Scrollbar,  QColor::fromHsl(0,   0, 70));
-        map(Progress,   QColor::fromHsl(216, 82, 20));
-        map(Button,     QColor::fromHsl(220, 6, 40));
-        map(ButtonAlt,  QColor::fromHsl(220, 6, 54));
-    } else {
-        map(Base,       QColor::fromHsl(0,   0, 220));
-        map(BaseAlt,    QColor::fromHsl(0,   0, 180));
-        map(Accent,     QColor::fromHsl(210, 10, 92));
-        map(AccentAlt,  QColor::fromHsl(210, 10, 88));
-        map(Text,       QColor::fromHsl(0,   0, 15));
+        map(Highlight, QColor::fromHsl(216, 82, 40));
+        map(Border, QColor::fromHsl(220, 3, 32));
+        map(BorderAlt, QColor::fromHsl(220, 3, 64));
+        map(Scrollbar, QColor::fromHsl(0, 0, 70));
+        map(Progress, QColor::fromHsl(216, 82, 20));
+        map(Button, QColor::fromHsl(220, 6, 40));
+        map(ButtonAlt, QColor::fromHsl(220, 6, 54));
+    }
+    else {
+        map(Base, QColor::fromHsl(0, 0, 220));
+        map(BaseAlt, QColor::fromHsl(0, 0, 180));
+        map(Accent, QColor::fromHsl(210, 10, 92));
+        map(AccentAlt, QColor::fromHsl(210, 10, 88));
+        map(Text, QColor::fromHsl(0, 0, 15));
         map(TextDisabled, QColor::fromHsl(0, 0, 65));
-        map(Highlight,  QColor::fromHsl(210, 90, 120));
-        map(Border,     QColor::fromHsl(0,   0, 200));
-        map(BorderAlt,  QColor::fromHsl(0,   0, 220));
-        map(Scrollbar,  QColor::fromHsl(0,   0, 85));
-        map(Progress,   QColor::fromHsl(210, 90, 45));
-        map(Button,     QColor::fromHsl(0,   0, 180));
-        map(ButtonAlt,  QColor::fromHsl(0,   0, 160));
+        map(Highlight, QColor::fromHsl(210, 90, 120));
+        map(Border, QColor::fromHsl(0, 0, 200));
+        map(BorderAlt, QColor::fromHsl(0, 0, 220));
+        map(Scrollbar, QColor::fromHsl(0, 0, 85));
+        map(Progress, QColor::fromHsl(210, 90, 45));
+        map(Button, QColor::fromHsl(0, 0, 180));
+        map(ButtonAlt, QColor::fromHsl(0, 0, 160));
     }
 
     setFontSize(DefaultSize, 12);
@@ -177,7 +178,8 @@ Stylesheet::setTheme(Theme theme)
     p->theme = theme;
 }
 
-Stylesheet::Theme Stylesheet::theme() const
+Stylesheet::Theme
+Stylesheet::theme() const
 {
     return p->palette.value("base").lightness() < 128 ? Dark : Light;
 }

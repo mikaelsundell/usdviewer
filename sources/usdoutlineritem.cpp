@@ -31,7 +31,8 @@ OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdPrim& prim)
 {
     p->d.item = this;
     p->d.prim = prim;
-    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+    setCheckState(0, Qt::Unchecked);
     p->init();
 }
 
@@ -41,10 +42,10 @@ OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdPrim& prim)
 {
     p->d.item = this;
     p->d.prim = prim;
-    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+    setCheckState(0, Qt::Unchecked);
     p->init();
 }
-
 OutlinerItem::~OutlinerItem() {}
 
 QVariant

@@ -33,7 +33,11 @@ QCheckBox::indicator {
 }
 
 QCheckBox::indicator:checked {
-    image: url(":/icons/resources/Checkbox.png");
+    image: url(":/icons/resources/Checked.png");
+}
+
+QCheckBox::indicator:indeterminate {
+    image: url(":/icons/resources/PartiallyChecked.png");
 }
 
 QComboBox {
@@ -171,7 +175,11 @@ QTreeView::indicator {
 }
 
 QTreeView::indicator:checked {
-    image: url(":/icons/resources/Checkbox.png");
+    image: url(":/icons/resources/Checked.png");
+}
+
+QTreeView::indicator:indeterminate {
+    image: url(":/icons/resources/PartiallyChecked.png");
 }
 
 QTreeView::item {

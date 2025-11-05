@@ -28,10 +28,13 @@ public:
     void addChildren(const UsdPrim& prim, OutlinerItem* parent);
     void toggleVisible(OutlinerItem* item);
     void updateFilter();
+    
+public Q_SLOTS:
     void updateSelection();
     void dataChanged(const QList<SdfPath>& paths);
     void selectionChanged();
 
+public:
     class ItemDelegate : public QStyledItemDelegate {
     public:
         ItemDelegate(QObject* parent = nullptr)
@@ -109,10 +112,12 @@ void
 OutlinerWidgetPrivate::initStage(const Stage& stage)
 {
     d.widget->clear();
-    UsdPrim prim = stage.stagePtr()->GetPseudoRoot();
-    OutlinerItem* item = new OutlinerItem(d.widget.data(), prim);
-    addChildren(prim, item);
-    initTree();
+    if (stage.isValid()) {
+        UsdPrim prim = stage.stagePtr()->GetPseudoRoot();
+        OutlinerItem* item = new OutlinerItem(d.widget.data(), prim);
+        addChildren(prim, item);
+        initTree();
+    }
 }
 
 void

@@ -13,7 +13,7 @@
   <property name="minimumSize">
    <size>
     <width>800</width>
-    <height>400</height>
+    <height>600</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -239,31 +239,34 @@
           <property name="leftMargin">
            <number>8</number>
           </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
           <item>
-           <widget class="QLabel" name="label">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Renderer ready.</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="enableDefaultCameraLight">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Enable default camera light </string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
+           <widget class="QWidget" name="widget" native="true">
+            <layout class="QVBoxLayout" name="verticalLayout_5">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>8</number>
+             </property>
+             <item>
+              <widget class="QCheckBox" name="enableDefaultCameraLight">
+               <property name="font">
+                <font>
+                 <pointsize>11</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Camera light </string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
           <item>
@@ -274,7 +277,7 @@
              </font>
             </property>
             <property name="text">
-             <string> Enable scene lights </string>
+             <string>Scene lights </string>
             </property>
            </widget>
           </item>
@@ -286,7 +289,7 @@
              </font>
             </property>
             <property name="text">
-             <string> Enable scene materials </string>
+             <string>Scene materials </string>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -314,7 +317,7 @@
              </font>
             </property>
             <property name="text">
-             <string>Draw mode</string>
+             <string>Draw</string>
             </property>
            </widget>
           </item>
@@ -363,74 +366,8 @@
     </item>
    </layout>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>1463</width>
-     <height>24</height>
-    </rect>
-   </property>
-   <widget class="QMenu" name="menuDisplay">
-    <property name="title">
-     <string>Display</string>
-    </property>
-    <widget class="QMenu" name="menuComplexity">
-     <property name="title">
-      <string>Complexity</string>
-     </property>
-     <addaction name="asComplexityLow"/>
-     <addaction name="asComplexityMedium"/>
-     <addaction name="asComplexityHigh"/>
-     <addaction name="asComplexityVeryHigh"/>
-    </widget>
-    <addaction name="menuComplexity"/>
-    <addaction name="separator"/>
-    <addaction name="displayFrameAll"/>
-    <addaction name="displayFrameSelected"/>
-    <addaction name="displayResetView"/>
-    <addaction name="separator"/>
-    <addaction name="displayExpand"/>
-    <addaction name="displayCollapse"/>
-   </widget>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>File</string>
-    </property>
-    <addaction name="fileOpen"/>
-    <addaction name="separator"/>
-    <addaction name="fileExportAll"/>
-    <addaction name="fileExportSelected"/>
-    <addaction name="separator"/>
-    <addaction name="fileExportImage"/>
-   </widget>
-   <widget class="QMenu" name="menuHelp">
-    <property name="title">
-     <string>Help</string>
-    </property>
-    <addaction name="actionAbout"/>
-    <addaction name="helpGithubReadme"/>
-    <addaction name="helpGithubIssues"/>
-   </widget>
-   <widget class="QMenu" name="menuEdit">
-    <property name="title">
-     <string>Edit</string>
-    </property>
-    <addaction name="editCopyImage"/>
-    <addaction name="separator"/>
-    <addaction name="editShow"/>
-    <addaction name="editHide"/>
-    <addaction name="separator"/>
-    <addaction name="editDelete"/>
-   </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuEdit"/>
-   <addaction name="menuDisplay"/>
-   <addaction name="menuHelp"/>
-  </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="usd::DockWidget" name="dockWidget_2">
+  <widget class="usd::DockWidget" name="outlinerDock">
    <property name="minimumSize">
     <size>
      <width>400</width>
@@ -458,10 +395,16 @@
       <widget class="QWidget" name="filterWidget" native="true">
        <layout class="QHBoxLayout" name="horizontalLayout_4">
         <property name="leftMargin">
-         <number>12</number>
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>8</number>
         </property>
         <property name="rightMargin">
-         <number>12</number>
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>8</number>
         </property>
         <item>
          <widget class="QLabel" name="label_4">
@@ -532,7 +475,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QWidget" name="dockWidget" native="true">
+      <widget class="QWidget" name="dockWidget_2" native="true">
        <property name="minimumSize">
         <size>
          <width>0</width>
@@ -586,7 +529,7 @@
           </widget>
           <widget class="usd::InspectorWidget" name="inspectorWidget">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
@@ -594,7 +537,7 @@
            <property name="maximumSize">
             <size>
              <width>16777215</width>
-             <height>200</height>
+             <height>16777215</height>
             </size>
            </property>
            <property name="font">
@@ -615,6 +558,100 @@
      </item>
     </layout>
    </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1463</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuDisplay">
+    <property name="title">
+     <string>Display</string>
+    </property>
+    <widget class="QMenu" name="menuComplexity">
+     <property name="title">
+      <string>Complexity</string>
+     </property>
+     <addaction name="asComplexityLow"/>
+     <addaction name="asComplexityMedium"/>
+     <addaction name="asComplexityHigh"/>
+     <addaction name="asComplexityVeryHigh"/>
+    </widget>
+    <addaction name="menuComplexity"/>
+    <addaction name="separator"/>
+    <addaction name="displayFrameAll"/>
+    <addaction name="displayFrameSelected"/>
+    <addaction name="displayResetView"/>
+    <addaction name="separator"/>
+    <addaction name="displayExpand"/>
+    <addaction name="displayCollapse"/>
+   </widget>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <widget class="QMenu" name="menuMode">
+     <property name="title">
+      <string>Load</string>
+     </property>
+     <addaction name="fileFull"/>
+     <addaction name="fileStructure"/>
+    </widget>
+    <addaction name="fileOpen"/>
+    <addaction name="menuMode"/>
+    <addaction name="separator"/>
+    <addaction name="fileReload"/>
+    <addaction name="fileClose"/>
+    <addaction name="separator"/>
+    <addaction name="fileExportAll"/>
+    <addaction name="fileExportSelected"/>
+    <addaction name="separator"/>
+    <addaction name="fileExportImage"/>
+    <addaction name="separator"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+    <addaction name="helpGithubReadme"/>
+    <addaction name="helpGithubIssues"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="editCopyImage"/>
+    <addaction name="separator"/>
+    <addaction name="editShow"/>
+    <addaction name="editHide"/>
+    <addaction name="separator"/>
+    <addaction name="editDelete"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>Theme</string>
+     </property>
+     <addaction name="themeLight"/>
+     <addaction name="themeDark"/>
+    </widget>
+    <addaction name="menuTheme"/>
+    <addaction name="separator"/>
+    <addaction name="viewOutliner"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuDisplay"/>
+   <addaction name="menuView"/>
+   <addaction name="menuHelp"/>
   </widget>
   <action name="displayFrameAll">
    <property name="text">
@@ -783,6 +820,68 @@
    </property>
    <property name="shortcut">
     <string>C</string>
+   </property>
+  </action>
+  <action name="themeLight">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Light</string>
+   </property>
+  </action>
+  <action name="themeDark">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Dark</string>
+   </property>
+  </action>
+  <action name="fileReload">
+   <property name="text">
+    <string>Reload</string>
+   </property>
+  </action>
+  <action name="viewOutliner">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Outliner</string>
+   </property>
+  </action>
+  <action name="fileFull">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Full</string>
+   </property>
+  </action>
+  <action name="fileStructure">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Structure</string>
+   </property>
+  </action>
+  <action name="fileClose">
+   <property name="text">
+    <string>Close</string>
    </property>
   </action>
  </widget>

@@ -15,7 +15,6 @@ public:
     ~StagePrivate();
     struct Data {
         UsdStageRefPtr stageptr;
-        QMap<QString, QVariant> metadata;
         bool updated = false;
     };
     Data d;
@@ -29,10 +28,10 @@ Stage::Stage()
     : p(new StagePrivate())
 {}
 
-Stage::Stage(const QString& filename)
+Stage::Stage(const QString& filename, load_type loadtype)
     : p(new StagePrivate())
 {
-    loadFromFile(filename);
+    loadFromFile(filename, loadtype);
 }
 
 Stage::Stage(const Stage& other)
@@ -42,18 +41,15 @@ Stage::Stage(const Stage& other)
 Stage::~Stage() {}
 
 bool
-Stage::loadFromFile(const QString& filename)
+Stage::loadFromFile(const QString& filename, load_type loadtype)
 {
-    p->d.stageptr = UsdStage::Open(filename.toStdString());
+    if (loadtype == load_type::load_all) {
+        p->d.stageptr = UsdStage::Open(filename.toStdString(), UsdStage::LoadAll);
+    }
+    else {
+        p->d.stageptr = UsdStage::Open(filename.toStdString(), UsdStage::LoadNone);
+    }
     if (p->d.stageptr) {
-        p->d.metadata.clear();
-        p->d.metadata["metersPerUnit"] = UsdGeomGetStageMetersPerUnit(p->d.stageptr);
-        ;
-        p->d.metadata["upAxis"] = QString::fromStdString(UsdGeomGetStageUpAxis(p->d.stageptr).GetString());
-        p->d.metadata["hasAuthoredTimeCodeRange"] = p->d.stageptr->HasAuthoredTimeCodeRange();
-        p->d.metadata["startTimeCode"] = p->d.stageptr->GetStartTimeCode();
-        p->d.metadata["endTimeCode"] = p->d.stageptr->GetEndTimeCode();
-        p->d.metadata["timeCodesPerSecond"] = p->d.stageptr->GetTimeCodesPerSecond();
         p->d.updated = false;
         return true;
     }
@@ -93,6 +89,31 @@ Stage::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
     }
     maskedStage->ExpandPopulationMask();
     return maskedStage->Export(filename.toStdString());
+}
+
+bool
+Stage::reload()
+{
+    try {
+        if (p->d.stageptr) {
+            p->d.stageptr->Reload();
+        }
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool
+Stage::close()
+{
+    try {
+        p->d.stageptr = nullptr;
+        p->d.updated = false;
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
 }
 
 bool

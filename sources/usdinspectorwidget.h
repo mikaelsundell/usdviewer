@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "usdcontroller.h"
 #include "usdselection.h"
 #include "usdstage.h"
 #include <QTreeWidget>
@@ -18,6 +19,9 @@ class InspectorWidget : public QTreeWidget {
 public:
     InspectorWidget(QWidget* parent = nullptr);
     virtual ~InspectorWidget();
+
+    Controller* controller();
+    void setController(Controller* controller);
 
     Selection* selection();
     void setSelection(Selection* selection);

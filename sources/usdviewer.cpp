@@ -6,6 +6,7 @@
 #include "icctransform.h"
 #include "mouseevent.h"
 #include "platform.h"
+#include "stylesheet.h"
 #include "usdcontroller.h"
 #include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
@@ -33,6 +34,7 @@ public:
     ViewerPrivate();
     void init();
     void initStage(const Stage& stage);
+    void initSettings();
     ViewCamera camera();
     ImagingGLWidget* renderer();
     InspectorWidget* inspector();
@@ -48,6 +50,8 @@ public:
 
 public Q_SLOTS:
     void open();
+    void reload();
+    void close();
     void ready();
     void copyImage();
     void clearColor();
@@ -73,12 +77,15 @@ public Q_SLOTS:
     void asComplexityMedium();
     void asComplexityHigh();
     void asComplexityVeryHigh();
+    void light();
+    void dark();
     void openGithubReadme();
     void openGithubIssues();
 
 public:
     struct Data {
         Stage stage;
+        Stage::load_type loadType;
         QStringList arguments;
         QStringList extensions;
         QColor clearColor;
@@ -91,7 +98,11 @@ public:
     Data d;
 };
 
-ViewerPrivate::ViewerPrivate() { d.extensions = { "usd", "usda", "usdc", "usdz" }; }
+ViewerPrivate::ViewerPrivate()
+{
+    d.loadType = Stage::load_type::load_all;
+    d.extensions = { "usd", "usda", "usdc", "usdz" };
+}
 
 void
 ViewerPrivate::init()
@@ -120,29 +131,43 @@ ViewerPrivate::init()
     renderer()->setClearColor(d.clearColor);
     renderer()->setController(d.controller.data());
     renderer()->setSelection(d.selection.data());
-    // metadata
-    inspector()->setHeaderLabels(QStringList() << "Key"
-                                               << "Value");
-    inspector()->setColumnWidth(InspectorItem::Key, 180);
-    inspector()->setColumnWidth(InspectorItem::Value, 80);
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
                                               << "Type"
                                               << "Vis");
+    outliner()->setColumnWidth(OutlinerItem::Name,  180);
     outliner()->setColumnWidth(OutlinerItem::Type,  60);
-    outliner()->setColumnWidth(OutlinerItem::Visible, 60);
-    {
-        QHeaderView* header = outliner()->header();
-        header->setStretchLastSection(false);
-        header->setSectionResizeMode(OutlinerItem::Name, QHeaderView::Stretch);
-        header->setSectionResizeMode(OutlinerItem::Type, QHeaderView::Fixed);
-        header->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Fixed);
-    }
+    outliner()->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
     outliner()->setController(d.controller.data());
     outliner()->setSelection(d.selection.data());
+    // inspector
+    inspector()->setHeaderLabels(QStringList() << "Key"
+                                               << "Value");
+    inspector()->setColumnWidth(InspectorItem::Key, 180);
+    inspector()->header()->setSectionResizeMode(InspectorItem::Value, QHeaderView::Stretch);
+    inspector()->setController(d.controller.data());
+    inspector()->setSelection(d.selection.data());
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
+    connect(d.ui->fileFull, &QAction::triggered, this, [this]() {
+        d.loadType = Stage::load_all;
+        setSettingsValue("loadType", "all");
+    });
+    connect(d.ui->fileStructure, &QAction::triggered, this, [this]() {
+        d.loadType = Stage::load_structure;
+        setSettingsValue("loadType", "structure");
+    });
+    {
+        QActionGroup* actions = new QActionGroup(this);
+        actions->setExclusive(true);
+        {
+            actions->addAction(d.ui->fileFull);
+            actions->addAction(d.ui->fileStructure);
+        }
+    }
+    connect(d.ui->fileReload, &QAction::triggered, this, &ViewerPrivate::reload);
+    connect(d.ui->fileClose, &QAction::triggered, this, &ViewerPrivate::close);
     connect(d.ui->fileExportAll, &QAction::triggered, this, &ViewerPrivate::exportAll);
     connect(d.ui->fileExportSelected, &QAction::triggered, this, &ViewerPrivate::exportSelected);
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
@@ -187,6 +212,13 @@ ViewerPrivate::init()
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
+    // docks
+    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this, [=](bool visible) {
+        d.ui->viewOutliner->setChecked(visible);
+    });
+    connect(d.ui->viewOutliner, &QAction::toggled, this, [=](bool checked) {
+        d.ui->outlinerDock->setVisible(checked);
+    });
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -199,8 +231,19 @@ ViewerPrivate::init()
         d.ui->drawMode->addItem("Geom Smooth", QVariant::fromValue(ImagingGLWidget::GeomSmooth));
         d.ui->drawMode->setCurrentIndex(d.ui->drawMode->findData(QVariant::fromValue(ImagingGLWidget::ShadedSmooth)));
     }
-    // stylesheet
-    stylesheet();
+    connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
+    connect(d.ui->themeDark, &QAction::triggered, this, &ViewerPrivate::dark);
+    {
+        QActionGroup* actions = new QActionGroup(this);
+        actions->setExclusive(true);
+        {
+            actions->addAction(d.ui->themeLight);
+            actions->addAction(d.ui->themeDark);
+        }
+    }
+    // settings
+    initSettings();
+    enable(false);
 // debug
 #ifdef QT_DEBUG
     QMenu* menu = d.ui->menubar->addMenu("Debug");
@@ -222,6 +265,25 @@ ViewerPrivate::initStage(const Stage& stage)
     outliner()->setStage(stage);
     d.stage = stage;
     enable(true);
+}
+
+void
+ViewerPrivate::initSettings()
+{
+    QString loadType = settingsValue("loadType", "all").toString();
+    if (loadType == "all") {
+        d.ui->fileFull->setChecked(true);
+    } else {
+        d.ui->fileStructure->setChecked(true);
+    }
+    QString theme = settingsValue("theme", "dark").toString();
+    if (theme == "dark") {
+        dark();
+        d.ui->themeDark->setChecked(true);
+    } else {
+        light();
+        d.ui->themeLight->setChecked(true);
+    }
 }
 
 ViewCamera
@@ -288,6 +350,13 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 void
 ViewerPrivate::enable(bool enable)
 {
+    d.ui->fileReload->setEnabled(enable);
+    d.ui->fileExportAll->setEnabled(enable);
+    d.ui->fileExportSelected->setEnabled(enable);
+    d.ui->fileExportImage->setEnabled(enable);
+    d.ui->menuEdit->setEnabled(enable);
+    d.ui->menuDisplay->setEnabled(enable);
+    d.ui->menuComplexity->setEnabled(enable);
     d.ui->collapse->setEnabled(enable);
     d.ui->expand->setEnabled(enable);
 }
@@ -304,33 +373,11 @@ ViewerPrivate::profile()
 void
 ViewerPrivate::stylesheet()
 {
-    QFile stylesheet(platform::getApplicationPath() + "/Resources/App.css");
-    stylesheet.open(QFile::ReadOnly);
-    QString qss = stylesheet.readAll();
-    QRegularExpression hslRegex("hsl\\(\\s*(\\d+)\\s*,\\s*(\\d+)%\\s*,\\s*(\\d+)%\\s*\\)");
-    QString transformqss = qss;
-    QRegularExpressionMatchIterator i = hslRegex.globalMatch(transformqss);
-    while (i.hasNext()) {
-        QRegularExpressionMatch match = i.next();
-        if (match.hasMatch()) {
-            if (!match.captured(1).isEmpty() && !match.captured(2).isEmpty() && !match.captured(3).isEmpty()) {
-                int h = match.captured(1).toInt();
-                int s = match.captured(2).toInt();
-                int l = match.captured(3).toInt();
-                QColor color = QColor::fromHslF(h / 360.0f, s / 100.0f, l / 100.0f);
-                // icc profile
-                ICCTransform* transform = ICCTransform::instance();
-                color = transform->map(color.rgb());
-                QString hsl = QString("hsl(%1, %2%, %3%)")
-                                  .arg(color.hue() == -1 ? 0 : color.hue())
-                                  .arg(static_cast<int>(color.hslSaturationF() * 100))
-                                  .arg(static_cast<int>(color.lightnessF() * 100));
-
-                transformqss.replace(match.captured(0), hsl);
-            }
-        }
+    QString path = platform::getApplicationPath() + "/Resources/App.qss";
+    auto ss = Stylesheet::instance();
+    if (ss->loadQss(path)) {
+        ss->applyQss(ss->compiled());
     }
-    qApp->setStyleSheet(transformqss);
 }
 
 void
@@ -344,12 +391,30 @@ ViewerPrivate::open()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
-        Stage stage(filename);
+        Stage stage(filename, d.loadType);
         if (stage.isValid()) {
             d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
             initStage(stage);
         }
         setSettingsValue("openDir", QFileInfo(filename).absolutePath());
+    }
+}
+
+void
+ViewerPrivate::reload()
+{
+    if (d.stage.isValid()) {
+        d.stage.reload();
+        initStage(d.stage);
+    }
+}
+
+void
+ViewerPrivate::close()
+{
+    if (d.stage.isValid()) {
+        d.stage.close();
+        initStage(d.stage);
     }
 }
 
@@ -598,6 +663,22 @@ ViewerPrivate::asComplexityVeryHigh()
 }
 
 void
+ViewerPrivate::light()
+{
+    Stylesheet::instance()->setTheme(Stylesheet::Light);
+    setSettingsValue("theme", "light");
+    stylesheet();
+}
+
+void
+ViewerPrivate::dark()
+{
+    Stylesheet::instance()->setTheme(Stylesheet::Dark);
+    setSettingsValue("theme", "dark");
+    stylesheet();
+}
+
+void
 ViewerPrivate::openGithubReadme()
 {
     QDesktopServices::openUrl(QUrl("https://github.com/mikaelsundell/usdviewer/blob/master/README.md"));
@@ -631,7 +712,7 @@ Viewer::setArguments(const QStringList& arguments)
             if (!filename.isEmpty()) {
                 QFileInfo fileInfo(filename);
                 if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                    Stage stage(filename);
+                    Stage stage(filename, p->d.loadType);
                     if (stage.isValid()) {
                         setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
                         p->initStage(stage);
@@ -656,7 +737,7 @@ Viewer::setArguments(const QStringList& arguments)
 #endif
             QFileInfo fileInfo(decodedPath);
             if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                Stage stage(decodedPath);
+                Stage stage(decodedPath, p->d.loadType);
                 if (stage.isValid()) {
                     setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(decodedPath));
                     p->initStage(stage);
@@ -667,7 +748,7 @@ Viewer::setArguments(const QStringList& arguments)
 
         QFileInfo fileInfo(arg);
         if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-            Stage stage(arg);
+            Stage stage(arg, p->d.loadType);
             if (stage.isValid()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(arg));
                 p->initStage(stage);
@@ -701,7 +782,7 @@ Viewer::dropEvent(QDropEvent* event)
         QString filename = urls.first().toLocalFile();
         QString extension = QFileInfo(filename).suffix().toLower();
         if (p->d.extensions.contains(extension)) {
-            Stage stage(filename);
+            Stage stage(filename, p->d.loadType);
             if (stage.isValid()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
                 p->initStage(stage);

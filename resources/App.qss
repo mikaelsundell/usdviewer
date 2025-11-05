@@ -1,0 +1,180 @@
+/* SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2025 - present Mikael Sundell
+ * https://github.com/mikaelsundell/usdviewer
+ */
+
+/* Top-level widgets */
+QMainWindow,
+QDialog,
+QDockWidget
+{
+    font-size: $defaultsize;
+    background-color: $base;
+}
+
+QMainWindow::separator {
+    background: $border;
+    width: 6px;
+}
+
+QCheckBox {
+    color: $text;
+    background-color: $base;
+    font-size: $defaultsize;
+    spacing: 8px;
+    padding-right: 10px;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    background-color: $basealt;
+    border: 1px solid $border;
+}
+
+QCheckBox::indicator:checked {
+    image: url(":/icons/resources/Checkbox.png");
+}
+
+QComboBox {
+    color: $text;
+    font-size: $defaultsize;
+    background-color: $basealt;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 2px;
+    border-radius: 0px;
+    margin-top: 4px;
+    outline: none;
+    border: 1px solid $border;
+}
+
+QComboBox:disabled {
+    color: $textdisabled;
+}
+
+QComboBox::down-arrow {
+    image: url(":/icons/resources/Dropdown.png");
+    width: 12px;
+    height: 12px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 16px;
+    right: 4px;
+    border: 0px;
+}
+
+QComboBox::item {
+    color: $text;
+    height: 10px;
+    background-color: $basealt;
+    border: 8px solid transparent;
+}
+
+QComboBox::item:selected {
+    background: $highlight;
+}
+
+QLabel
+{
+    font-size: $defaultsize;
+    color: $text;
+}
+
+QLineEdit
+{
+    color: $text;
+    font-size: $defaultsize;
+    background-color: $base;
+    height: 20px;  
+    min-width: 50px;      
+    border: 1px solid $borderalt;
+    border-radius: 0px;        
+    padding: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+QPushButton
+{
+    color: $text;
+    font-size: $defaultsize;
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 $button,
+        stop: 1.0 $buttonalt
+    );
+    height: 20px;  
+    min-width: 50px;      
+    border: 1px solid $borderalt;
+    border-radius: 0px;        
+    padding: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+QPushButton:default
+{
+    font-weight: bold;
+}
+
+QPushButton:disabled
+{
+    color: $textdisabled;
+}
+
+QPushButton:pressed
+{
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 $button.lightness(120),
+        stop: 1.0 $buttonalt.lightness(120)
+    );
+}
+
+QTextBrowser
+{
+    font-size: $defaultsize;
+    color: $text;
+    background-color: $base;
+    selection-background-color: $highlight;
+    alternate-background-color: $base;
+}
+
+QTreeView
+{
+    font-size: $defaultsize;
+    color: $text;
+    background-color: $base;
+    selection-background-color: $highlight;
+    alternate-background-color: $base;
+}
+
+QTreeView QHeaderView:section
+{
+    color: $text;
+    background-color: $basealt;
+    border: 1px solid $border;
+    padding: 4px 6px;
+}
+
+QTreeView::indicator {
+    width: 18px;
+    height: 18px;
+    background-color: $basealt;
+    border: 1px solid $border;
+}
+
+QTreeView::indicator:checked {
+    image: url(":/icons/resources/Checkbox.png");
+}
+
+QTreeView::item {
+    height: 26px;
+    padding: 4px;
+}

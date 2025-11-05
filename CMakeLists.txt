@@ -33,7 +33,7 @@ list (FILTER project_sources EXCLUDE REGEX "_")
 
 file (GLOB project_resources
     "resources/*.icc"
-    "resources/*.css"
+    "resources/*.qss"
 )
 
 # source groups

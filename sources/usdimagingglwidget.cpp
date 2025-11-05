@@ -149,9 +149,14 @@ void
 ImagingGLWidgetPrivate::initStage(const Stage& stage)
 {
     d.stage = stage;
-    initCamera();
-    d.glEngine.reset();
-    initGL();
+    if (stage.isValid()) {
+        d.glEngine.reset();
+        initCamera();
+        initGL();
+    }
+    else {
+        d.glEngine.reset();
+    }
 }
 
 void
@@ -423,10 +428,6 @@ ImagingGLWidgetPrivate::widgetViewport() const
     return GfVec4d(0, 0, size[0], size[1]);
 }
 
-void
-ImagingGLWidgetPrivate::cleanUp()
-{}
-
 // todo: not yet in use
 // #include "usdimagingglwidget.moc"
 
@@ -438,7 +439,7 @@ ImagingGLWidget::ImagingGLWidget(QWidget* parent)
     p->init();
 }
 
-ImagingGLWidget::~ImagingGLWidget() { p->cleanUp(); }
+ImagingGLWidget::~ImagingGLWidget() {}
 
 ViewCamera
 ImagingGLWidget::viewCamera() const

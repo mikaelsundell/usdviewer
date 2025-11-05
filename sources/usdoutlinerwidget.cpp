@@ -6,6 +6,9 @@
 #include "usdoutlineritem.h"
 #include "usdselection.h"
 #include "usdutils.h"
+
+#include <QApplication>
+
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QPointer>
@@ -95,20 +98,63 @@ public:
     Data d;
 };
 
+class TriStateDelegate : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    bool editorEvent(QEvent* event,
+                     QAbstractItemModel* model,
+                     const QStyleOptionViewItem& option,
+                     const QModelIndex& index) override
+    {
+        if (!(index.flags() & Qt::ItemIsUserCheckable))
+            return QStyledItemDelegate::editorEvent(event, model, option, index);
+
+        if (event->type() != QEvent::MouseButtonRelease &&
+            event->type() != QEvent::MouseButtonDblClick &&
+            event->type() != QEvent::KeyPress)
+            return QStyledItemDelegate::editorEvent(event, model, option, index);
+
+        QStyleOptionViewItem opt = option;
+        initStyleOption(&opt, index);
+        const QWidget* w = option.widget;
+        const QStyle* style = w ? w->style() : QApplication::style();
+        QRect checkRect = style->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &opt, w);
+
+        if (auto* me = dynamic_cast<QMouseEvent*>(event)) {
+            if (!checkRect.contains(me->pos()))
+                return QStyledItemDelegate::editorEvent(event, model, option, index);
+        }
+        Qt::CheckState s = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
+        switch (s) {
+        case Qt::Unchecked:          s = Qt::Checked; break;
+        case Qt::Checked:            s = Qt::Unchecked; break;
+        case Qt::PartiallyChecked:   s = Qt::Unchecked; break;
+        }
+
+        model->setData(index, s, Qt::CheckStateRole);
+        return true;
+    }
+};
+
 OutlinerWidgetPrivate::OutlinerWidgetPrivate() { d.pending = 0; }
 
 void
 OutlinerWidgetPrivate::init()
 {
-    ItemDelegate* delegate = new ItemDelegate(d.widget.data());
-    d.widget->setItemDelegate(delegate);
+    auto* delegate = new TriStateDelegate(d.widget.data());
+    d.widget->setItemDelegateForColumn(0, delegate);
+    
+    //ItemDelegate* delegate = new ItemDelegate(d.widget.data());
+    //d.widget->setItemDelegate(delegate);
+    
     connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::updateSelection);
     connect(d.widget.data(), &OutlinerWidget::itemChanged, this, [this](QTreeWidgetItem* item, int column) {
         if (column == OutlinerItem::Name) {  // assuming checkboxes are in Name column
             OutlinerItem* outlinerItem = static_cast<OutlinerItem*>(item);
             checkStateChanged(outlinerItem);
         }
-    });   
+    });
 }
 
 void

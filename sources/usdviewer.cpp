@@ -60,7 +60,9 @@ public Q_SLOTS:
     void exportSelected();
     void exportImage();
     void showSelected();
+    void showHierarchy();
     void hideSelected();
+    void hideHierarchy();
     void frameAll();
     void frameSelected();
     void resetView();
@@ -180,8 +182,10 @@ ViewerPrivate::init()
     connect(d.ui->fileExportSelected, &QAction::triggered, this, &ViewerPrivate::exportSelected);
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
-    connect(d.ui->editShow, &QAction::triggered, this, &ViewerPrivate::showSelected);
-    connect(d.ui->editHide, &QAction::triggered, this, &ViewerPrivate::hideSelected);
+    connect(d.ui->editShowSelected, &QAction::triggered, this, &ViewerPrivate::showSelected);
+    connect(d.ui->editShowHierarchy, &QAction::triggered, this, &ViewerPrivate::showHierarchy);
+    connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
+    connect(d.ui->editHideHierarchy, &QAction::triggered, this, &ViewerPrivate::hideHierarchy);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
     connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
@@ -574,10 +578,26 @@ ViewerPrivate::showSelected()
 }
 
 void
+ViewerPrivate::showHierarchy()
+{
+    if (selection()->paths().size()) {
+        d.stageModel->setVisible(d.selection->paths(), true, true);
+    }
+}
+
+void
 ViewerPrivate::hideSelected()
 {
     if (selection()->paths().size()) {
         d.stageModel->setVisible(d.selection->paths(), false);
+    }
+}
+
+void
+ViewerPrivate::hideHierarchy()
+{
+    if (selection()->paths().size()) {
+        d.stageModel->setVisible(d.selection->paths(), false, true);
     }
 }
 

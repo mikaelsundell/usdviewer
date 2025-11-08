@@ -105,7 +105,14 @@ void
 ImagingGLWidgetPrivate::initGL()
 {
     if (!d.glEngine) {
-        d.glEngine.reset(new UsdImagingGLEngine());
+        
+        
+        // Create and configure parameters
+        UsdImagingGLEngine::Parameters params;
+        params.allowAsynchronousSceneProcessing = true;    // enable async rendering
+        params.displayUnloadedPrimsWithBounds = true;      // show bo
+        
+        d.glEngine.reset(new UsdImagingGLEngine(params));
         Hgi* hgi = d.glEngine->GetHgi();
         if (hgi) {
             TfToken driver = hgi->GetAPIName();
@@ -166,7 +173,6 @@ ImagingGLWidgetPrivate::paintGL()
             TfToken aovtoken(QString_TfToken(d.aov));
             d.glEngine->SetRendererAov(aovtoken);
             GfVec4d viewport = widgetViewport();
-
             d.glEngine->SetRenderBufferSize(widgetSize());
             d.glEngine->SetFraming(
                 CameraUtilFraming(GfRange2f(GfVec2i(), widgetSize()), GfRect2i(GfVec2i(), widgetSize())));

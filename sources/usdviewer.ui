@@ -625,10 +625,24 @@
     <property name="title">
      <string>Edit</string>
     </property>
+    <widget class="QMenu" name="menu_2">
+     <property name="title">
+      <string>Show</string>
+     </property>
+     <addaction name="editShowSelected"/>
+     <addaction name="editShowHierarchy"/>
+    </widget>
+    <widget class="QMenu" name="menu">
+     <property name="title">
+      <string>Hide</string>
+     </property>
+     <addaction name="editHideSelected"/>
+     <addaction name="editHideHierarchy"/>
+    </widget>
     <addaction name="editCopyImage"/>
     <addaction name="separator"/>
-    <addaction name="editShow"/>
-    <addaction name="editHide"/>
+    <addaction name="menu_2"/>
+    <addaction name="menu"/>
     <addaction name="separator"/>
     <addaction name="editDelete"/>
    </widget>
@@ -783,22 +797,6 @@
     <string>4</string>
    </property>
   </action>
-  <action name="editShow">
-   <property name="text">
-    <string>Show</string>
-   </property>
-   <property name="shortcut">
-    <string>S</string>
-   </property>
-  </action>
-  <action name="editHide">
-   <property name="text">
-    <string>Hide</string>
-   </property>
-   <property name="shortcut">
-    <string>H</string>
-   </property>
-  </action>
   <action name="editDelete">
    <property name="text">
     <string>Delete</string>
@@ -891,6 +889,38 @@
    </property>
    <property name="text">
     <string>Payloads</string>
+   </property>
+  </action>
+  <action name="editShowSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>S</string>
+   </property>
+  </action>
+  <action name="editShowHierarchy">
+   <property name="text">
+    <string>Hieararchy</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+S</string>
+   </property>
+  </action>
+  <action name="editHideSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>H</string>
+   </property>
+  </action>
+  <action name="editHideHierarchy">
+   <property name="text">
+    <string>Hierarchy</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+H</string>
    </property>
   </action>
  </widget>

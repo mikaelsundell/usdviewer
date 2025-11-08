@@ -26,15 +26,15 @@ public:
     bool loadFromFile(const QString& filename, load_type loadType);
     bool loadPayloads(const QList<SdfPath>& paths);
     bool unloadPayloads(const QList<SdfPath>& paths);
-    void setVisible(const QList<SdfPath>& paths, bool visible);
+    void setVisible(const QList<SdfPath>& paths, bool visible, bool hierarchy = false);
     bool exportToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool reload();
     bool close();
     bool isLoaded() const;
     load_type loadType() const;
-    GfBBox3d boundingBox() const;
-    GfBBox3d boundingBox(const QList<SdfPath> paths) const;
+    GfBBox3d boundingBox();
+    GfBBox3d boundingBox(const QList<SdfPath> paths);
     UsdStageRefPtr stage() const;
 
 Q_SIGNALS:

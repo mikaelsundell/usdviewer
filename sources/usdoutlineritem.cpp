@@ -74,10 +74,9 @@ OutlinerItem::data(int column, int role) const
             if (prim && prim.IsActive()) {
                 UsdGeomImageable imageable(prim);
                 if (imageable) {
-                    //TfToken vis;
-                    //imageable.GetVisibilityAttr().Get(&vis);
-                    //return (vis == UsdGeomTokens->invisible) ? "H" : "V";
-
+                    TfToken vis;
+                    imageable.GetVisibilityAttr().Get(&vis);
+                    return (vis == UsdGeomTokens->invisible) ? "H" : "V";
                     return "V";
                 }
             }

@@ -102,6 +102,18 @@ QLineEdit
     padding-right: 5px;
 }
 
+QProgressBar {
+    min-height: 10px;
+    max-height: 10px; 
+    border-radius: 4px;
+    background-color: $base;
+}
+
+QProgressBar::chunk {
+    border-radius: 4px;
+    background-color: $highlight;
+}
+
 QPushButton
 {
     color: $text;

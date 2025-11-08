@@ -32,7 +32,7 @@ public:
     void initGL();
     void initCamera();
     void initController();
-    void initDataModel();
+    void initStageModel();
     void initSelection();
     void paintGL();
     void mousePressEvent(QMouseEvent* event);
@@ -74,7 +74,7 @@ public:
         ImagingGLWidget::DrawMode drawMode;
         UsdImagingGLRenderParams params;
         QScopedPointer<UsdImagingGLEngine> glEngine;
-        QPointer<DataModel> dataModel;
+        QPointer<StageModel> stageModel;
         QPointer<Selection> selection;
         QPointer<ImagingGLWidget> widget;
     };
@@ -122,10 +122,10 @@ ImagingGLWidgetPrivate::initGL()
 void
 ImagingGLWidgetPrivate::initCamera()
 {
-    Q_ASSERT("stage is not loaded" && d.dataModel->isLoaded());
+    Q_ASSERT("stage is not loaded" && d.stageModel->isLoaded());
     d.viewCamera = ViewCamera();
-    d.viewCamera.setBoundingBox(d.dataModel->boundingBox());
-    TfToken upAxis = UsdGeomGetStageUpAxis(d.dataModel->stage());
+    d.viewCamera.setBoundingBox(d.stageModel->boundingBox());
+    TfToken upAxis = UsdGeomGetStageUpAxis(d.stageModel->stage());
     if (upAxis == TfToken("X")) {
         d.viewCamera.setCameraUp(ViewCamera::X);
     }
@@ -139,10 +139,10 @@ ImagingGLWidgetPrivate::initCamera()
 }
 
 void
-ImagingGLWidgetPrivate::initDataModel()
+ImagingGLWidgetPrivate::initStageModel()
 {
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &ImagingGLWidgetPrivate::stageChanged);
-    connect(d.dataModel.data(), &DataModel::primsChanged, this, &ImagingGLWidgetPrivate::primsChanged);
+    connect(d.stageModel.data(), &StageModel::stageChanged, this, &ImagingGLWidgetPrivate::stageChanged);
+    connect(d.stageModel.data(), &StageModel::primsChanged, this, &ImagingGLWidgetPrivate::primsChanged);
 }
 
 void
@@ -160,7 +160,7 @@ ImagingGLWidgetPrivate::paintGL()
     // paintGL() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
 
-    if (d.dataModel && d.dataModel->isLoaded()) {
+    if (d.stageModel && d.stageModel->isLoaded()) {
         if (d.glEngine) {
             Q_ASSERT("aov is not set and is required" && d.aov.size());
             TfToken aovtoken(QString_TfToken(d.aov));
@@ -239,7 +239,7 @@ ImagingGLWidgetPrivate::paintGL()
             TfErrorMark mark;
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
-            d.glEngine->Render(d.dataModel->stage()->GetPseudoRoot(), d.params);
+            d.glEngine->Render(d.stageModel->stage()->GetPseudoRoot(), d.params);
             hgi->EndFrame();
 
             GLint viewportX[4];
@@ -324,7 +324,7 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
     // pickEvent() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
 
-    if (d.dataModel && d.dataModel->isLoaded()) {
+    if (d.stageModel && d.stageModel->isLoaded()) {
         if (d.glEngine) {
 #ifdef WIN32
             glDepthMask(GL_TRUE);  // needed on windows
@@ -342,7 +342,7 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
             GfVec3d hitPoint, hitNormal;
             SdfPath hitPrimPath, hitInstancerPath;
             if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(), pickfrustum.ComputeProjectionMatrix(),
-                                             d.dataModel->stage()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
+                                             d.stageModel->stage()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
                                              &hitPrimPath, &hitInstancerPath)) {
                 d.selection->replacePaths(QList<SdfPath>() << hitPrimPath);
             }
@@ -377,7 +377,7 @@ void
 ImagingGLWidgetPrivate::stageChanged()
 {
     d.glEngine.reset();
-    if (d.dataModel->isLoaded()) {
+    if (d.stageModel->isLoaded()) {
         initCamera();
         initGL();
     }
@@ -562,18 +562,18 @@ ImagingGLWidget::setRendererAov(const QString& aov)
     }
 }
 
-DataModel*
-ImagingGLWidget::dataModel() const
+StageModel*
+ImagingGLWidget::stageModel() const
 {
-    return p->d.dataModel;
+    return p->d.stageModel;
 }
 
 void
-ImagingGLWidget::setDataModel(DataModel* dataModel)
+ImagingGLWidget::setStageModel(StageModel* stageModel)
 {
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-        p->initDataModel();
+    if (p->d.stageModel != stageModel) {
+        p->d.stageModel = stageModel;
+        p->initStageModel();
         update();
     }
 }

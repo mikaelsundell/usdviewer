@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Usdprogress</class>
- <widget class="QDialog" name="Usdprogress">
+ <class>UsdPayloadDialog</class>
+ <widget class="QDialog" name="UsdPayloadDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Progress</string>
+   <string>Payloads</string>
   </property>
   <property name="modal">
    <bool>false</bool>
@@ -28,6 +28,9 @@
     <widget class="QProgressBar" name="progress">
      <property name="value">
       <number>0</number>
+     </property>
+     <property name="textVisible">
+      <bool>false</bool>
      </property>
     </widget>
    </item>

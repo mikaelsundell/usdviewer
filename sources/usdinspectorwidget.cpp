@@ -30,7 +30,7 @@ namespace usd {
 class InspectorWidgetPrivate : public QObject {
 public:
     void init();
-    void initDataModel();
+    void initStageModel();
     void initSelection();
 
 public Q_SLOTS:
@@ -39,7 +39,7 @@ public Q_SLOTS:
 
 public:
     struct Data {
-        QPointer<DataModel> dataModel;
+        QPointer<StageModel> stageModel;
         QPointer<Selection> selection;
         QPointer<InspectorWidget> widget;
     };
@@ -51,9 +51,9 @@ InspectorWidgetPrivate::init()
 {}
 
 void
-InspectorWidgetPrivate::initDataModel()
+InspectorWidgetPrivate::initStageModel()
 {
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &InspectorWidgetPrivate::stageChanged);
+    connect(d.stageModel.data(), &StageModel::stageChanged, this, &InspectorWidgetPrivate::stageChanged);
 }
 
 void
@@ -66,8 +66,8 @@ void
 InspectorWidgetPrivate::stageChanged()
 {
     d.widget->clear();
-    if (d.dataModel->isLoaded()) {
-        UsdStageRefPtr stage = d.dataModel->stage();
+    if (d.stageModel->isLoaded()) {
+        UsdStageRefPtr stage = d.stageModel->stage();
         InspectorItem* stageItem = new InspectorItem(d.widget.data());
         stageItem->setText(InspectorItem::Key, "Stage");
         d.widget->addTopLevelItem(stageItem);
@@ -121,7 +121,7 @@ InspectorWidgetPrivate::selectionChanged()
     QList<SdfPath> selectedPaths = d.selection->paths();
     d.widget->clear();
 
-    if (!d.dataModel->isLoaded()) {
+    if (!d.stageModel->isLoaded()) {
         return;
     }
 
@@ -138,7 +138,7 @@ InspectorWidgetPrivate::selectionChanged()
     }
 
     SdfPath path = selectedPaths.first();
-    UsdStageRefPtr stage = d.dataModel->stage();
+    UsdStageRefPtr stage = d.stageModel->stage();
     UsdPrim prim = stage->GetPrimAtPath(path);
     if (!prim)
         return;
@@ -197,18 +197,18 @@ InspectorWidget::InspectorWidget(QWidget* parent)
 
 InspectorWidget::~InspectorWidget() {}
 
-DataModel*
-InspectorWidget::dataModel() const
+StageModel*
+InspectorWidget::stageModel() const
 {
-    return p->d.dataModel;
+    return p->d.stageModel;
 }
 
 void
-InspectorWidget::setDataModel(DataModel* dataModel)
+InspectorWidget::setStageModel(StageModel* stageModel)
 {
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-        p->initDataModel();
+    if (p->d.stageModel != stageModel) {
+        p->d.stageModel = stageModel;
+        p->initStageModel();
         update();
     }
 }

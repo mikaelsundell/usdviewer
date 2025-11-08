@@ -7,10 +7,10 @@
 #include "mouseevent.h"
 #include "platform.h"
 #include "stylesheet.h"
-#include "usddatamodel.h"
 #include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
-#include "usdprogress.h"
+#include "usdpayloaddialog.h"
+#include "usdstagemodel.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
@@ -34,19 +34,21 @@ public:
     ViewerPrivate();
     void init();
     void initSettings();
+    void profile();
+    void stylesheet();
     ViewCamera camera();
     ImagingGLWidget* renderer();
     InspectorWidget* inspector();
     OutlinerWidget* outliner();
-    DataModel* dataModel();
+    StageModel* stageModel();
     Selection* selection();
-    QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
-    void setSettingsValue(const QString& key, const QVariant& value);
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
-    void profile();
-    void stylesheet();
-
+    QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
+    void setSettingsValue(const QString& key, const QVariant& value);
+    void loadSettings();
+    void saveSettings();
+    
 public Q_SLOTS:
     void open();
     void reload();
@@ -79,18 +81,21 @@ public Q_SLOTS:
     void dark();
     void openGithubReadme();
     void openGithubIssues();
-
+    
+public Q_SLOTS:
+    void boundingBoxChanged(const GfBBox3d& bbox);
+    
 public:
     struct Data {
-        DataModel::load_type loadType;
+        StageModel::load_type loadType;
         QStringList arguments;
         QStringList extensions;
         QColor clearColor;
         QScopedPointer<MouseEvent> clearColorFilter;
-        QScopedPointer<DataModel> dataModel;
+        QScopedPointer<StageModel> stageModel;
         QScopedPointer<Selection> selection;
-        QScopedPointer<Ui_Usdviewer> ui;
-        QPointer<Progress> progress;
+        QScopedPointer<Ui_UsdViewer> ui;
+        QPointer<PayloadDialog> payloadDialog;
         QPointer<Viewer> viewer;
     };
     Data d;
@@ -98,7 +103,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadType = DataModel::load_type::load_all;
+    d.loadType = StageModel::load_type::load_all;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
 
@@ -112,8 +117,10 @@ ViewerPrivate::init()
     QString inputProfile = resources.filePath("sRGB2014.icc");  // built-in Qt input profile
     transform->setInputProfile(inputProfile);
     profile();
-    d.ui.reset(new Ui_Usdviewer());
+    d.ui.reset(new Ui_UsdViewer());
     d.ui->setupUi(d.viewer.data());
+    // settings
+    loadSettings();
     // clear color
     d.clearColor = QColor(settingsValue("clearColor", "#4f4f4f").toString());
     d.ui->clearcolor->setStyleSheet("background-color: " + d.clearColor.name() + ";");
@@ -121,12 +128,12 @@ ViewerPrivate::init()
     d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
     // event filter
     d.viewer->installEventFilter(this);
-    // containers
-    d.dataModel.reset(new DataModel());
+    // models
+    d.stageModel.reset(new StageModel());
     d.selection.reset(new Selection());
-    // renderer
+    // models
     renderer()->setClearColor(d.clearColor);
-    renderer()->setDataModel(d.dataModel.data());
+    renderer()->setStageModel(d.stageModel.data());
     renderer()->setSelection(d.selection.data());
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
@@ -135,34 +142,36 @@ ViewerPrivate::init()
     outliner()->setColumnWidth(OutlinerItem::Name, 180);
     outliner()->setColumnWidth(OutlinerItem::Type, 60);
     outliner()->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
-    outliner()->setDataModel(d.dataModel.data());
+    outliner()->setStageModel(d.stageModel.data());
     outliner()->setSelection(d.selection.data());
     // inspector
     inspector()->setHeaderLabels(QStringList() << "Key"
                                                << "Value");
     inspector()->setColumnWidth(InspectorItem::Key, 180);
     inspector()->header()->setSectionResizeMode(InspectorItem::Value, QHeaderView::Stretch);
-    inspector()->setDataModel(d.dataModel.data());
+    inspector()->setStageModel(d.stageModel.data());
     inspector()->setSelection(d.selection.data());
-    // progress
-    d.progress = new Progress(d.viewer);
+    // payload
+    d.payloadDialog = new PayloadDialog(d.viewer);
+    d.payloadDialog->setStageModel(d.stageModel.data());
+    d.payloadDialog->setSelection(d.selection.data());
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->fileFull, &QAction::triggered, this, [this]() {
-        d.loadType = DataModel::load_all;
+        d.loadType = StageModel::load_all;
         setSettingsValue("loadType", "all");
     });
-    connect(d.ui->fileStructure, &QAction::triggered, this, [this]() {
-        d.loadType = DataModel::load_structure;
-        setSettingsValue("loadType", "structure");
+    connect(d.ui->filePayload, &QAction::triggered, this, [this]() {
+        d.loadType = StageModel::load_payload;
+        setSettingsValue("loadType", "payload");
     });
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         {
             actions->addAction(d.ui->fileFull);
-            actions->addAction(d.ui->fileStructure);
+            actions->addAction(d.ui->filePayload);
         }
     }
     connect(d.ui->fileReload, &QAction::triggered, this, &ViewerPrivate::reload);
@@ -210,24 +219,27 @@ ViewerPrivate::init()
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
+    
+    connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
+    
+    
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this,
             [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
     // progress
-    connect(d.ui->viewProgress, &QAction::toggled, this, [=](bool checked) {
+    connect(d.ui->viewPayload, &QAction::toggled, this, [=](bool checked) {
         if (checked) {
-            d.progress->show();
-            d.progress->raise();
-        } else {
-            if (d.progress)
-                d.progress->hide();
+            d.payloadDialog->show();
+            d.payloadDialog->raise();
+        }
+        else {
+            if (d.payloadDialog)
+                d.payloadDialog->hide();
         }
     });
-    connect(d.progress, &Progress::finished, this, [=]() {
-        d.ui->viewProgress->setChecked(false);
-    });
+    connect(d.payloadDialog, &PayloadDialog::finished, this, [=]() { d.ui->viewPayload->setChecked(false); });
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -250,11 +262,12 @@ ViewerPrivate::init()
             actions->addAction(d.ui->themeDark);
         }
     }
-    connect(d.dataModel.data(), &DataModel::loadPathsSubmitted, d.progress, &Progress::loadPathsSubmitted);
-    connect(d.dataModel.data(), &DataModel::loadPathFailed, d.progress, &Progress::loadPathFailed);
-    connect(d.dataModel.data(), &DataModel::loadPathCompleted, d.progress, &Progress::loadPathCompleted);
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, [=]() { enable(true); });
-    connect(d.progress, &Progress::cancelRequested, [&]() { qWarning() << "user canceled loading."; });
+    connect(d.stageModel.data(), &StageModel::payloadsRequested, d.payloadDialog, &PayloadDialog::payloadsRequested);
+    connect(d.stageModel.data(), &StageModel::payloadsFailed, d.payloadDialog, &PayloadDialog::payloadsFailed);
+    connect(d.stageModel.data(), &StageModel::payloadsLoaded, d.payloadDialog, &PayloadDialog::payloadsLoaded);
+    connect(d.stageModel.data(), &StageModel::payloadsUnloaded, d.payloadDialog, &PayloadDialog::payloadsUnloaded);
+    connect(d.stageModel.data(), &StageModel::stageChanged, this, [=]() { enable(true); });
+    connect(d.payloadDialog, &PayloadDialog::cancelRequested, [&]() { qWarning() << "user canceled loading."; });
     // settings
     initSettings();
     enable(false);
@@ -275,12 +288,12 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settingsValue("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadType = DataModel::load_all;
+        d.loadType = StageModel::load_all;
         d.ui->fileFull->setChecked(true);
     }
     else {
-        d.loadType = DataModel::load_structure;
-        d.ui->fileStructure->setChecked(true);
+        d.loadType = StageModel::load_payload;
+        d.ui->filePayload->setChecked(true);
     }
     QString theme = settingsValue("theme", "dark").toString();
     if (theme == "dark") {
@@ -290,6 +303,25 @@ ViewerPrivate::initSettings()
     else {
         light();
         d.ui->themeLight->setChecked(true);
+    }
+}
+
+void
+ViewerPrivate::profile()
+{
+    QString outputProfile = platform::getIccProfileUrl(d.viewer->winId());
+    // icc profile
+    ICCTransform* transform = ICCTransform::instance();
+    transform->setOutputProfile(outputProfile);
+}
+
+void
+ViewerPrivate::stylesheet()
+{
+    QString path = platform::getApplicationPath() + "/Resources/App.qss";
+    auto ss = Stylesheet::instance();
+    if (ss->loadQss(path)) {
+        ss->applyQss(ss->compiled());
     }
 }
 
@@ -318,10 +350,10 @@ ViewerPrivate::outliner()
     return d.ui->outlinerWidget;
 }
 
-DataModel*
-ViewerPrivate::dataModel()
+StageModel*
+ViewerPrivate::stageModel()
 {
-    return d.dataModel.data();
+    return d.stageModel.data();
 }
 
 Selection*
@@ -330,26 +362,19 @@ ViewerPrivate::selection()
     return d.selection.data();
 }
 
-QVariant
-ViewerPrivate::settingsValue(const QString& key, const QVariant& defaultValue)
-{
-    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
-    return settings.value(key, defaultValue);
-}
-
-void
-ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value)
-{
-    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
-    settings.setValue(key, value);
-}
-
 bool
 ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 {
     if (event->type() == QEvent::ScreenChangeInternal) {
         profile();
         stylesheet();
+    }
+    if (event->type() == QEvent::Close) {
+        if (d.payloadDialog && d.payloadDialog->isVisible()) {
+            d.payloadDialog->close();
+        }
+        saveSettings();
+        return true;
     }
     return QObject::eventFilter(object, event);
 }
@@ -368,23 +393,30 @@ ViewerPrivate::enable(bool enable)
     d.ui->expand->setEnabled(enable);
 }
 
-void
-ViewerPrivate::profile()
+QVariant
+ViewerPrivate::settingsValue(const QString& key, const QVariant& defaultValue)
 {
-    QString outputProfile = platform::getIccProfileUrl(d.viewer->winId());
-    // icc profile
-    ICCTransform* transform = ICCTransform::instance();
-    transform->setOutputProfile(outputProfile);
+    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
+    return settings.value(key, defaultValue);
 }
 
 void
-ViewerPrivate::stylesheet()
+ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value)
 {
-    QString path = platform::getApplicationPath() + "/Resources/App.qss";
-    auto ss = Stylesheet::instance();
-    if (ss->loadQss(path)) {
-        ss->applyQss(ss->compiled());
-    }
+    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
+    settings.setValue(key, value);
+}
+
+void
+ViewerPrivate::loadSettings()
+{
+    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
+}
+
+void
+ViewerPrivate::saveSettings()
+{
+    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
 }
 
 void
@@ -398,8 +430,8 @@ ViewerPrivate::open()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
-        d.dataModel->loadFromFile(filename, d.loadType);
-        if (d.dataModel->isLoaded()) {
+        d.stageModel->loadFromFile(filename, d.loadType);
+        if (d.stageModel->isLoaded()) {
             d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
         }
         setSettingsValue("openDir", QFileInfo(filename).absolutePath());
@@ -409,16 +441,16 @@ ViewerPrivate::open()
 void
 ViewerPrivate::reload()
 {
-    if (d.dataModel->isLoaded()) {
-        d.dataModel->reload();
+    if (d.stageModel->isLoaded()) {
+        d.stageModel->reload();
     }
 }
 
 void
 ViewerPrivate::close()
 {
-    if (d.dataModel->isLoaded()) {
-        d.dataModel->close();
+    if (d.stageModel->isLoaded()) {
+        d.stageModel->close();
     }
 }
 
@@ -463,7 +495,7 @@ ViewerPrivate::exportAll()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.dataModel->exportToFile(filename)) {
+        if (d.stageModel->exportToFile(filename)) {
             setSettingsValue("exportDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -485,7 +517,7 @@ ViewerPrivate::exportSelected()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.dataModel->exportPathsToFile(d.selection->paths(), filename)) {
+        if (d.stageModel->exportPathsToFile(d.selection->paths(), filename)) {
             setSettingsValue("exportSelectedDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -537,7 +569,7 @@ void
 ViewerPrivate::showSelected()
 {
     if (selection()->paths().size()) {
-        d.dataModel->visibleFromPaths(d.selection->paths(), true);
+        d.stageModel->setVisible(d.selection->paths(), true);
     }
 }
 
@@ -545,14 +577,14 @@ void
 ViewerPrivate::hideSelected()
 {
     if (selection()->paths().size()) {
-        d.dataModel->visibleFromPaths(d.selection->paths(), false);
+        d.stageModel->setVisible(d.selection->paths(), false);
     }
 }
 
 void
 ViewerPrivate::frameAll()
 {
-    camera().setBoundingBox(d.dataModel->boundingBox());
+    camera().setBoundingBox(d.stageModel->boundingBox());
     camera().frameAll();
     renderer()->update();
 }
@@ -561,7 +593,7 @@ void
 ViewerPrivate::frameSelected()
 {
     if (selection()->paths().size()) {
-        camera().setBoundingBox(d.dataModel->boundingBox(selection()->paths()));
+        camera().setBoundingBox(d.stageModel->boundingBox(selection()->paths()));
         camera().frameAll();
         renderer()->update();
     }
@@ -686,6 +718,12 @@ ViewerPrivate::openGithubIssues()
     QDesktopServices::openUrl(QUrl("https://github.com/mikaelsundell/usdviewer/issues"));
 }
 
+void
+ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
+{
+    frameAll();
+}
+
 #include "usdviewer.moc"
 
 Viewer::Viewer(QWidget* parent)
@@ -708,8 +746,8 @@ Viewer::setArguments(const QStringList& arguments)
             if (!filename.isEmpty()) {
                 QFileInfo fileInfo(filename);
                 if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                    p->d.dataModel->loadFromFile(filename, p->d.loadType);
-                    if (p->d.dataModel->isLoaded()) {
+                    p->d.stageModel->loadFromFile(filename, p->d.loadType);
+                    if (p->d.stageModel->isLoaded()) {
                         setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
                     }
                     else {
@@ -732,8 +770,8 @@ Viewer::setArguments(const QStringList& arguments)
 #endif
             QFileInfo fileInfo(decodedPath);
             if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                p->d.dataModel->loadFromFile(decodedPath, p->d.loadType);
-                if (p->d.dataModel->isLoaded()) {
+                p->d.stageModel->loadFromFile(decodedPath, p->d.loadType);
+                if (p->d.stageModel->isLoaded()) {
                     setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(decodedPath));
                 }
             }
@@ -742,8 +780,8 @@ Viewer::setArguments(const QStringList& arguments)
 
         QFileInfo fileInfo(arg);
         if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-            p->d.dataModel->loadFromFile(arg, p->d.loadType);
-            if (p->d.dataModel->isLoaded()) {
+            p->d.stageModel->loadFromFile(arg, p->d.loadType);
+            if (p->d.stageModel->isLoaded()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(arg));
             }
         }
@@ -775,8 +813,8 @@ Viewer::dropEvent(QDropEvent* event)
         QString filename = urls.first().toLocalFile();
         QString extension = QFileInfo(filename).suffix().toLower();
         if (p->d.extensions.contains(extension)) {
-            p->d.dataModel->loadFromFile(filename, p->d.loadType);
-            if (p->d.dataModel->isLoaded()) {
+            p->d.stageModel->loadFromFile(filename, p->d.loadType);
+            if (p->d.stageModel->isLoaded()) {
                 setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
             }
             else {

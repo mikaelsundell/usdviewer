@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "usddatamodel.h"
 #include "usdselection.h"
+#include "usdstagemodel.h"
 #include "usdviewcamera.h"
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
@@ -45,8 +45,8 @@ public:
     QList<QString> rendererAovs() const;
     void setRendererAov(const QString& aov);
 
-    DataModel* dataModel() const;
-    void setDataModel(DataModel* dataModel);
+    StageModel* stageModel() const;
+    void setStageModel(StageModel* stageModel);
 
     Selection* selection();
     void setSelection(Selection* selection);

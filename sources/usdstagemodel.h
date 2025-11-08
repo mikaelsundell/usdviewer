@@ -12,21 +12,21 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class DataModelPrivate;
-class DataModel : public QObject {
+class StageModelPrivate;
+class StageModel : public QObject {
     Q_OBJECT
 public:
-    enum load_type { load_none, load_all, load_structure };
+    enum load_type { load_none, load_all, load_payload };
 
 public:
-    DataModel();
-    DataModel(const QString& filename, load_type loadtype = load_type::load_all);
-    DataModel(const DataModel& other);
-    ~DataModel();
+    StageModel();
+    StageModel(const QString& filename, load_type loadtype = load_type::load_all);
+    StageModel(const StageModel& other);
+    ~StageModel();
     bool loadFromFile(const QString& filename, load_type loadType);
-    bool loadFromPaths(const QList<SdfPath>& paths);
-    bool unloadFromPath(const QList<SdfPath>& paths);
-    void visibleFromPaths(const QList<SdfPath>& paths, bool visible);
+    bool loadPayloads(const QList<SdfPath>& paths);
+    bool unloadPayloads(const QList<SdfPath>& paths);
+    void setVisible(const QList<SdfPath>& paths, bool visible);
     bool exportToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool reload();
@@ -38,15 +38,15 @@ public:
     UsdStageRefPtr stage() const;
 
 Q_SIGNALS:
-    void loadPathsSubmitted(const QList<SdfPath>& paths);
-    void loadPathFailed(const SdfPath& path);
-    void loadPathCompleted(const SdfPath& path);
-    void unloadPathsSubmitted(const QList<SdfPath>& path);
-    void unloadPathCompleted(const SdfPath& path);
+    void payloadsRequested(const QList<SdfPath>& paths);
+    void payloadsFailed(const SdfPath& path);
+    void payloadsLoaded(const SdfPath& path);
+    void payloadsUnloaded(const SdfPath& path);
+    void boundingBoxChanged(const GfBBox3d& bbox);
     void primsChanged(const QList<SdfPath>& paths);
     void stageChanged();
 
 private:
-    QExplicitlySharedDataPointer<DataModelPrivate> p;
+    QExplicitlySharedDataPointer<StageModelPrivate> p;
 };
 }  // namespace usd

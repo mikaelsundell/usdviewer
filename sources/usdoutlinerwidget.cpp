@@ -24,7 +24,7 @@ public:
     OutlinerWidgetPrivate();
     void init();
     void initController();
-    void initDataModel();
+    void initStageModel();
     void initSelection();
     void initTree();
     void initCheckState(QTreeWidgetItem* item, bool enable);
@@ -91,7 +91,7 @@ public:
         QList<SdfPath> load;
         QList<SdfPath> unload;
         QString filter;
-        QPointer<DataModel> dataModel;
+        QPointer<StageModel> stageModel;
         QPointer<Selection> selection;
         QPointer<OutlinerWidget> widget;
     };
@@ -102,17 +102,14 @@ class TriStateDelegate : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
 
-    bool editorEvent(QEvent* event,
-                     QAbstractItemModel* model,
-                     const QStyleOptionViewItem& option,
+    bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option,
                      const QModelIndex& index) override
     {
         if (!(index.flags() & Qt::ItemIsUserCheckable))
             return QStyledItemDelegate::editorEvent(event, model, option, index);
 
-        if (event->type() != QEvent::MouseButtonRelease &&
-            event->type() != QEvent::MouseButtonDblClick &&
-            event->type() != QEvent::KeyPress)
+        if (event->type() != QEvent::MouseButtonRelease && event->type() != QEvent::MouseButtonDblClick
+            && event->type() != QEvent::KeyPress)
             return QStyledItemDelegate::editorEvent(event, model, option, index);
 
         QStyleOptionViewItem opt = option;
@@ -127,9 +124,9 @@ public:
         }
         Qt::CheckState s = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
         switch (s) {
-        case Qt::Unchecked:          s = Qt::Checked; break;
-        case Qt::Checked:            s = Qt::Unchecked; break;
-        case Qt::PartiallyChecked:   s = Qt::Unchecked; break;
+        case Qt::Unchecked: s = Qt::Checked; break;
+        case Qt::Checked: s = Qt::Unchecked; break;
+        case Qt::PartiallyChecked: s = Qt::Unchecked; break;
         }
 
         model->setData(index, s, Qt::CheckStateRole);
@@ -144,10 +141,10 @@ OutlinerWidgetPrivate::init()
 {
     auto* delegate = new TriStateDelegate(d.widget.data());
     d.widget->setItemDelegateForColumn(0, delegate);
-    
+
     //ItemDelegate* delegate = new ItemDelegate(d.widget.data());
     //d.widget->setItemDelegate(delegate);
-    
+
     connect(d.widget.data(), &OutlinerWidget::itemSelectionChanged, this, &OutlinerWidgetPrivate::updateSelection);
     connect(d.widget.data(), &OutlinerWidget::itemChanged, this, [this](QTreeWidgetItem* item, int column) {
         if (column == OutlinerItem::Name) {  // assuming checkboxes are in Name column
@@ -158,10 +155,10 @@ OutlinerWidgetPrivate::init()
 }
 
 void
-OutlinerWidgetPrivate::initDataModel()
+OutlinerWidgetPrivate::initStageModel()
 {
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &OutlinerWidgetPrivate::stageChanged);
-    connect(d.dataModel.data(), &DataModel::primsChanged, this, &OutlinerWidgetPrivate::primsChanged);
+    connect(d.stageModel.data(), &StageModel::stageChanged, this, &OutlinerWidgetPrivate::stageChanged);
+    connect(d.stageModel.data(), &StageModel::primsChanged, this, &OutlinerWidgetPrivate::primsChanged);
 }
 
 void
@@ -235,7 +232,7 @@ OutlinerWidgetPrivate::expand()
 void
 OutlinerWidgetPrivate::addItem(OutlinerItem* parent, const SdfPath& path)
 {
-    OutlinerItem* item = new OutlinerItem(parent, d.dataModel->stage(), path);
+    OutlinerItem* item = new OutlinerItem(parent, d.stageModel->stage(), path);
     parent->addChild(item);
     addChildren(item, path);
 }
@@ -243,7 +240,7 @@ OutlinerWidgetPrivate::addItem(OutlinerItem* parent, const SdfPath& path)
 void
 OutlinerWidgetPrivate::addChildren(OutlinerItem* parent, const SdfPath& path)
 {
-    UsdStageRefPtr stage = d.dataModel->stage();
+    UsdStageRefPtr stage = d.stageModel->stage();
     UsdPrim prim = stage->GetPrimAtPath(path);
     for (const UsdPrim& child : prim.GetAllChildren()) {
         addItem(parent, child.GetPath());
@@ -258,7 +255,7 @@ OutlinerWidgetPrivate::toggleVisible(OutlinerItem* item)
     if (!pathString.isEmpty()) {
         paths.append(SdfPath(pathString.toStdString()));
     }
-    d.dataModel->visibleFromPaths(paths, !item->isVisible());
+    d.stageModel->setVisible(paths, !item->isVisible());
 }
 
 void
@@ -310,7 +307,7 @@ OutlinerWidgetPrivate::checkStateChanged(OutlinerItem* item)
         return;
 
     SdfPath path(pathString.toStdString());
-    UsdStageRefPtr stage = d.dataModel->stage();
+    UsdStageRefPtr stage = d.stageModel->stage();
     UsdPrim prim = stage->GetPrimAtPath(path);
     if (!prim)
         return;
@@ -335,11 +332,11 @@ OutlinerWidgetPrivate::checkStateChanged(OutlinerItem* item)
     QTimer::singleShot(0, d.widget, [this]() {
         if (--d.pending <= 0) {
             if (!d.load.isEmpty()) {
-                d.dataModel->loadFromPaths(d.load);
+                d.stageModel->loadPayloads(d.load);
                 d.load.clear();
             }
             if (!d.unload.isEmpty()) {
-                d.dataModel->unloadFromPath(d.unload);
+                d.stageModel->unloadPayloads(d.unload);
                 d.unload.clear();
             }
             d.pending = 0;
@@ -387,15 +384,13 @@ void
 OutlinerWidgetPrivate::stageChanged()
 {
     d.widget->clear();
-    UsdPrim prim = d.dataModel->stage()->GetPseudoRoot();
-    OutlinerItem* rootItem = new OutlinerItem(d.widget.data(), d.dataModel->stage(), prim.GetPath());
+    UsdPrim prim = d.stageModel->stage()->GetPseudoRoot();
+    OutlinerItem* rootItem = new OutlinerItem(d.widget.data(), d.stageModel->stage(), prim.GetPath());
     addChildren(rootItem, prim.GetPath());
     initTree();
-    bool enable = (d.dataModel->loadType() == DataModel::load_structure);
+    bool enable = (d.stageModel->loadType() == StageModel::load_payload);
     initCheckState(rootItem, enable);
 }
-
-
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)
     : QTreeWidget(parent)
@@ -419,7 +414,6 @@ OutlinerWidget::expand()
     p->expand();
 }
 
-
 Selection*
 OutlinerWidget::selection()
 {
@@ -436,18 +430,18 @@ OutlinerWidget::setSelection(Selection* selection)
     }
 }
 
-DataModel*
-OutlinerWidget::dataModel() const
+StageModel*
+OutlinerWidget::stageModel() const
 {
-    return p->d.dataModel;
+    return p->d.stageModel;
 }
 
 void
-OutlinerWidget::setDataModel(DataModel* dataModel)
+OutlinerWidget::setStageModel(StageModel* stageModel)
 {
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-        p->initDataModel();
+    if (p->d.stageModel != stageModel) {
+        p->d.stageModel = stageModel;
+        p->initStageModel();
         update();
     }
 }

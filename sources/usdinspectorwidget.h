@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "usddatamodel.h"
 #include "usdselection.h"
+#include "usdstagemodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -19,8 +19,8 @@ public:
     InspectorWidget(QWidget* parent = nullptr);
     virtual ~InspectorWidget();
 
-    DataModel* dataModel() const;
-    void setDataModel(DataModel* data);
+    StageModel* stageModel() const;
+    void setStageModel(StageModel* data);
 
     Selection* selection();
     void setSelection(Selection* selection);

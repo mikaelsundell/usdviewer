@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Usdviewer</class>
- <widget class="QMainWindow" name="Usdviewer">
+ <class>UsdViewer</class>
+ <widget class="QMainWindow" name="UsdViewer">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -599,7 +599,7 @@
       <string>Load</string>
      </property>
      <addaction name="fileFull"/>
-     <addaction name="fileStructure"/>
+     <addaction name="filePayload"/>
     </widget>
     <addaction name="fileOpen"/>
     <addaction name="menuMode"/>
@@ -646,7 +646,7 @@
     <addaction name="menuTheme"/>
     <addaction name="separator"/>
     <addaction name="viewOutliner"/>
-    <addaction name="viewProgress"/>
+    <addaction name="viewPayload"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -869,7 +869,7 @@
     <string>Full</string>
    </property>
   </action>
-  <action name="fileStructure">
+  <action name="filePayload">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -877,7 +877,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Structure</string>
+    <string>Payload</string>
    </property>
   </action>
   <action name="fileClose">
@@ -885,12 +885,12 @@
     <string>Close</string>
    </property>
   </action>
-  <action name="viewProgress">
+  <action name="viewPayload">
    <property name="checkable">
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Progress</string>
+    <string>Payloads</string>
    </property>
   </action>
  </widget>

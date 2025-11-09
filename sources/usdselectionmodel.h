@@ -25,6 +25,7 @@ public:
     void removePath(const SdfPath& path);
     QList<SdfPath> paths() const;
     void clear();
+    bool isEmpty() const;
     bool isValid() const;
 
 Q_SIGNALS:

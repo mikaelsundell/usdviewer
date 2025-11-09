@@ -44,6 +44,7 @@ public:
 public Q_SLOTS:
     void loaded(const QString& filename);
     void selectionChanged();
+    void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void stageChanged();
 
@@ -73,10 +74,11 @@ public:
         ImagingGLWidget::Complexity complexity;
         ImagingGLWidget::DrawMode drawMode;
         UsdImagingGLRenderParams params;
+        QList<SdfPath> mask;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<StageModel> stageModel;
         QPointer<SelectionModel> selectionModel;
-        QPointer<ImagingGLWidget> widget;
+        QPointer<ImagingGLWidget> glwidget;
     };
     Data d;
 };
@@ -86,7 +88,7 @@ ImagingGLWidgetPrivate::init()
 {
     QSurfaceFormat format;
     format.setSamples(4);
-    d.widget->setFormat(format);
+    d.glwidget->setFormat(format);
     d.count = 0;
     d.frame = 0;
     d.aov = "color";
@@ -107,9 +109,8 @@ ImagingGLWidgetPrivate::initGL()
     if (!d.glEngine) {
         // Create and configure parameters
         UsdImagingGLEngine::Parameters params;
-        params.allowAsynchronousSceneProcessing = true;  // enable async rendering
-        params.displayUnloadedPrimsWithBounds = true;    // show bo
-
+        params.allowAsynchronousSceneProcessing = true;
+        params.displayUnloadedPrimsWithBounds = true;
         d.glEngine.reset(new UsdImagingGLEngine(params));
         Hgi* hgi = d.glEngine->GetHgi();
         if (hgi) {
@@ -120,7 +121,7 @@ ImagingGLWidgetPrivate::initGL()
             qWarning() << "could not initialize gl engine, no hydra driver found.";
             d.glEngine.reset();
         }
-        d.widget->rendererReady();
+        d.glwidget->rendererReady();
     }
 }
 
@@ -147,13 +148,15 @@ void
 ImagingGLWidgetPrivate::initStageModel()
 {
     connect(d.stageModel.data(), &StageModel::stageChanged, this, &ImagingGLWidgetPrivate::stageChanged);
+    connect(d.stageModel.data(), &StageModel::maskChanged, this, &ImagingGLWidgetPrivate::maskChanged);
     connect(d.stageModel.data(), &StageModel::primsChanged, this, &ImagingGLWidgetPrivate::primsChanged);
 }
 
 void
 ImagingGLWidgetPrivate::initSelection()
 {
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &ImagingGLWidgetPrivate::selectionChanged);
+    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this,
+            &ImagingGLWidgetPrivate::selectionChanged);
 }
 
 void
@@ -244,11 +247,32 @@ ImagingGLWidgetPrivate::paintGL()
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
             QReadLocker locker(d.stageModel->stageLock());
-            d.glEngine->Render(d.stageModel->stage()->GetPseudoRoot(), d.params);
-            hgi->EndFrame();
+            
 
-            GLint viewportX[4];
-            glGetIntegerv(GL_VIEWPORT, viewportX);
+            
+            // If masking, draw only masked roots
+            if (!d.mask.isEmpty()) {
+                
+                qDebug() << "Render mask stage ...";
+                
+                for (const SdfPath& path : d.mask) {
+                    UsdPrim prim = d.stageModel->stage()->GetPrimAtPath(path);
+                    if (prim && prim.IsActive())
+                        d.glEngine->Render(prim, d.params);
+                }
+            } else {
+                
+                qDebug() << "Render normal stage ...";
+                
+                d.glEngine->Render(d.stageModel->stage()->GetPseudoRoot(), d.params);
+            }
+            
+            /*
+            UsdStageRefPtr renderStage = d.maskedStage ? d.maskedStage : d.stageModel->stage();
+            if (renderStage) {
+                d.glEngine->Render(renderStage->GetPseudoRoot(), d.params);
+            }*/
+            hgi->EndFrame();
             if (!mark.IsClean()) {
                 qWarning() << "gl engine errors occured during rendering";
             }
@@ -299,7 +323,7 @@ ImagingGLWidgetPrivate::mouseMoveEvent(QMouseEvent* event)
             double factor = -.002 * (delta.x() + delta.y());
             d.viewCamera.distance(1 + factor);
         }
-        d.widget->update();
+        d.glwidget->update();
     }
     d.mousepos = event->pos();
 }
@@ -318,13 +342,13 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
     double clamped = std::max(-0.5, std::min(0.5, delta));
     double factor = 1.0 - clamped;
     d.viewCamera.distance(factor);
-    d.widget->update();
+    d.glwidget->update();
 }
 
 void
 ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
 {
-    d.widget->makeCurrent();
+    d.glwidget->makeCurrent();
 
     // pickEvent() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
@@ -369,22 +393,33 @@ ImagingGLWidgetPrivate::selectionChanged()
     for (SdfPath path : d.selectionModel->paths()) {
         d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
     }
-    d.widget->update();
+    d.glwidget->update();
+}
+
+void
+ImagingGLWidgetPrivate::maskChanged(const QList<SdfPath>& paths)
+{
+    d.mask = paths;
+    d.glwidget->update();
 }
 
 void
 ImagingGLWidgetPrivate::primsChanged(const QList<SdfPath>& paths)
 {
-    d.widget->update();
+    d.glwidget->update();
 }
 
 void
 ImagingGLWidgetPrivate::stageChanged()
 {
+    d.mask.clear();
     d.glEngine.reset();
     if (d.stageModel->isLoaded()) {
         initCamera();
         initGL();
+    } else {
+        initGL();
+        d.glwidget->update();
     }
 }
 
@@ -409,7 +444,7 @@ ImagingGLWidgetPrivate::deviceRatio(QPoint value) const
 double
 ImagingGLWidgetPrivate::deviceRatio(double value) const
 {
-    return value * d.widget->devicePixelRatio();
+    return value * d.glwidget->devicePixelRatio();
 }
 
 double
@@ -424,8 +459,8 @@ ImagingGLWidgetPrivate::widgetAspectRatio() const
 GfVec2i
 ImagingGLWidgetPrivate::widgetSize() const
 {
-    int w = deviceRatio(d.widget->width());
-    int h = deviceRatio(d.widget->height());
+    int w = deviceRatio(d.glwidget->width());
+    int h = deviceRatio(d.glwidget->height());
     return GfVec2i(w, h);
 }
 
@@ -443,7 +478,7 @@ ImagingGLWidget::ImagingGLWidget(QWidget* parent)
     : QOpenGLWidget(parent)
     , p(new ImagingGLWidgetPrivate())
 {
-    p->d.widget = this;
+    p->d.glwidget = this;
     p->init();
 }
 

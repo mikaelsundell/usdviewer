@@ -59,7 +59,8 @@ InspectorWidgetPrivate::initStageModel()
 void
 InspectorWidgetPrivate::initSelection()
 {
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &InspectorWidgetPrivate::selectionChanged);
+    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this,
+            &InspectorWidgetPrivate::selectionChanged);
 }
 
 void

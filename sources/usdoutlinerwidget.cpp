@@ -367,14 +367,16 @@ void
 OutlinerWidgetPrivate::stageChanged()
 {
     d.widget->clear();
-    UsdPrim prim = d.stageModel->stage()->GetPseudoRoot();
-    OutlinerItem* rootItem = new OutlinerItem(d.widget.data(), d.stageModel->stage(), prim.GetPath());
-    itemCheckState(rootItem, false, true);
-    addChildren(rootItem, prim.GetPath());
-    initTree();
+    if (d.stageModel->isLoaded()) {
+        UsdPrim prim = d.stageModel->stage()->GetPseudoRoot();
+        OutlinerItem* rootItem = new OutlinerItem(d.widget.data(), d.stageModel->stage(), prim.GetPath());
+        itemCheckState(rootItem, false, true);
+        addChildren(rootItem, prim.GetPath());
+        initTree();
 
-    if (d.stageModel->loadType() == StageModel::load_payload)
-        itemCheckState(rootItem, true, true);
+        if (d.stageModel->loadType() == StageModel::load_payload)
+            itemCheckState(rootItem, true, true);
+    }
 }
 
 OutlinerWidget::OutlinerWidget(QWidget* parent)

@@ -60,9 +60,10 @@ public Q_SLOTS:
     void exportSelected();
     void exportImage();
     void showSelected();
-    void showHierarchy();
+    void showRecursive();
     void hideSelected();
-    void hideHierarchy();
+    void hideRecursive();
+    void isolate(bool checked);
     void frameAll();
     void frameSelected();
     void resetView();
@@ -86,6 +87,7 @@ public Q_SLOTS:
 
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
+    void selectionChanged() const;
 
 public:
     struct Data {
@@ -133,7 +135,7 @@ ViewerPrivate::init()
     // models
     d.stageModel.reset(new StageModel());
     d.selectionModel.reset(new SelectionModel());
-    // models
+    // renderer
     renderer()->setClearColor(d.clearColor);
     renderer()->setStageModel(d.stageModel.data());
     renderer()->setSelectionModel(d.selectionModel.data());
@@ -183,9 +185,9 @@ ViewerPrivate::init()
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->editShowSelected, &QAction::triggered, this, &ViewerPrivate::showSelected);
-    connect(d.ui->editShowHierarchy, &QAction::triggered, this, &ViewerPrivate::showHierarchy);
+    connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
-    connect(d.ui->editHideHierarchy, &QAction::triggered, this, &ViewerPrivate::hideHierarchy);
+    connect(d.ui->editHideRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
     connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
@@ -200,6 +202,7 @@ ViewerPrivate::init()
             actions->addAction(d.ui->asComplexityVeryHigh);
         }
     }
+    connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
     connect(d.ui->displayFrameSelected, &QAction::triggered, this, &ViewerPrivate::frameSelected);
     connect(d.ui->displayResetView, &QAction::triggered, this, &ViewerPrivate::resetView);
@@ -223,27 +226,6 @@ ViewerPrivate::init()
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-
-    connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
-
-
-    // docks
-    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
-    connect(d.ui->viewOutliner, &QAction::toggled, this,
-            [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
-    // progress
-    connect(d.ui->viewPayload, &QAction::toggled, this, [=](bool checked) {
-        if (checked) {
-            d.payloadDialog->show();
-            d.payloadDialog->raise();
-        }
-        else {
-            if (d.payloadDialog)
-                d.payloadDialog->hide();
-        }
-    });
-    connect(d.payloadDialog, &PayloadDialog::finished, this, [=]() { d.ui->viewPayload->setChecked(false); });
     // draw modes
     {
         d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
@@ -266,12 +248,31 @@ ViewerPrivate::init()
             actions->addAction(d.ui->themeDark);
         }
     }
+    // models
+    connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
     connect(d.stageModel.data(), &StageModel::payloadsRequested, d.payloadDialog, &PayloadDialog::payloadsRequested);
     connect(d.stageModel.data(), &StageModel::payloadsFailed, d.payloadDialog, &PayloadDialog::payloadsFailed);
     connect(d.stageModel.data(), &StageModel::payloadsLoaded, d.payloadDialog, &PayloadDialog::payloadsLoaded);
     connect(d.stageModel.data(), &StageModel::payloadsUnloaded, d.payloadDialog, &PayloadDialog::payloadsUnloaded);
     connect(d.stageModel.data(), &StageModel::stageChanged, this, [=]() { enable(true); });
     connect(d.payloadDialog, &PayloadDialog::cancelRequested, [&]() { qWarning() << "user canceled loading."; });
+    // docks
+    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
+    connect(d.ui->viewOutliner, &QAction::toggled, this,
+            [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
+    // payload
+    connect(d.ui->viewPayload, &QAction::toggled, this, [=](bool checked) {
+        if (checked) {
+            d.payloadDialog->show();
+            d.payloadDialog->raise();
+        }
+        else {
+            if (d.payloadDialog)
+                d.payloadDialog->hide();
+        }
+    });
+    connect(d.payloadDialog, &PayloadDialog::finished, this, [=]() { d.ui->viewPayload->setChecked(false); });
     // settings
     initSettings();
     enable(false);
@@ -387,6 +388,7 @@ void
 ViewerPrivate::enable(bool enable)
 {
     d.ui->fileReload->setEnabled(enable);
+    d.ui->fileClose->setEnabled(enable);
     d.ui->fileExportAll->setEnabled(enable);
     d.ui->fileExportSelected->setEnabled(enable);
     d.ui->fileExportImage->setEnabled(enable);
@@ -455,6 +457,8 @@ ViewerPrivate::close()
 {
     if (d.stageModel->isLoaded()) {
         d.stageModel->close();
+        d.viewer->setWindowTitle(QString("%1").arg(PROJECT_NAME));
+        enable(false);
     }
 }
 
@@ -578,7 +582,7 @@ ViewerPrivate::showSelected()
 }
 
 void
-ViewerPrivate::showHierarchy()
+ViewerPrivate::showRecursive()
 {
     if (selectionModel()->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), true, true);
@@ -594,7 +598,7 @@ ViewerPrivate::hideSelected()
 }
 
 void
-ViewerPrivate::hideHierarchy()
+ViewerPrivate::hideRecursive()
 {
     if (selectionModel()->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), false, true);
@@ -602,11 +606,26 @@ ViewerPrivate::hideHierarchy()
 }
 
 void
+ViewerPrivate::isolate(bool checked)
+{
+    if (checked) {
+        if (selectionModel()->paths().size()) {
+            d.stageModel->setMask(d.selectionModel->paths());
+        }
+    }
+    else {
+        d.stageModel->setMask(QList<SdfPath>());
+    }
+}
+
+void
 ViewerPrivate::frameAll()
 {
-    camera().setBoundingBox(d.stageModel->boundingBox());
-    camera().frameAll();
-    renderer()->update();
+    if (d.stageModel->isLoaded()) {
+        camera().setBoundingBox(d.stageModel->boundingBox());
+        camera().frameAll();
+        renderer()->update();
+    }
 }
 
 void
@@ -742,6 +761,12 @@ void
 ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
 {
     frameAll();
+}
+
+void
+ViewerPrivate::selectionChanged() const
+{
+    qDebug() << "selectionCHanged ... activate the isolate button";
 }
 
 #include "usdviewer.moc"

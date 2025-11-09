@@ -74,6 +74,12 @@ SelectionModel::clear()
 SelectionModel::~SelectionModel() {}
 
 bool
+SelectionModel::isEmpty() const
+{
+    return p->d.paths.size();
+}
+
+bool
 SelectionModel::isValid() const
 {
     return true;

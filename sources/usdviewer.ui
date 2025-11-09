@@ -632,14 +632,14 @@
       <string>Show</string>
      </property>
      <addaction name="editShowSelected"/>
-     <addaction name="editShowHierarchy"/>
+     <addaction name="editShowRecursive"/>
     </widget>
     <widget class="QMenu" name="menu">
      <property name="title">
       <string>Hide</string>
      </property>
      <addaction name="editHideSelected"/>
-     <addaction name="editHideHierarchy"/>
+     <addaction name="editHideRecursive"/>
     </widget>
     <addaction name="editCopyImage"/>
     <addaction name="separator"/>
@@ -901,9 +901,9 @@
     <string>S</string>
    </property>
   </action>
-  <action name="editShowHierarchy">
+  <action name="editShowRecursive">
    <property name="text">
-    <string>Hieararchy</string>
+    <string>Recursive</string>
    </property>
    <property name="shortcut">
     <string>Shift+S</string>
@@ -917,9 +917,9 @@
     <string>H</string>
    </property>
   </action>
-  <action name="editHideHierarchy">
+  <action name="editHideRecursive">
    <property name="text">
-    <string>Hierarchy</string>
+    <string>Recursive</string>
    </property>
    <property name="shortcut">
     <string>Shift+H</string>
@@ -930,7 +930,7 @@
     <bool>true</bool>
    </property>
    <property name="checked">
-    <bool>true</bool>
+    <bool>false</bool>
    </property>
    <property name="text">
     <string>Isolate</string>

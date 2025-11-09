@@ -37,7 +37,7 @@ SelectionModel::addPath(const SdfPath& path)
 {
     if (!p->d.paths.contains(path)) {
         p->d.paths.append(path);
-        selectionChanged();
+        Q_EMIT selectionChanged();
     }
 }
 
@@ -45,7 +45,7 @@ void
 SelectionModel::replacePaths(const QList<SdfPath>& paths)
 {
     p->d.paths = paths;
-    selectionChanged();
+    Q_EMIT selectionChanged();
 }
 
 void
@@ -67,7 +67,7 @@ SelectionModel::clear()
 {
     if (p->d.paths.size()) {
         p->d.paths.clear();
-        selectionChanged();
+        Q_EMIT selectionChanged();
     }
 }
 

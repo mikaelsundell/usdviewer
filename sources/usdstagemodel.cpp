@@ -27,7 +27,7 @@ public:
     void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive);
     GfBBox3d boundingBox();
     GfBBox3d boundingBox(const QList<SdfPath> paths);
-    
+
 public:
     void primsChanged(const QList<SdfPath> paths);
     void stageChanged();
@@ -77,11 +77,7 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_type l
         }
     }
     QMetaObject::invokeMethod(
-        d.stageModel,
-        [this]() {
-            stageChanged();
-        },
-        Qt::QueuedConnection);
+        d.stageModel, [this]() { stageChanged(); }, Qt::QueuedConnection);
     return true;
 }
 
@@ -228,11 +224,7 @@ StageModelPrivate::close()
         d.bboxCache.reset();
     }
     QMetaObject::invokeMethod(
-        d.stageModel,
-        [this]() {
-            stageChanged();
-        },
-        Qt::QueuedConnection);
+        d.stageModel, [this]() { stageChanged(); }, Qt::QueuedConnection);
 
     return true;
 }
@@ -250,11 +242,7 @@ StageModelPrivate::reload()
         }
     }
     QMetaObject::invokeMethod(
-        d.stageModel,
-        [this]() {
-            stageChanged();
-        },
-        Qt::QueuedConnection);
+        d.stageModel, [this]() { stageChanged(); }, Qt::QueuedConnection);
 
     return true;
 }
@@ -319,7 +307,7 @@ StageModelPrivate::boundingBox()
         Q_ASSERT("stage is not loaded" && isLoaded());
         if (!d.bboxCache) {
             d.bboxCache.reset(
-                              new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
+                new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
         }
         return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
     }
@@ -363,7 +351,8 @@ StageModelPrivate::primsChanged(const QList<SdfPath> paths)
                 UsdPrim prim = d.stage->GetPrimAtPath(path);
                 if (prim && prim.IsValid() && prim.IsActive()) {
                     newMask.append(path);
-                } else {
+                }
+                else {
                     changed = true;
                 }
             }

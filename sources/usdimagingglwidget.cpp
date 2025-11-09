@@ -9,6 +9,9 @@
 #include <QColor>
 #include <QMouseEvent>
 #include <QObject>
+#include <QPainter>
+#include <QPen>
+#include <QPoint>
 #include <QPointer>
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
@@ -35,6 +38,7 @@ public:
     void initStageModel();
     void initSelection();
     void paintGL();
+    void paintEvent(QPaintEvent* event);
     void mousePressEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
@@ -49,6 +53,7 @@ public Q_SLOTS:
     void stageChanged();
 
 public:
+    void resolveSelection(const QRect& rect);
     double complexityRefinement(ImagingGLWidget::Complexity complexity);
     QPoint deviceRatio(QPoint value) const;
     double deviceRatio(double value) const;
@@ -68,6 +73,9 @@ public:
         bool sceneLightsEnabled;
         bool sceneMaterialsEnabled;
         bool drag;
+        bool sweep;
+        QPoint start;
+        QPoint end;
         QPoint mousepos;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
@@ -88,6 +96,9 @@ ImagingGLWidgetPrivate::init()
 {
     QSurfaceFormat format;
     format.setSamples(4);
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+    format.setAlphaBufferSize(8);
     d.glwidget->setFormat(format);
     d.count = 0;
     d.frame = 0;
@@ -107,7 +118,6 @@ void
 ImagingGLWidgetPrivate::initGL()
 {
     if (!d.glEngine) {
-        // Create and configure parameters
         UsdImagingGLEngine::Parameters params;
         params.allowAsynchronousSceneProcessing = true;
         params.displayUnloadedPrimsWithBounds = true;
@@ -247,31 +257,16 @@ ImagingGLWidgetPrivate::paintGL()
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
             QReadLocker locker(d.stageModel->stageLock());
-            
-
-            
-            // If masking, draw only masked roots
             if (!d.mask.isEmpty()) {
-                
-                qDebug() << "Render mask stage ...";
-                
                 for (const SdfPath& path : d.mask) {
                     UsdPrim prim = d.stageModel->stage()->GetPrimAtPath(path);
                     if (prim && prim.IsActive())
                         d.glEngine->Render(prim, d.params);
                 }
-            } else {
-                
-                qDebug() << "Render normal stage ...";
-                
+            }
+            else {
                 d.glEngine->Render(d.stageModel->stage()->GetPseudoRoot(), d.params);
             }
-            
-            /*
-            UsdStageRefPtr renderStage = d.maskedStage ? d.maskedStage : d.stageModel->stage();
-            if (renderStage) {
-                d.glEngine->Render(renderStage->GetPseudoRoot(), d.params);
-            }*/
             hgi->EndFrame();
             if (!mark.IsClean()) {
                 qWarning() << "gl engine errors occured during rendering";
@@ -285,54 +280,142 @@ ImagingGLWidgetPrivate::paintGL()
 }
 
 void
+ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
+{
+    if (d.sweep) {
+        QPainter painter(d.glwidget);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+
+        QRect rect(d.start, d.end);
+        rect = rect.normalized();
+
+        painter.setPen(QPen(QColor(0, 150, 255, 200), 1));
+        painter.setBrush(QColor(0, 150, 255, 50));
+        painter.drawRect(rect);
+    }
+}
+
+void
 ImagingGLWidgetPrivate::mousePressEvent(QMouseEvent* event)
 {
-    d.drag = true;
-    if (event->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) {
-        if (event->button() == Qt::LeftButton) {
-            d.viewCamera.setCameraMode(ViewCamera::Tumble);
+    if (d.stageModel->isLoaded()) {
+        if (event->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) {
+            d.drag = true;
+            if (event->button() == Qt::LeftButton) {
+                d.viewCamera.setCameraMode(ViewCamera::Tumble);
+            }
+            else if (event->button() == Qt::MiddleButton) {
+                d.viewCamera.setCameraMode(ViewCamera::Truck);
+            }
+            else if (event->button() == Qt::RightButton) {
+                d.viewCamera.setCameraMode(ViewCamera::Zoom);
+            }
         }
-        else if (event->button() == Qt::MiddleButton) {
-            d.viewCamera.setCameraMode(ViewCamera::Truck);
+        else {
+            d.sweep = true;
+            d.start = event->pos();
+            d.end = event->pos();
         }
-        else if (event->button() == Qt::RightButton) {
-            d.viewCamera.setCameraMode(ViewCamera::Zoom);
-        }
+        d.mousepos = event->pos();
     }
-    else {
-        pickEvent(event);
-    }
-    d.mousepos = event->pos();
 }
 
 void
 ImagingGLWidgetPrivate::mouseMoveEvent(QMouseEvent* event)
 {
-    QPoint pos = event->pos();
-    if (d.drag) {
-        QPoint delta = deviceRatio(pos) - deviceRatio(d.mousepos);
-        if (d.viewCamera.cameraMode() == ViewCamera::Truck) {
-            double height = widgetSize()[1];
-            double factor = d.viewCamera.mapToFrustumHeight(height);
-            d.viewCamera.truck(-delta.x() * factor, delta.y() * factor);
+    if (d.stageModel->isLoaded()) {
+        QPoint pos = event->pos();
+        if (d.drag) {
+            QPoint delta = deviceRatio(pos) - deviceRatio(d.mousepos);
+            if (d.viewCamera.cameraMode() == ViewCamera::Truck) {
+                double height = widgetSize()[1];
+                double factor = d.viewCamera.mapToFrustumHeight(height);
+                d.viewCamera.truck(-delta.x() * factor, delta.y() * factor);
+            }
+            else if (d.viewCamera.cameraMode() == ViewCamera::Tumble) {
+                d.viewCamera.tumble(0.25 * delta.x(), 0.25 * delta.y());
+            }
+            else if (d.viewCamera.cameraMode() == ViewCamera::Zoom) {
+                double factor = -.002 * (delta.x() + delta.y());
+                d.viewCamera.distance(1 + factor);
+            }
+            d.glwidget->update();
         }
-        else if (d.viewCamera.cameraMode() == ViewCamera::Tumble) {
-            d.viewCamera.tumble(0.25 * delta.x(), 0.25 * delta.y());
+        else if (d.sweep) {
+            d.end = event->pos();
+            d.glwidget->update();
         }
-        else if (d.viewCamera.cameraMode() == ViewCamera::Zoom) {
-            double factor = -.002 * (delta.x() + delta.y());
-            d.viewCamera.distance(1 + factor);
-        }
-        d.glwidget->update();
+        d.mousepos = event->pos();
     }
-    d.mousepos = event->pos();
 }
 
 void
 ImagingGLWidgetPrivate::mouseReleaseEvent(QMouseEvent* event)
 {
-    d.drag = false;
-    d.viewCamera.setCameraMode(ViewCamera::None);
+    if (d.stageModel->isLoaded()) {
+        if (d.drag) {
+            d.drag = false;
+            d.viewCamera.setCameraMode(ViewCamera::None);
+        }
+        else if (d.sweep) {
+            d.end = event->pos();
+            QRect rect(d.start, d.end);
+            resolveSelection(rect);
+            d.sweep = false;
+        }
+    }
+}
+
+void
+ImagingGLWidgetPrivate::resolveSelection(const QRect& rect)
+{
+    d.glwidget->makeCurrent();
+#ifdef WIN32
+    glDepthMask(GL_TRUE);
+#endif
+    QRect normalizedRect = rect.normalized();
+    GfVec4d viewport = widgetViewport();
+    GfVec2d center(
+        (normalizedRect.center().x() - viewport[0]) / static_cast<double>(viewport[2]),
+        (normalizedRect.center().y() - viewport[1]) / static_cast<double>(viewport[3]));
+    center[0] = (center[0] * 2.0 - 1.0);
+    center[1] = -1.0 * (center[1] * 2.0 - 1.0);
+
+    GfVec2d size(
+        static_cast<double>(normalizedRect.width()) / viewport[2],
+        static_cast<double>(normalizedRect.height()) / viewport[3]);
+
+    GfCamera camera = d.viewCamera.camera();
+    GfFrustum frustum = camera.GetFrustum();
+    GfFrustum pickFrustum = frustum.ComputeNarrowedFrustum(center, size);
+
+    bool click = (rect.width() < 3 && rect.height() < 3);
+
+    UsdImagingGLEngine::PickParams pickParams;
+    pickParams.resolveMode = click ? TfToken("resolveNearestToCenter")
+                                   : TfToken("resolveDeep");
+
+    UsdImagingGLEngine::IntersectionResultVector results;
+    bool hit = d.glEngine->TestIntersection(
+        pickParams,
+        pickFrustum.ComputeViewMatrix(),
+        pickFrustum.ComputeProjectionMatrix(),
+        d.stageModel->stage()->GetPseudoRoot(),
+        d.params,
+        &results);
+
+    QList<SdfPath> selectedPaths;
+    if (hit) {
+        for (const auto& r : results) {
+            if (!r.hitPrimPath.IsEmpty())
+                selectedPaths.append(r.hitPrimPath);
+        }
+    }
+    if (!selectedPaths.isEmpty())
+        d.selectionModel->replacePaths(selectedPaths);
+    else
+        d.selectionModel->clear();
+    d.glwidget->update();
 }
 
 void
@@ -417,7 +500,8 @@ ImagingGLWidgetPrivate::stageChanged()
     if (d.stageModel->isLoaded()) {
         initCamera();
         initGL();
-    } else {
+    }
+    else {
         initGL();
         d.glwidget->update();
     }
@@ -645,6 +729,13 @@ void
 ImagingGLWidget::paintGL()
 {
     p->paintGL();
+}
+
+void
+ImagingGLWidget::paintEvent(QPaintEvent* event)
+{
+    QOpenGLWidget::paintEvent(event);
+    p->paintEvent(event);
 }
 
 void

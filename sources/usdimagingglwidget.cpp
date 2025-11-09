@@ -257,15 +257,16 @@ ImagingGLWidgetPrivate::paintGL()
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
             QReadLocker locker(d.stageModel->stageLock());
+            UsdPrim root = d.stageModel->stage()->GetPseudoRoot();
             if (!d.mask.isEmpty()) {
-                for (const SdfPath& path : d.mask) {
-                    UsdPrim prim = d.stageModel->stage()->GetPrimAtPath(path);
-                    if (prim && prim.IsActive())
-                        d.glEngine->Render(prim, d.params);
-                }
+                SdfPathVector paths;
+                for (const SdfPath& path : d.mask)
+                    paths.push_back(path);
+                d.glEngine->PrepareBatch(root, d.params);
+                d.glEngine->RenderBatch(paths, d.params);
             }
             else {
-                d.glEngine->Render(d.stageModel->stage()->GetPseudoRoot(), d.params);
+                d.glEngine->Render(root, d.params);
             }
             hgi->EndFrame();
             if (!mark.IsClean()) {

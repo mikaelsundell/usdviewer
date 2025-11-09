@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "usdselection.h"
+#include "usdselectionmodel.h"
 #include "usdstagemodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
@@ -20,10 +20,10 @@ public:
     virtual ~InspectorWidget();
 
     StageModel* stageModel() const;
-    void setStageModel(StageModel* data);
+    void setStageModel(StageModel* stageModel);
 
-    Selection* selection();
-    void setSelection(Selection* selection);
+    SelectionModel* selectionModel();
+    void setSelectionModel(SelectionModel* selectionModel);
 
 private:
     QScopedPointer<InspectorWidgetPrivate> p;

@@ -41,14 +41,14 @@ public:
     InspectorWidget* inspector();
     OutlinerWidget* outliner();
     StageModel* stageModel();
-    Selection* selection();
+    SelectionModel* selectionModel();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
     QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
     void setSettingsValue(const QString& key, const QVariant& value);
     void loadSettings();
     void saveSettings();
-    
+
 public Q_SLOTS:
     void open();
     void reload();
@@ -83,10 +83,10 @@ public Q_SLOTS:
     void dark();
     void openGithubReadme();
     void openGithubIssues();
-    
+
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
-    
+
 public:
     struct Data {
         StageModel::load_type loadType;
@@ -95,7 +95,7 @@ public:
         QColor clearColor;
         QScopedPointer<MouseEvent> clearColorFilter;
         QScopedPointer<StageModel> stageModel;
-        QScopedPointer<Selection> selection;
+        QScopedPointer<SelectionModel> selectionModel;
         QScopedPointer<Ui_UsdViewer> ui;
         QPointer<PayloadDialog> payloadDialog;
         QPointer<Viewer> viewer;
@@ -132,11 +132,11 @@ ViewerPrivate::init()
     d.viewer->installEventFilter(this);
     // models
     d.stageModel.reset(new StageModel());
-    d.selection.reset(new Selection());
+    d.selectionModel.reset(new SelectionModel());
     // models
     renderer()->setClearColor(d.clearColor);
     renderer()->setStageModel(d.stageModel.data());
-    renderer()->setSelection(d.selection.data());
+    renderer()->setSelectionModel(d.selectionModel.data());
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
                                               << "Type"
@@ -145,18 +145,18 @@ ViewerPrivate::init()
     outliner()->setColumnWidth(OutlinerItem::Type, 60);
     outliner()->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
     outliner()->setStageModel(d.stageModel.data());
-    outliner()->setSelection(d.selection.data());
+    outliner()->setSelectionModel(d.selectionModel.data());
     // inspector
     inspector()->setHeaderLabels(QStringList() << "Key"
                                                << "Value");
     inspector()->setColumnWidth(InspectorItem::Key, 180);
     inspector()->header()->setSectionResizeMode(InspectorItem::Value, QHeaderView::Stretch);
     inspector()->setStageModel(d.stageModel.data());
-    inspector()->setSelection(d.selection.data());
+    inspector()->setSelectionModel(d.selectionModel.data());
     // payload
     d.payloadDialog = new PayloadDialog(d.viewer);
     d.payloadDialog->setStageModel(d.stageModel.data());
-    d.payloadDialog->setSelection(d.selection.data());
+    d.payloadDialog->setSelectionModel(d.selectionModel.data());
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
@@ -223,10 +223,10 @@ ViewerPrivate::init()
     connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
     connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-    
+
     connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
-    
-    
+
+
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
@@ -360,10 +360,10 @@ ViewerPrivate::stageModel()
     return d.stageModel.data();
 }
 
-Selection*
-ViewerPrivate::selection()
+SelectionModel*
+ViewerPrivate::selectionModel()
 {
-    return d.selection.data();
+    return d.selectionModel.data();
 }
 
 bool
@@ -521,7 +521,7 @@ ViewerPrivate::exportSelected()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.stageModel->exportPathsToFile(d.selection->paths(), filename)) {
+        if (d.stageModel->exportPathsToFile(d.selectionModel->paths(), filename)) {
             setSettingsValue("exportSelectedDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -572,32 +572,32 @@ ViewerPrivate::exportImage()
 void
 ViewerPrivate::showSelected()
 {
-    if (selection()->paths().size()) {
-        d.stageModel->setVisible(d.selection->paths(), true);
+    if (selectionModel()->paths().size()) {
+        d.stageModel->setVisible(d.selectionModel->paths(), true);
     }
 }
 
 void
 ViewerPrivate::showHierarchy()
 {
-    if (selection()->paths().size()) {
-        d.stageModel->setVisible(d.selection->paths(), true, true);
+    if (selectionModel()->paths().size()) {
+        d.stageModel->setVisible(d.selectionModel->paths(), true, true);
     }
 }
 
 void
 ViewerPrivate::hideSelected()
 {
-    if (selection()->paths().size()) {
-        d.stageModel->setVisible(d.selection->paths(), false);
+    if (selectionModel()->paths().size()) {
+        d.stageModel->setVisible(d.selectionModel->paths(), false);
     }
 }
 
 void
 ViewerPrivate::hideHierarchy()
 {
-    if (selection()->paths().size()) {
-        d.stageModel->setVisible(d.selection->paths(), false, true);
+    if (selectionModel()->paths().size()) {
+        d.stageModel->setVisible(d.selectionModel->paths(), false, true);
     }
 }
 
@@ -612,8 +612,8 @@ ViewerPrivate::frameAll()
 void
 ViewerPrivate::frameSelected()
 {
-    if (selection()->paths().size()) {
-        camera().setBoundingBox(d.stageModel->boundingBox(selection()->paths()));
+    if (selectionModel()->paths().size()) {
+        camera().setBoundingBox(d.stageModel->boundingBox(selectionModel()->paths()));
         camera().frameAll();
         renderer()->update();
     }
@@ -635,7 +635,7 @@ ViewerPrivate::clear()
 void
 ViewerPrivate::expand()
 {
-    if (selection()->paths().size()) {
+    if (selectionModel()->paths().size()) {
         outliner()->expand();
     }
 }

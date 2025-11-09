@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "usdselection.h"
+#include "usdselectionmodel.h"
 #include "usdstagemodel.h"
 #include "usdviewcamera.h"
 #include <QOpenGLFunctions>
@@ -48,8 +48,8 @@ public:
     StageModel* stageModel() const;
     void setStageModel(StageModel* stageModel);
 
-    Selection* selection();
-    void setSelection(Selection* selection);
+    SelectionModel* selectionModel();
+    void setSelectionModel(SelectionModel* selectionModel);
 
 Q_SIGNALS:
     void rendererReady();

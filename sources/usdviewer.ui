@@ -583,6 +583,8 @@
     </widget>
     <addaction name="menuComplexity"/>
     <addaction name="separator"/>
+    <addaction name="displayIsolate"/>
+    <addaction name="separator"/>
     <addaction name="displayFrameAll"/>
     <addaction name="displayFrameSelected"/>
     <addaction name="displayResetView"/>
@@ -921,6 +923,20 @@
    </property>
    <property name="shortcut">
     <string>Shift+H</string>
+   </property>
+  </action>
+  <action name="displayIsolate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Isolate</string>
+   </property>
+   <property name="shortcut">
+    <string>I</string>
    </property>
   </action>
  </widget>

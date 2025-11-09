@@ -75,7 +75,7 @@ public:
         UsdImagingGLRenderParams params;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<StageModel> stageModel;
-        QPointer<Selection> selection;
+        QPointer<SelectionModel> selectionModel;
         QPointer<ImagingGLWidget> widget;
     };
     Data d;
@@ -105,13 +105,11 @@ void
 ImagingGLWidgetPrivate::initGL()
 {
     if (!d.glEngine) {
-        
-        
         // Create and configure parameters
         UsdImagingGLEngine::Parameters params;
-        params.allowAsynchronousSceneProcessing = true;    // enable async rendering
-        params.displayUnloadedPrimsWithBounds = true;      // show bo
-        
+        params.allowAsynchronousSceneProcessing = true;  // enable async rendering
+        params.displayUnloadedPrimsWithBounds = true;    // show bo
+
         d.glEngine.reset(new UsdImagingGLEngine(params));
         Hgi* hgi = d.glEngine->GetHgi();
         if (hgi) {
@@ -155,7 +153,7 @@ ImagingGLWidgetPrivate::initStageModel()
 void
 ImagingGLWidgetPrivate::initSelection()
 {
-    connect(d.selection.data(), &Selection::selectionChanged, this, &ImagingGLWidgetPrivate::selectionChanged);
+    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &ImagingGLWidgetPrivate::selectionChanged);
 }
 
 void
@@ -245,6 +243,7 @@ ImagingGLWidgetPrivate::paintGL()
             TfErrorMark mark;
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
+            QReadLocker locker(d.stageModel->stageLock());
             d.glEngine->Render(d.stageModel->stage()->GetPseudoRoot(), d.params);
             hgi->EndFrame();
 
@@ -350,10 +349,10 @@ ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
             if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(), pickfrustum.ComputeProjectionMatrix(),
                                              d.stageModel->stage()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
                                              &hitPrimPath, &hitInstancerPath)) {
-                d.selection->replacePaths(QList<SdfPath>() << hitPrimPath);
+                d.selectionModel->replacePaths(QList<SdfPath>() << hitPrimPath);
             }
             else {
-                d.selection->clear();
+                d.selectionModel->clear();
             }
         }
         else {
@@ -367,7 +366,7 @@ ImagingGLWidgetPrivate::selectionChanged()
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
     d.glEngine->ClearSelected();
-    for (SdfPath path : d.selection->paths()) {
+    for (SdfPath path : d.selectionModel->paths()) {
         d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
     }
     d.widget->update();
@@ -584,17 +583,17 @@ ImagingGLWidget::setStageModel(StageModel* stageModel)
     }
 }
 
-Selection*
-ImagingGLWidget::selection()
+SelectionModel*
+ImagingGLWidget::selectionModel()
 {
-    return p->d.selection;
+    return p->d.selectionModel;
 }
 
 void
-ImagingGLWidget::setSelection(Selection* selection)
+ImagingGLWidget::setSelectionModel(SelectionModel* selectionModel)
 {
-    if (p->d.selection != selection) {
-        p->d.selection = selection;
+    if (p->d.selectionModel != selectionModel) {
+        p->d.selectionModel = selectionModel;
         p->initSelection();
         update();
     }

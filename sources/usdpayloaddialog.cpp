@@ -3,19 +3,17 @@
 // https://github.com/mikaelsundell/specviz
 
 #include "usdpayloaddialog.h"
-#include <QFileInfo>
 #include <QDir>
+#include <QFileInfo>
 #include <QPointer>
 #include <QTimer>
 #include <pxr/usd/ar/resolver.h>
+#include <pxr/usd/pcp/arc.h>
+#include <pxr/usd/sdf/payload.h>
 #include <pxr/usd/usd/payloads.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/ar/resolver.h>
-#include <pxr/usd/sdf/payload.h>
-#include <pxr/usd/pcp/arc.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primCompositionQuery.h>
+#include <pxr/usd/usd/stage.h>
 
 // generated files
 #include "ui_usdpayloaddialog.h"
@@ -38,7 +36,7 @@ public:
         qsizetype total = 0;
         qsizetype completed = 0;
         QPointer<StageModel> stageModel;
-        QPointer<Selection> selection;
+        QPointer<SelectionModel> selectionModel;
         QPointer<PayloadDialog> dialog;
         QScopedPointer<Ui_UsdPayloadDialog> ui;
     };
@@ -136,14 +134,12 @@ PayloadDialogPrivate::payloadsLoaded(const SdfPath& path)
                     SdfLayerHandle introducingLayer = arc.GetIntroducingLayer();
                     if (introducingLayer && !introducingLayer->GetRealPath().empty()) {
                         QFileInfo baseInfo(QString::fromStdString(introducingLayer->GetRealPath()));
-                        QString composed =
-                            QDir(baseInfo.absolutePath()).filePath(QString::fromStdString(assetPath));
+                        QString composed = QDir(baseInfo.absolutePath()).filePath(QString::fromStdString(assetPath));
                         resolved = composed.toStdString();
                     }
                 }
 
-                QString displayPath =
-                    QString::fromStdString(resolved.empty() ? assetPath : resolved);
+                QString displayPath = QString::fromStdString(resolved.empty() ? assetPath : resolved);
 
                 QFileInfo info(displayPath);
                 if (info.exists()) {
@@ -159,7 +155,8 @@ PayloadDialogPrivate::payloadsLoaded(const SdfPath& path)
                         sizeStr = QString("%1 MB").arg(size / (1024.0 * 1024.0), 0, 'f', 1);
 
                     item->setText(2, sizeStr);
-                } else {
+                }
+                else {
                     item->setText(3, displayPath);
                     item->setText(2, "—");
                 }
@@ -169,8 +166,7 @@ PayloadDialogPrivate::payloadsLoaded(const SdfPath& path)
         }
     }
     d.completed++;
-    int progress = static_cast<int>(
-        (float)d.completed / std::max<qsizetype>(1, d.total) * 100.0f);
+    int progress = static_cast<int>((float)d.completed / std::max<qsizetype>(1, d.total) * 100.0f);
     d.ui->progress->setValue(progress);
 
     QString name = QString::fromStdString(path.GetName());
@@ -214,17 +210,17 @@ PayloadDialog::PayloadDialog(QWidget* parent)
 
 PayloadDialog::~PayloadDialog() {}
 
-Selection*
-PayloadDialog::selection()
+SelectionModel*
+PayloadDialog::selectionModel()
 {
-    return p->d.selection;
+    return p->d.selectionModel;
 }
 
 void
-PayloadDialog::setSelection(Selection* selection)
+PayloadDialog::setSelectionModel(SelectionModel* selectionModel)
 {
-    if (p->d.selection != selection) {
-        p->d.selection = selection;
+    if (p->d.selectionModel != selectionModel) {
+        p->d.selectionModel = selectionModel;
         update();
     }
 }

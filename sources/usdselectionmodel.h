@@ -13,12 +13,12 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class SelectionPrivate;
-class Selection : public QObject {
+class SelectionModelPrivate;
+class SelectionModel : public QObject {
     Q_OBJECT
 public:
-    Selection(QObject* parent = nullptr);
-    ~Selection();
+    SelectionModel(QObject* parent = nullptr);
+    ~SelectionModel();
     bool isSelected(const SdfPath& path) const;
     void addPath(const SdfPath& path);
     void replacePaths(const QList<SdfPath>& paths);
@@ -31,6 +31,6 @@ Q_SIGNALS:
     void selectionChanged() const;
 
 private:
-    QScopedPointer<SelectionPrivate> p;
+    QScopedPointer<SelectionModelPrivate> p;
 };
 }  // namespace usd

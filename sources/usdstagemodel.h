@@ -6,6 +6,7 @@
 
 #include <QExplicitlySharedDataPointer>
 #include <QObject>
+#include <QReadWriteLock>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/usd/usd/stage.h>
 
@@ -36,6 +37,7 @@ public:
     GfBBox3d boundingBox();
     GfBBox3d boundingBox(const QList<SdfPath> paths);
     UsdStageRefPtr stage() const;
+    QReadWriteLock* stageLock() const;
 
 Q_SIGNALS:
     void payloadsRequested(const QList<SdfPath>& paths);

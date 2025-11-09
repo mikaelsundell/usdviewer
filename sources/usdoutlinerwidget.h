@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "usdselection.h"
+#include "usdselectionmodel.h"
 #include "usdstagemodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
@@ -24,8 +24,8 @@ public:
     StageModel* stageModel() const;
     void setStageModel(StageModel* stageModel);
 
-    Selection* selection();
-    void setSelection(Selection* selection);
+    SelectionModel* selectionModel();
+    void setSelectionModel(SelectionModel* selectionModel);
 
     QString filter() const;
     void setFilter(const QString& filter);

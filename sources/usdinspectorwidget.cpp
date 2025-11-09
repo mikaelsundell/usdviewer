@@ -4,7 +4,7 @@
 
 #include "usdinspectorwidget.h"
 #include "usdinspectoritem.h"
-#include "usdselection.h"
+#include "usdselectionmodel.h"
 #include <QFileInfo>
 #include <QPointer>
 #include <pxr/base/gf/bbox3d.h>
@@ -40,7 +40,7 @@ public Q_SLOTS:
 public:
     struct Data {
         QPointer<StageModel> stageModel;
-        QPointer<Selection> selection;
+        QPointer<SelectionModel> selectionModel;
         QPointer<InspectorWidget> widget;
     };
     Data d;
@@ -59,7 +59,7 @@ InspectorWidgetPrivate::initStageModel()
 void
 InspectorWidgetPrivate::initSelection()
 {
-    connect(d.selection.data(), &Selection::selectionChanged, this, &InspectorWidgetPrivate::selectionChanged);
+    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &InspectorWidgetPrivate::selectionChanged);
 }
 
 void
@@ -118,7 +118,7 @@ GfMatrixToString(const GfMatrix4d& m)
 void
 InspectorWidgetPrivate::selectionChanged()
 {
-    QList<SdfPath> selectedPaths = d.selection->paths();
+    QList<SdfPath> selectedPaths = d.selectionModel->paths();
     d.widget->clear();
 
     if (!d.stageModel->isLoaded()) {
@@ -213,17 +213,17 @@ InspectorWidget::setStageModel(StageModel* stageModel)
     }
 }
 
-Selection*
-InspectorWidget::selection()
+SelectionModel*
+InspectorWidget::selectionModel()
 {
-    return p->d.selection;
+    return p->d.selectionModel;
 }
 
 void
-InspectorWidget::setSelection(Selection* selection)
+InspectorWidget::setSelectionModel(SelectionModel* selectionModel)
 {
-    if (p->d.selection != selection) {
-        p->d.selection = selection;
+    if (p->d.selectionModel != selectionModel) {
+        p->d.selectionModel = selectionModel;
         p->initSelection();
         update();
     }

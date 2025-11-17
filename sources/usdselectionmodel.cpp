@@ -33,27 +33,55 @@ SelectionModel::isSelected(const SdfPath& path) const
 }
 
 void
-SelectionModel::addPath(const SdfPath& path)
+SelectionModel::addPaths(const QList<SdfPath>& paths)
 {
-    if (!p->d.paths.contains(path)) {
-        p->d.paths.append(path);
-        Q_EMIT selectionChanged();
+    bool changed = false;
+    for (const SdfPath& path : paths) {
+        if (!p->d.paths.contains(path)) {
+            p->d.paths.append(path);
+            changed = true;
+        }
     }
+
+    if (changed)
+        Q_EMIT selectionChanged(p->d.paths);
 }
 
 void
 SelectionModel::replacePaths(const QList<SdfPath>& paths)
 {
     p->d.paths = paths;
-    Q_EMIT selectionChanged();
+    Q_EMIT selectionChanged(p->d.paths);
 }
 
 void
-SelectionModel::removePath(const SdfPath& path)
+SelectionModel::removePaths(const QList<SdfPath>& paths)
 {
-    Q_ASSERT("item is not selected" && isSelected(path));
-    p->d.paths.removeOne(path);
-    selectionChanged();
+    bool changed = false;
+    for (const SdfPath& path : paths) {
+        if (p->d.paths.removeOne(path))
+            changed = true;
+    }
+    if (changed)
+        Q_EMIT selectionChanged(p->d.paths);
+}
+
+void
+SelectionModel::togglePaths(const QList<SdfPath>& paths)
+{
+    bool changed = false;
+    for (const SdfPath& path : paths) {
+        if (p->d.paths.contains(path)) {
+            p->d.paths.removeOne(path);
+            changed = true;
+        }
+        else {
+            p->d.paths.append(path);
+            changed = true;
+        }
+    }
+    if (changed)
+        Q_EMIT selectionChanged(p->d.paths);
 }
 
 QList<SdfPath>
@@ -67,8 +95,8 @@ SelectionModel::clear()
 {
     if (p->d.paths.size()) {
         p->d.paths.clear();
-        Q_EMIT selectionChanged();
     }
+    Q_EMIT selectionChanged(p->d.paths);
 }
 
 SelectionModel::~SelectionModel() {}

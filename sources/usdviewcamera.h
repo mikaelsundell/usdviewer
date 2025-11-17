@@ -31,6 +31,9 @@ public:
 
     double aspectRatio() const;
     void setAspectRatio(double aspectRatio);
+    
+    GfVec3d focusPoint() const;
+    void setFocusPoint(const GfVec3d& point);
 
     GfBBox3d boundingBox() const;
     void setBoundingBox(const GfBBox3d& boundingBox);

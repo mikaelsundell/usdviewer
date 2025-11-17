@@ -17,7 +17,7 @@ class StageModelPrivate;
 class StageModel : public QObject {
     Q_OBJECT
 public:
-    enum load_type { load_none, load_all, load_payload };
+    enum load_type { load_all, load_payload };
 
 public:
     StageModel();
@@ -27,6 +27,7 @@ public:
     bool loadFromFile(const QString& filename, load_type loadType);
     bool loadPayloads(const QList<SdfPath>& paths);
     bool unloadPayloads(const QList<SdfPath>& paths);
+    bool saveToFile(const QString& filename);
     bool exportToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool reload();
@@ -37,6 +38,7 @@ public:
     load_type loadType() const;
     GfBBox3d boundingBox();
     GfBBox3d boundingBox(const QList<SdfPath> paths);
+    QString filename() const;
     UsdStageRefPtr stage() const;
     QReadWriteLock* stageLock() const;
 

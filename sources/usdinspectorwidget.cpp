@@ -34,7 +34,7 @@ public:
     void initSelection();
 
 public Q_SLOTS:
-    void selectionChanged();
+    void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged();
 
 public:
@@ -117,28 +117,23 @@ GfMatrixToString(const GfMatrix4d& m)
 }
 
 void
-InspectorWidgetPrivate::selectionChanged()
+InspectorWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
-    QList<SdfPath> selectedPaths = d.selectionModel->paths();
     d.widget->clear();
-
     if (!d.stageModel->isLoaded()) {
         return;
     }
-
-    if (selectedPaths.isEmpty()) {
+    if (paths.isEmpty()) {
         return;
     }
-
-    if (selectedPaths.size() > 1) {
+    if (paths.size() > 1) {
         InspectorItem* multiItem = new InspectorItem(d.widget.data());
         multiItem->setText(InspectorItem::Key, "[Multiple selection]");
         d.widget->addTopLevelItem(multiItem);
         multiItem->setExpanded(true);
         return;
     }
-
-    SdfPath path = selectedPaths.first();
+    SdfPath path = paths.first();
     UsdStageRefPtr stage = d.stageModel->stage();
     UsdPrim prim = stage->GetPrimAtPath(path);
     if (!prim)
@@ -156,12 +151,13 @@ InspectorWidgetPrivate::selectionChanged()
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
     };
 
+    /*
     addChild("Type", QString::fromStdString(prim.GetTypeName().GetString()));
     addChild("Active", prim.IsActive() ? "true" : "false");
     addChild("Visibility",
              QString::fromStdString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
 
-    /*addChild("Kind", QString::fromStdString(UsdModelAPI(prim).GetKind()));
+    addChild("Kind", QString::fromStdString(UsdModelAPI(prim).GetKind()));
 
     if (prim.IsA<UsdGeomXformable>()) {
         GfMatrix4d worldXf;

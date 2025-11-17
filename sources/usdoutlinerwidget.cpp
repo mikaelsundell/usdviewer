@@ -38,7 +38,7 @@ public:
 public Q_SLOTS:
     void updateSelection();
     void checkStateChanged(OutlinerItem* item);
-    void selectionChanged();
+    void selectionChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void stageChanged();
 
@@ -294,7 +294,7 @@ OutlinerWidgetPrivate::updateSelection()
         if (!pathString.isEmpty())
             paths.append(SdfPath(pathString.toStdString()));
     }
-    d.selectionModel->replacePaths(paths);
+    //d.selectionModel->replacePaths(paths);
 }
 
 void
@@ -338,14 +338,13 @@ OutlinerWidgetPrivate::checkStateChanged(OutlinerItem* item)
 }
 
 void
-OutlinerWidgetPrivate::selectionChanged()
+OutlinerWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
-    QList<SdfPath> selectedPaths = d.selectionModel->paths();
     std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
         QString pathString = item->data(0, Qt::UserRole).toString();
         if (!pathString.isEmpty()) {
             SdfPath path(pathString.toStdString());
-            item->setSelected(selectedPaths.contains(path));
+            item->setSelected(paths.contains(path));
         }
         for (int i = 0; i < item->childCount(); ++i)
             selectItems(item->child(i));

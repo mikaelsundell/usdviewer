@@ -32,6 +32,7 @@ public:
         GfMatrix4d inverseUp;
         GfBBox3d boundingBox;
         GfVec3d center;
+        GfVec3d focusPoint;
         GfRange3d range;
         ViewCamera::CameraUp cameraUp;
         ViewCamera::CameraMode cameraMode;
@@ -54,6 +55,8 @@ ViewCameraPrivate::init()
     d.farClipping = 2000000;
     d.fit = 1.1;
     d.inverseUp = GfMatrix4d(1.0);
+    d.center = GfVec3d(0);
+    d.focusPoint = d.center;
     d.cameraUp = ViewCamera::Y;
     d.cameraMode = ViewCamera::None;
     d.direction = ViewCamera::Vertical;
@@ -95,7 +98,9 @@ ViewCameraPrivate::truck(double right, double up)
     const GfFrustum frustum = camera().GetFrustum();
     GfVec3d cameraUp = frustum.ComputeUpVector();
     GfVec3d cameraRight = GfCross(frustum.ComputeViewDirection(), cameraUp);
-    d.center += (right * cameraRight + up * cameraUp);
+    GfVec3d delta = (right * cameraRight + up * cameraUp);
+    d.center += delta;
+    d.focusPoint += delta;
     d.valid = false;
 }
 
@@ -145,7 +150,7 @@ ViewCameraPrivate::camera()
         matrix *= rotateAxis(GfVec3d().XAxis(), -d.axispitch);
         matrix *= rotateAxis(GfVec3d().YAxis(), -d.axisroll);
         matrix *= d.inverseUp;
-        matrix *= GfMatrix4d().SetTranslate(d.center);
+        matrix *= GfMatrix4d().SetTranslate(d.focusPoint);
         d.camera.SetTransform(matrix);
         d.camera.SetFocusDistance(d.distance);
         d.camera.SetPerspectiveFromAspectRatioAndFieldOfView(d.aspectRatio, d.fov, GfCamera::FOVVertical);
@@ -241,6 +246,21 @@ ViewCamera::setAspectRatio(double aspectRatio)
     }
 }
 
+GfVec3d
+ViewCamera::focusPoint() const
+{
+    return p->d.focusPoint;
+}
+
+void
+ViewCamera::setFocusPoint(const GfVec3d& point)
+{
+    if (p->d.focusPoint != point) {
+        p->d.focusPoint = point;
+        p->d.valid = false;
+    }
+}
+
 GfBBox3d
 ViewCamera::boundingBox() const
 {
@@ -253,6 +273,7 @@ ViewCamera::setBoundingBox(const GfBBox3d& boundingBox)
     if (p->d.boundingBox != boundingBox) {
         p->d.boundingBox = boundingBox;
         p->d.center = boundingBox.ComputeCentroid();
+        p->d.focusPoint = p->d.center;
         p->d.range = boundingBox.ComputeAlignedRange();
         p->d.valid = false;
     }

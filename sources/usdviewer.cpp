@@ -33,9 +33,9 @@ class ViewerPrivate : public QObject {
 public:
     ViewerPrivate();
     void init();
+    void initRecentFiles();
     void initSettings();
-    void profile();
-    void stylesheet();
+    bool loadFile(const QString& filename);
     ViewCamera camera();
     ImagingGLWidget* renderer();
     InspectorWidget* inspector();
@@ -44,6 +44,8 @@ public:
     SelectionModel* selectionModel();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
+    void profile();
+    void stylesheet();
     QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
     void setSettingsValue(const QString& key, const QVariant& value);
     void loadSettings();
@@ -51,6 +53,9 @@ public:
 
 public Q_SLOTS:
     void open();
+    void save();
+    void saveAs();
+    void saveCopy();
     void reload();
     void close();
     void ready();
@@ -87,13 +92,15 @@ public Q_SLOTS:
 
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
-    void selectionChanged() const;
+    void selectionChanged(const QList<SdfPath>& paths) const;
 
 public:
+    void updateRecentFiles(const QString& filename);
     struct Data {
         StageModel::load_type loadType;
         QStringList arguments;
         QStringList extensions;
+        QStringList recentFiles;
         QColor clearColor;
         QScopedPointer<MouseEvent> clearColorFilter;
         QScopedPointer<StageModel> stageModel;
@@ -162,11 +169,11 @@ ViewerPrivate::init()
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
-    connect(d.ui->fileFull, &QAction::triggered, this, [this]() {
+    connect(d.ui->modeFull, &QAction::triggered, this, [this]() {
         d.loadType = StageModel::load_all;
         setSettingsValue("loadType", "all");
     });
-    connect(d.ui->filePayload, &QAction::triggered, this, [this]() {
+    connect(d.ui->modePayload, &QAction::triggered, this, [this]() {
         d.loadType = StageModel::load_payload;
         setSettingsValue("loadType", "payload");
     });
@@ -174,10 +181,13 @@ ViewerPrivate::init()
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         {
-            actions->addAction(d.ui->fileFull);
-            actions->addAction(d.ui->filePayload);
+            actions->addAction(d.ui->modeFull);
+            actions->addAction(d.ui->modePayload);
         }
     }
+    connect(d.ui->fileSave, &QAction::triggered, this, &ViewerPrivate::save);
+    connect(d.ui->fileSaveAs, &QAction::triggered, this, &ViewerPrivate::saveAs);
+    connect(d.ui->fileSaveCopy, &QAction::triggered, this, &ViewerPrivate::saveCopy);
     connect(d.ui->fileReload, &QAction::triggered, this, &ViewerPrivate::reload);
     connect(d.ui->fileClose, &QAction::triggered, this, &ViewerPrivate::close);
     connect(d.ui->fileExportAll, &QAction::triggered, this, &ViewerPrivate::exportAll);
@@ -289,16 +299,49 @@ ViewerPrivate::init()
 }
 
 void
+ViewerPrivate::initRecentFiles()
+{
+    QMenu* recentMenu = d.ui->fileRecent;
+    if (!recentMenu)
+        return;
+
+    recentMenu->clear();
+    if (d.recentFiles.isEmpty()) {
+        QAction* emptyAction = new QAction("No recent files", recentMenu);
+        emptyAction->setEnabled(false);
+        recentMenu->addAction(emptyAction);
+        return;
+    }
+
+    for (const QString& file : d.recentFiles) {
+        QString fileName = QFileInfo(file).fileName();
+        QAction* action = new QAction(fileName, recentMenu);
+        action->setToolTip(file);
+        action->setData(file);
+        connect(action, &QAction::triggered, this, [this, file]() { loadFile(file); });
+        recentMenu->addAction(action);
+    }
+    recentMenu->addSeparator();
+    QAction* clearAction = new QAction("Clear", recentMenu);
+    connect(clearAction, &QAction::triggered, this, [this, recentMenu]() {
+        d.recentFiles.clear();
+        setSettingsValue("recentFiles", QStringList());
+        initRecentFiles();
+    });
+    recentMenu->addAction(clearAction);
+}
+
+void
 ViewerPrivate::initSettings()
 {
     QString loadType = settingsValue("loadType", "all").toString();
     if (loadType == "all") {
         d.loadType = StageModel::load_all;
-        d.ui->fileFull->setChecked(true);
+        d.ui->modeFull->setChecked(true);
     }
     else {
         d.loadType = StageModel::load_payload;
-        d.ui->filePayload->setChecked(true);
+        d.ui->modePayload->setChecked(true);
     }
     QString theme = settingsValue("theme", "dark").toString();
     if (theme == "dark") {
@@ -311,22 +354,25 @@ ViewerPrivate::initSettings()
     }
 }
 
-void
-ViewerPrivate::profile()
+bool
+ViewerPrivate::loadFile(const QString& filename)
 {
-    QString outputProfile = platform::getIccProfileUrl(d.viewer->winId());
-    // icc profile
-    ICCTransform* transform = ICCTransform::instance();
-    transform->setOutputProfile(outputProfile);
-}
-
-void
-ViewerPrivate::stylesheet()
-{
-    QString path = platform::getApplicationPath() + "/Resources/App.qss";
-    auto ss = Stylesheet::instance();
-    if (ss->loadQss(path)) {
-        ss->applyQss(ss->compiled());
+    QFileInfo fileInfo(filename);
+    if (d.extensions.contains(fileInfo.suffix().toLower())) {
+        d.stageModel->loadFromFile(filename, d.loadType);
+        if (d.stageModel->isLoaded()) {
+            d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(fileInfo.fileName()));
+            setSettingsValue("openDir", QFileInfo(filename).absolutePath());
+            updateRecentFiles(filename);
+            return true;
+        }
+        else {
+            qWarning() << "Could not load stage from filename: " << filename;
+            return false;
+        }
+    }
+    else {
+        return false;
     }
 }
 
@@ -389,6 +435,8 @@ ViewerPrivate::enable(bool enable)
 {
     d.ui->fileReload->setEnabled(enable);
     d.ui->fileClose->setEnabled(enable);
+    d.ui->fileSave->setEnabled(enable);
+    d.ui->fileSaveCopy->setEnabled(enable);
     d.ui->fileExportAll->setEnabled(enable);
     d.ui->fileExportSelected->setEnabled(enable);
     d.ui->fileExportImage->setEnabled(enable);
@@ -397,6 +445,25 @@ ViewerPrivate::enable(bool enable)
     d.ui->menuComplexity->setEnabled(enable);
     d.ui->collapse->setEnabled(enable);
     d.ui->expand->setEnabled(enable);
+}
+
+void
+ViewerPrivate::profile()
+{
+    QString outputProfile = platform::getIccProfileUrl(d.viewer->winId());
+    // icc profile
+    ICCTransform* transform = ICCTransform::instance();
+    transform->setOutputProfile(outputProfile);
+}
+
+void
+ViewerPrivate::stylesheet()
+{
+    QString path = platform::getApplicationPath() + "/Resources/App.qss";
+    auto ss = Stylesheet::instance();
+    if (ss->loadQss(path)) {
+        ss->applyQss(ss->compiled());
+    }
 }
 
 QVariant
@@ -416,13 +483,13 @@ ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value)
 void
 ViewerPrivate::loadSettings()
 {
-    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
+    d.recentFiles = settingsValue("recentFiles", QStringList()).toStringList();
 }
 
 void
 ViewerPrivate::saveSettings()
 {
-    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
+    setSettingsValue("recentFiles", d.recentFiles);
 }
 
 void
@@ -436,11 +503,86 @@ ViewerPrivate::open()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
     if (filename.size()) {
-        d.stageModel->loadFromFile(filename, d.loadType);
-        if (d.stageModel->isLoaded()) {
-            d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-        }
-        setSettingsValue("openDir", QFileInfo(filename).absolutePath());
+        loadFile(filename);
+    }
+}
+
+void
+ViewerPrivate::save()
+{
+    QString filename = d.stageModel->filename();
+    if (filename.isEmpty()) {
+        saveAs();
+        return;
+    }
+    if (d.stageModel->saveToFile(filename)) {
+        d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
+    }
+}
+
+void
+ViewerPrivate::saveAs()
+{
+    QString saveDir = settingsValue("saveDir", QDir::homePath()).toString();
+    QString currentFile = d.stageModel->filename();
+    QString defaultName;
+
+    if (!currentFile.isEmpty()) {
+        QFileInfo info(currentFile);
+        defaultName = info.fileName();
+        saveDir = info.absolutePath();
+    }
+    else {
+        defaultName = "untitled.usd";
+    }
+
+    QStringList filters;
+    for (const QString& ext : d.extensions)
+        filters.append("*." + ext);
+
+    QString filter = QString("USD files (%1)").arg(filters.join(' '));
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Save USD file as",
+                                                    QDir(saveDir).filePath(defaultName), filter);
+
+    if (filename.isEmpty())
+        return;
+
+    if (d.stageModel->saveToFile(filename)) {
+        setSettingsValue("saveDir", QFileInfo(filename).absolutePath());
+        d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
+        updateRecentFiles(filename);
+    }
+}
+
+void
+ViewerPrivate::saveCopy()
+{
+    QString copyDir = settingsValue("copyDir", QDir::homePath()).toString();
+    QString currentFile = d.stageModel->filename();
+    QString defaultName;
+
+    if (!currentFile.isEmpty()) {
+        QFileInfo info(currentFile);
+        defaultName = QString("%1 (Copy).%2").arg(info.completeBaseName(), info.suffix());
+        copyDir = info.absolutePath();
+    }
+    else {
+        defaultName = "untitled.usd";
+    }
+
+    QStringList filters;
+    for (const QString& ext : d.extensions)
+        filters.append("*." + ext);
+
+    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Save copy of USD file",
+                                                    QDir(copyDir).filePath(defaultName), filter);
+
+    if (filename.isEmpty())
+        return;
+
+    if (d.stageModel->exportToFile(filename)) {
+        setSettingsValue("copyDir", QFileInfo(filename).absolutePath());
     }
 }
 
@@ -764,9 +906,27 @@ ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
 }
 
 void
-ViewerPrivate::selectionChanged() const
+ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 {
-    qDebug() << "selectionCHanged ... activate the isolate button";
+    if (paths.size()) {
+        d.ui->displayExpand->setEnabled(true);
+        d.ui->displayIsolate->setEnabled(true);
+    } else {
+        d.ui->displayExpand->setEnabled(false);
+        d.ui->displayIsolate->setEnabled(false);
+    }
+}
+
+void
+ViewerPrivate::updateRecentFiles(const QString& filename)
+{
+    d.recentFiles.removeAll(filename);
+    d.recentFiles.prepend(filename);
+    const int maxRecent = 10;
+    while (d.recentFiles.size() > maxRecent)
+        d.recentFiles.removeLast();
+    setSettingsValue("recentFiles", d.recentFiles);
+    initRecentFiles();
 }
 
 #include "usdviewer.moc"
@@ -789,47 +949,24 @@ Viewer::setArguments(const QStringList& arguments)
         if (arguments[i] == "--open" && i + 1 < arguments.size()) {
             QString filename = arguments[i + 1];
             if (!filename.isEmpty()) {
-                QFileInfo fileInfo(filename);
-                if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                    p->d.stageModel->loadFromFile(filename, p->d.loadType);
-                    if (p->d.stageModel->isLoaded()) {
-                        setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-                    }
-                    else {
-                        qWarning() << "Could not load stage from filename: " << filename;
-                    }
-                    return;
-                }
+                p->loadFile(filename);
+                return;
             }
         }
     }
     if (arguments.size() == 2) {
         QString arg = arguments[1];
         const QString protocolPrefix = "usdviewer://";
-
         if (arg.startsWith(protocolPrefix, Qt::CaseInsensitive)) {
             QString pathEncoded = arg.mid(protocolPrefix.length());
             QString decodedPath = QUrl::fromPercentEncoding(pathEncoded.toUtf8());
 #ifdef Q_OS_WIN
             decodedPath = QDir::fromNativeSeparators(decodedPath);
 #endif
-            QFileInfo fileInfo(decodedPath);
-            if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-                p->d.stageModel->loadFromFile(decodedPath, p->d.loadType);
-                if (p->d.stageModel->isLoaded()) {
-                    setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(decodedPath));
-                }
-            }
+            p->loadFile(decodedPath);
             return;
         }
-
-        QFileInfo fileInfo(arg);
-        if (p->d.extensions.contains(fileInfo.suffix().toLower())) {
-            p->d.stageModel->loadFromFile(arg, p->d.loadType);
-            if (p->d.stageModel->isLoaded()) {
-                setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(arg));
-            }
-        }
+        p->loadFile(arg);
     }
 }
 
@@ -856,16 +993,7 @@ Viewer::dropEvent(QDropEvent* event)
     const QList<QUrl> urls = event->mimeData()->urls();
     if (urls.size() == 1) {
         QString filename = urls.first().toLocalFile();
-        QString extension = QFileInfo(filename).suffix().toLower();
-        if (p->d.extensions.contains(extension)) {
-            p->d.stageModel->loadFromFile(filename, p->d.loadType);
-            if (p->d.stageModel->isLoaded()) {
-                setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-            }
-            else {
-                qWarning() << "Could not load stage from filename: " << filename;
-            }
-        }
+        p->loadFile(filename);
     }
 }
 }  // namespace usd

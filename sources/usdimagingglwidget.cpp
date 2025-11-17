@@ -39,21 +39,22 @@ public:
     void initSelection();
     void paintGL();
     void paintEvent(QPaintEvent* event);
+    void mouseDoubleClickEvent(QMouseEvent* event);
     void mousePressEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
     void wheelEvent(QWheelEvent* event);
-    void pickEvent(QMouseEvent* event);
-
+    
 public Q_SLOTS:
     void loaded(const QString& filename);
-    void selectionChanged();
+    void selectionChanged(const QList<SdfPath>& paths);
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void stageChanged();
 
 public:
-    void resolveSelection(const QRect& rect);
+    void focusEvent(QMouseEvent* event);
+    void sweepEvent(const QRect& rect, QMouseEvent* event);
     double complexityRefinement(ImagingGLWidget::Complexity complexity);
     QPoint deviceRatio(QPoint value) const;
     double deviceRatio(double value) const;
@@ -286,13 +287,19 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
     if (d.sweep) {
         QPainter painter(d.glwidget);
         painter.setRenderHint(QPainter::Antialiasing, false);
-
         QRect rect(d.start, d.end);
         rect = rect.normalized();
-
         painter.setPen(QPen(QColor(0, 150, 255, 200), 1));
         painter.setBrush(QColor(0, 150, 255, 50));
         painter.drawRect(rect);
+    }
+}
+
+void
+ImagingGLWidgetPrivate::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (event->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) {
+        focusEvent(event);
     }
 }
 
@@ -361,62 +368,10 @@ ImagingGLWidgetPrivate::mouseReleaseEvent(QMouseEvent* event)
         else if (d.sweep) {
             d.end = event->pos();
             QRect rect(d.start, d.end);
-            resolveSelection(rect);
+            sweepEvent(rect, event);
             d.sweep = false;
         }
     }
-}
-
-void
-ImagingGLWidgetPrivate::resolveSelection(const QRect& rect)
-{
-    d.glwidget->makeCurrent();
-#ifdef WIN32
-    glDepthMask(GL_TRUE);
-#endif
-    QRect normalizedRect = rect.normalized();
-    GfVec4d viewport = widgetViewport();
-    GfVec2d center(
-        (normalizedRect.center().x() - viewport[0]) / static_cast<double>(viewport[2]),
-        (normalizedRect.center().y() - viewport[1]) / static_cast<double>(viewport[3]));
-    center[0] = (center[0] * 2.0 - 1.0);
-    center[1] = -1.0 * (center[1] * 2.0 - 1.0);
-
-    GfVec2d size(
-        static_cast<double>(normalizedRect.width()) / viewport[2],
-        static_cast<double>(normalizedRect.height()) / viewport[3]);
-
-    GfCamera camera = d.viewCamera.camera();
-    GfFrustum frustum = camera.GetFrustum();
-    GfFrustum pickFrustum = frustum.ComputeNarrowedFrustum(center, size);
-
-    bool click = (rect.width() < 3 && rect.height() < 3);
-
-    UsdImagingGLEngine::PickParams pickParams;
-    pickParams.resolveMode = click ? TfToken("resolveNearestToCenter")
-                                   : TfToken("resolveDeep");
-
-    UsdImagingGLEngine::IntersectionResultVector results;
-    bool hit = d.glEngine->TestIntersection(
-        pickParams,
-        pickFrustum.ComputeViewMatrix(),
-        pickFrustum.ComputeProjectionMatrix(),
-        d.stageModel->stage()->GetPseudoRoot(),
-        d.params,
-        &results);
-
-    QList<SdfPath> selectedPaths;
-    if (hit) {
-        for (const auto& r : results) {
-            if (!r.hitPrimPath.IsEmpty())
-                selectedPaths.append(r.hitPrimPath);
-        }
-    }
-    if (!selectedPaths.isEmpty())
-        d.selectionModel->replacePaths(selectedPaths);
-    else
-        d.selectionModel->clear();
-    d.glwidget->update();
 }
 
 void
@@ -430,51 +385,134 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
 }
 
 void
-ImagingGLWidgetPrivate::pickEvent(QMouseEvent* event)
+ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
 {
     d.glwidget->makeCurrent();
+    if (!d.stageModel || !d.stageModel->isLoaded() || !d.glEngine)
+        return;
 
-    // pickEvent() may be invoked by Qt before the USD stage is fully initialized.
-    // Ensure the stage exists and is successfully loaded before rendering.
-
-    if (d.stageModel && d.stageModel->isLoaded()) {
-        if (d.glEngine) {
 #ifdef WIN32
-            glDepthMask(GL_TRUE);  // needed on windows
+    glDepthMask(GL_TRUE);
 #endif
-            QPoint mousepos = deviceRatio(event->pos());
-            GfVec4d viewport = widgetViewport();
-            GfVec2d pos = GfVec2d((mousepos.x() - viewport[0]) / static_cast<double>(viewport[2]),
-                                  (mousepos.y() - viewport[1]) / static_cast<double>(viewport[3]));
-            pos[0] = (pos[0] * 2.0 - 1.0);
-            pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
-            GfVec2d size(1.0 / static_cast<double>(viewport[2]), 1.0 / static_cast<double>(viewport[3]));
-            GfCamera camera = d.viewCamera.camera();
-            GfFrustum frustum = camera.GetFrustum();
-            GfFrustum pickfrustum = frustum.ComputeNarrowedFrustum(pos, size);
-            GfVec3d hitPoint, hitNormal;
-            SdfPath hitPrimPath, hitInstancerPath;
-            if (d.glEngine->TestIntersection(pickfrustum.ComputeViewMatrix(), pickfrustum.ComputeProjectionMatrix(),
-                                             d.stageModel->stage()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
-                                             &hitPrimPath, &hitInstancerPath)) {
-                d.selectionModel->replacePaths(QList<SdfPath>() << hitPrimPath);
-            }
-            else {
-                d.selectionModel->clear();
-            }
-        }
-        else {
-            qWarning() << "gl engine is not inititialized, render pass will be skipped";
-        }
+
+    const qreal deviceRatio = d.glwidget->devicePixelRatioF();
+    QPointF mousePosDevice = event->pos() * deviceRatio;
+    GfVec4d viewport = widgetViewport();
+
+    GfVec2d pos(
+        (mousePosDevice.x() - viewport[0]) / static_cast<double>(viewport[2]),
+        (mousePosDevice.y() - viewport[1]) / static_cast<double>(viewport[3])
+    );
+    pos[0] = pos[0] * 2.0 - 1.0;
+    pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
+
+    GfVec2d size(
+        1.0 / static_cast<double>(viewport[2]),
+        1.0 / static_cast<double>(viewport[3])
+    );
+
+    GfCamera camera = d.viewCamera.camera();
+    GfFrustum frustum = camera.GetFrustum();
+    GfFrustum pickFrustum = frustum.ComputeNarrowedFrustum(pos, size);
+
+    GfVec3d hitPoint, hitNormal;
+    SdfPath hitPrimPath, hitInstancerPath;
+
+    bool hit = d.glEngine->TestIntersection(
+        pickFrustum.ComputeViewMatrix(),
+        pickFrustum.ComputeProjectionMatrix(),
+        d.stageModel->stage()->GetPseudoRoot(),
+        d.params,
+        &hitPoint,
+        &hitNormal,
+        &hitPrimPath,
+        &hitInstancerPath);
+
+    if (hit) {
+        qDebug() << "Focus set to hit point:"
+                 << hitPoint[0] << hitPoint[1] << hitPoint[2]
+                 << "on prim" << QString::fromStdString(hitPrimPath.GetString());
+
+        d.viewCamera.setFocusPoint(hitPoint);
+        d.glwidget->update();
+    } else {
+        qDebug() << "No hit under cursor for focus event.";
     }
 }
 
 void
-ImagingGLWidgetPrivate::selectionChanged()
+ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
+{
+    d.glwidget->makeCurrent();
+    if (!d.stageModel || !d.stageModel->isLoaded() || !d.glEngine)
+        return;
+    
+#ifdef WIN32
+    glDepthMask(GL_TRUE);
+#endif
+    QPoint tl = deviceRatio(rect.topLeft());
+    QPoint br = deviceRatio(rect.bottomRight());
+
+    if (br.x() < tl.x()) std::swap(tl.rx(), br.rx());
+    if (br.y() < tl.y()) std::swap(tl.ry(), br.ry());
+    const QRect r(tl, br);
+    
+    GfVec4d viewport = widgetViewport();
+
+    GfVec2d center(
+        ((r.left() + r.right()) * 0.5 - viewport[0]) / static_cast<double>(viewport[2]),
+        ((r.top()  + r.bottom())* 0.5 - viewport[1]) / static_cast<double>(viewport[3]));
+    center[0] = center[0] * 2.0 - 1.0;
+    center[1] = -1.0 * (center[1] * 2.0 - 1.0);
+
+    GfVec2d size(
+        static_cast<double>(r.width())  / viewport[2],
+        static_cast<double>(r.height()) / viewport[3]);
+
+    const bool click = (r.width() < 3 && r.height() < 3);
+
+    UsdImagingGLEngine::PickParams pickParams;
+    pickParams.resolveMode = click ? TfToken("resolveNearestToCenter") : TfToken("resolveDeep");
+
+    GfCamera cam = d.viewCamera.camera();
+    GfFrustum fr = cam.GetFrustum();
+    GfFrustum pickFr = fr.ComputeNarrowedFrustum(center, size);
+
+    UsdImagingGLEngine::IntersectionResultVector results;
+    const bool hit = d.glEngine->TestIntersection(
+        pickParams,
+        pickFr.ComputeViewMatrix(),
+        pickFr.ComputeProjectionMatrix(),
+        d.stageModel->stage()->GetPseudoRoot(),
+        d.params,
+        &results);
+
+    QList<SdfPath> selectedPaths;
+    if (hit) {
+        for (const auto& rItem : results)
+            if (!rItem.hitPrimPath.IsEmpty())
+                selectedPaths.append(rItem.hitPrimPath);
+    }
+    if (!selectedPaths.isEmpty()) {
+        if (event->modifiers() & Qt::ShiftModifier) {
+            d.selectionModel->togglePaths(selectedPaths);
+        } else {
+            d.selectionModel->replacePaths(selectedPaths);
+        }
+    }
+    else
+    {
+        d.selectionModel->clear();
+    }
+    d.glwidget->update();
+}
+
+void
+ImagingGLWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
     d.glEngine->ClearSelected();
-    for (SdfPath path : d.selectionModel->paths()) {
+    for (SdfPath path : paths) {
         d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
     }
     d.glwidget->update();
@@ -737,6 +775,12 @@ ImagingGLWidget::paintEvent(QPaintEvent* event)
 {
     QOpenGLWidget::paintEvent(event);
     p->paintEvent(event);
+}
+
+void
+ImagingGLWidget::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    p->mouseDoubleClickEvent(event);
 }
 
 void

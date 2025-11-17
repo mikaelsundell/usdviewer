@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1463</width>
-    <height>837</height>
+    <width>1280</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -467,7 +467,8 @@
           </property>
           <property name="icon">
            <iconset resource="usdviewer.qrc">
-            <normaloff>:/icons/resources/ExpandDisabled.png</normaloff>:/icons/resources/ExpandDisabled.png</iconset>
+            <normaloff>:/icons/resources/Expand.png</normaloff>
+            <disabledoff>:/icons/resources/ExpandDisabled.png</disabledoff>:/icons/resources/Expand.png</iconset>
           </property>
          </widget>
         </item>
@@ -564,7 +565,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1463</width>
+     <width>1280</width>
      <height>24</height>
     </rect>
    </property>
@@ -596,15 +597,26 @@
     <property name="title">
      <string>File</string>
     </property>
-    <widget class="QMenu" name="menuMode">
+    <widget class="QMenu" name="fileMode">
      <property name="title">
-      <string>Load</string>
+      <string>Mode</string>
      </property>
-     <addaction name="fileFull"/>
-     <addaction name="filePayload"/>
+     <addaction name="modeFull"/>
+     <addaction name="modePayload"/>
+    </widget>
+    <widget class="QMenu" name="fileRecent">
+     <property name="title">
+      <string>Recent</string>
+     </property>
+     <addaction name="actionClear"/>
     </widget>
     <addaction name="fileOpen"/>
-    <addaction name="menuMode"/>
+    <addaction name="fileMode"/>
+    <addaction name="fileRecent"/>
+    <addaction name="separator"/>
+    <addaction name="fileSave"/>
+    <addaction name="fileSaveAs"/>
+    <addaction name="fileSaveCopy"/>
     <addaction name="separator"/>
     <addaction name="fileReload"/>
     <addaction name="fileClose"/>
@@ -858,7 +870,7 @@
     <string>Outliner</string>
    </property>
   </action>
-  <action name="fileFull">
+  <action name="modeFull">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -869,7 +881,7 @@
     <string>Full</string>
    </property>
   </action>
-  <action name="filePayload">
+  <action name="modePayload">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -937,6 +949,32 @@
    </property>
    <property name="shortcut">
     <string>I</string>
+   </property>
+  </action>
+  <action name="actionClear">
+   <property name="text">
+    <string>No recent files</string>
+   </property>
+  </action>
+  <action name="fileSave">
+   <property name="text">
+    <string>Save</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="fileSaveCopy">
+   <property name="text">
+    <string>Save copy ...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+S</string>
+   </property>
+  </action>
+  <action name="fileSaveAs">
+   <property name="text">
+    <string>Save as ...</string>
    </property>
   </action>
  </widget>

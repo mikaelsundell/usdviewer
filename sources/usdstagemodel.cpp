@@ -19,6 +19,7 @@ public:
     bool loadFromFile(const QString& filename, StageModel::load_type loadType);
     bool loadPayloads(const QList<SdfPath>& paths);
     bool unloadPayloads(const QList<SdfPath>& paths);
+    bool saveToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool close();
     bool reload();
@@ -34,6 +35,7 @@ public:
     struct Data {
         UsdStageRefPtr stage;
         StageModel::load_type loadType;
+        QString filename;
         GfBBox3d bbox;
         QList<SdfPath> mask;
         QThreadPool pool;
@@ -46,7 +48,7 @@ public:
 
 StageModelPrivate::StageModelPrivate()
 {
-    d.loadType = StageModel::load_type::load_none;
+    d.loadType = StageModel::load_type::load_all;
     d.pool.setMaxThreadCount(QThread::idealThreadCount());
     d.pool.setThreadPriority(QThread::HighPriority);
 }
@@ -58,18 +60,16 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_type l
 {
     {
         QWriteLocker locker(&d.stageLock);
-
         if (loadType == StageModel::load_type::load_all)
             d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadAll);
         else
             d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadNone);
-
         d.loadType = loadType;
-
         if (d.stage) {
             d.bboxCache.reset(new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(),
                                                    true));  // use extents hint
             d.bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
+            d.filename = filename;
         }
         else {
             d.bboxCache.reset();
@@ -77,7 +77,12 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_type l
         }
     }
     QMetaObject::invokeMethod(
-        d.stageModel, [this]() { stageChanged(); }, Qt::QueuedConnection);
+        d.stageModel,
+        [this]() {
+            setMask(QList<SdfPath>());
+            stageChanged();
+        },
+        Qt::QueuedConnection);
     return true;
 }
 
@@ -91,7 +96,6 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths)
 
     auto stage = d.stage;
     auto pool = &d.pool;
-
     QFuture<void> future = QtConcurrent::run(pool, [this, stage, paths]() {
         QList<SdfPath> failed;
         QList<SdfPath> loaded;
@@ -103,13 +107,11 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths)
                     failed.append(path);
                     continue;
                 }
-
                 if (prim.IsLoaded()) {
                     loaded.append(path);
                     Q_EMIT d.stageModel->payloadsLoaded(path);
                     continue;
                 }
-
                 try {
                     prim.Load();
                     loaded.append(path);
@@ -188,6 +190,32 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
     });
     return true;
 }
+
+bool
+StageModelPrivate::saveToFile(const QString& filename)
+{
+    if (!isLoaded())
+        return false;
+
+    QWriteLocker locker(&d.stageLock);
+    try {
+        SdfLayerHandle rootLayer = d.stage->GetRootLayer();
+        if (!rootLayer) {
+            return false;
+        }
+        if (rootLayer->IsAnonymous()) {
+            return d.stage->Export(filename.toStdString());
+        }
+        if (QFileInfo(d.filename).canonicalFilePath() == QFileInfo(filename).canonicalFilePath()) {
+            d.stage->Save();
+            return true;
+        }
+        return d.stage->Export(filename.toStdString());
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
 
 bool
 StageModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
@@ -296,6 +324,7 @@ StageModelPrivate::setVisible(const QList<SdfPath>& paths, bool visible, bool re
 void
 StageModelPrivate::setMask(const QList<SdfPath>& paths)
 {
+    d.mask = paths;
     Q_EMIT d.stageModel->maskChanged(paths);
 }
 
@@ -409,6 +438,12 @@ StageModel::unloadPayloads(const QList<SdfPath>& paths)
 }
 
 bool
+StageModel::saveToFile(const QString& filename)
+{
+    return p->saveToFile(filename);
+}
+
+bool
 StageModel::exportToFile(const QString& filename)
 {
     QReadLocker locker(&p->d.stageLock);
@@ -442,7 +477,6 @@ StageModel::isLoaded() const
 void
 StageModel::setMask(const QList<SdfPath>& paths)
 {
-    p->d.mask = paths;
     p->setMask(paths);
 }
 
@@ -468,6 +502,12 @@ GfBBox3d
 StageModel::boundingBox(const QList<SdfPath> paths)
 {
     return p->boundingBox(paths);
+}
+
+QString
+StageModel::filename() const
+{
+    return p->d.filename;
 }
 
 UsdStageRefPtr

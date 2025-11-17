@@ -376,7 +376,13 @@
     </item>
    </layout>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="font">
+    <font>
+     <pointsize>11</pointsize>
+    </font>
+   </property>
+  </widget>
   <widget class="usd::DockWidget" name="outlinerDock">
    <property name="minimumSize">
     <size>

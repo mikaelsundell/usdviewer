@@ -22,6 +22,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QSettings>
+#include <QTimer>
 #include <QToolButton>
 
 // generated files
@@ -95,6 +96,7 @@ public Q_SLOTS:
 
 public:
     void updateRecentFiles(const QString& filename);
+    void updateStatus(const QString& message, bool error = false);
     struct Data {
         StageModel::LoadMode loadMode;
         QStringList arguments;
@@ -344,23 +346,40 @@ bool
 ViewerPrivate::loadFile(const QString& filename)
 {
     QFileInfo fileInfo(filename);
-    if (d.extensions.contains(fileInfo.suffix().toLower())) {
-        d.stageModel->loadFromFile(filename, d.loadMode);
-        if (d.stageModel->isLoaded()) {
-            d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(fileInfo.fileName()));
-            setSettingsValue("openDir", QFileInfo(filename).absolutePath());
-            updateRecentFiles(filename);
-            return true;
-        }
-        else {
-            qWarning() << "Could not load stage from filename: " << filename;
-            return false;
-        }
+    if (!d.extensions.contains(fileInfo.suffix().toLower())) {
+        updateStatus(QString("unsupported file format: %1").arg(fileInfo.suffix()), true);
+        return false;
     }
-    else {
+
+    QElapsedTimer timer;
+    timer.start();
+
+    d.stageModel->loadFromFile(filename, d.loadMode);
+
+    if (d.stageModel->isLoaded()) {
+        qint64 elapsedMs = timer.elapsed();
+        double elapsedSec = elapsedMs / 1000.0;
+
+        QString shortName = fileInfo.fileName();
+        d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(shortName));
+        setSettingsValue("openDir", fileInfo.absolutePath());
+        updateRecentFiles(filename);
+
+        updateStatus(
+            QString("Loaded %1 in %2 seconds")
+                .arg(shortName)
+                .arg(QString::number(elapsedSec, 'f', 2)),
+            false);
+
+        return true;
+    } else {
+        updateStatus(
+            QString("Failed to load file: %1").arg(fileInfo.fileName()),
+            true);
         return false;
     }
 }
+
 
 ViewCamera
 ViewerPrivate::camera()
@@ -907,6 +926,18 @@ ViewerPrivate::updateRecentFiles(const QString& filename)
         d.recentFiles.removeLast();
     setSettingsValue("recentFiles", d.recentFiles);
     initRecentFiles();
+}
+
+void
+ViewerPrivate::updateStatus(const QString& message, bool error)
+{
+    QStatusBar* bar = d.ui->statusbar;
+    QString text = error ? QString(" error: %1").arg(message) : QString(" %1").arg(message);
+    int timeoutMs = 4000;
+    bar->showMessage(text, timeoutMs);
+    QTimer::singleShot(timeoutMs, bar, [bar]() {
+        bar->showMessage(" Ready.");
+    });
 }
 
 #include "usdviewer.moc"

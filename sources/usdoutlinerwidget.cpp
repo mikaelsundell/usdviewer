@@ -294,7 +294,7 @@ OutlinerWidgetPrivate::updateSelection()
         if (!pathString.isEmpty())
             paths.append(SdfPath(pathString.toStdString()));
     }
-    //d.selectionModel->replacePaths(paths);
+    d.selectionModel->replacePaths(paths);
 }
 
 void
@@ -340,6 +340,7 @@ OutlinerWidgetPrivate::checkStateChanged(OutlinerItem* item)
 void
 OutlinerWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
+    QSignalBlocker blocker(d.widget);
     std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
         QString pathString = item->data(0, Qt::UserRole).toString();
         if (!pathString.isEmpty()) {
@@ -349,10 +350,8 @@ OutlinerWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
         for (int i = 0; i < item->childCount(); ++i)
             selectItems(item->child(i));
     };
-
     for (int i = 0; i < d.widget->topLevelItemCount(); ++i)
         selectItems(d.widget->topLevelItem(i));
-
     d.widget->update();
 }
 
@@ -373,7 +372,7 @@ OutlinerWidgetPrivate::stageChanged()
         addChildren(rootItem, prim.GetPath());
         initTree();
 
-        if (d.stageModel->loadType() == StageModel::load_payload)
+        if (d.stageModel->loadMode() == StageModel::Payload)
             itemCheckState(rootItem, true, true);
     }
 }

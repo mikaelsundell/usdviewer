@@ -322,7 +322,20 @@
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="drawMode"/>
+           <widget class="QToolButton" name="wireframe">
+            <property name="text">
+             <string>Wireframe</string>
+            </property>
+            <property name="shortcut">
+             <string>W</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QLabel" name="label_2">
@@ -332,12 +345,9 @@
              </font>
             </property>
             <property name="text">
-             <string>AOV</string>
+             <string>Background</string>
             </property>
            </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="aov"/>
           </item>
           <item>
            <widget class="QFrame" name="clearcolor">
@@ -455,6 +465,9 @@
             <normaloff>:/icons/resources/Collapse.png</normaloff>
             <disabledoff>:/icons/resources/CollapseDisabled.png</disabledoff>:/icons/resources/Collapse.png</iconset>
           </property>
+          <property name="shortcut">
+           <string>C</string>
+          </property>
          </widget>
         </item>
         <item>
@@ -469,6 +482,9 @@
            <iconset resource="usdviewer.qrc">
             <normaloff>:/icons/resources/Expand.png</normaloff>
             <disabledoff>:/icons/resources/ExpandDisabled.png</disabledoff>:/icons/resources/Expand.png</iconset>
+          </property>
+          <property name="shortcut">
+           <string>E</string>
           </property>
          </widget>
         </item>

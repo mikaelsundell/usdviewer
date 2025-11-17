@@ -16,7 +16,7 @@ class StageModelPrivate : public QSharedData {
 public:
     StageModelPrivate();
     ~StageModelPrivate();
-    bool loadFromFile(const QString& filename, StageModel::load_type loadType);
+    bool loadFromFile(const QString& filename, StageModel::LoadMode loadMode);
     bool loadPayloads(const QList<SdfPath>& paths);
     bool unloadPayloads(const QList<SdfPath>& paths);
     bool saveToFile(const QString& filename);
@@ -34,7 +34,7 @@ public:
     void stageChanged();
     struct Data {
         UsdStageRefPtr stage;
-        StageModel::load_type loadType;
+        StageModel::LoadMode loadMode;
         QString filename;
         GfBBox3d bbox;
         QList<SdfPath> mask;
@@ -48,7 +48,7 @@ public:
 
 StageModelPrivate::StageModelPrivate()
 {
-    d.loadType = StageModel::load_type::load_all;
+    d.loadMode = StageModel::LoadMode::All;
     d.pool.setMaxThreadCount(QThread::idealThreadCount());
     d.pool.setThreadPriority(QThread::HighPriority);
 }
@@ -56,15 +56,15 @@ StageModelPrivate::StageModelPrivate()
 StageModelPrivate::~StageModelPrivate() {}
 
 bool
-StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_type loadType)
+StageModelPrivate::loadFromFile(const QString& filename, StageModel::LoadMode loadMode)
 {
     {
         QWriteLocker locker(&d.stageLock);
-        if (loadType == StageModel::load_type::load_all)
+        if (loadMode == StageModel::LoadMode::All)
             d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadAll);
         else
             d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadNone);
-        d.loadType = loadType;
+        d.loadMode = loadMode;
         if (d.stage) {
             d.bboxCache.reset(new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(),
                                                    true));  // use extents hint
@@ -406,11 +406,11 @@ StageModel::StageModel()
     p->d.stageModel = this;
 }
 
-StageModel::StageModel(const QString& filename, load_type loadType)
+StageModel::StageModel(const QString& filename, LoadMode loadMode)
     : p(new StageModelPrivate())
 {
     p->d.stageModel = this;
-    loadFromFile(filename, loadType);
+    loadFromFile(filename, loadMode);
 }
 
 StageModel::StageModel(const StageModel& other)
@@ -420,9 +420,9 @@ StageModel::StageModel(const StageModel& other)
 StageModel::~StageModel() {}
 
 bool
-StageModel::loadFromFile(const QString& filename, load_type loadType)
+StageModel::loadFromFile(const QString& filename, LoadMode loadMode)
 {
-    return p->loadFromFile(filename, loadType);
+    return p->loadFromFile(filename, loadMode);
 }
 
 bool
@@ -492,10 +492,10 @@ StageModel::boundingBox()
     return p->boundingBox();
 }
 
-StageModel::load_type
-StageModel::loadType() const
+StageModel::LoadMode
+StageModel::loadMode() const
 {
-    return p->d.loadType;
+    return p->d.loadMode;
 }
 
 GfBBox3d

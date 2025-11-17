@@ -79,8 +79,7 @@ public Q_SLOTS:
     void defaultCameraLightEnabled(bool checked);
     void sceneLightsEnabled(bool checked);
     void sceneMaterialsEnabled(bool checked);
-    void drawModeChanged(int index);
-    void aovChanged(int index);
+    void wireframeChanged(bool checked);
     void asComplexityLow();
     void asComplexityMedium();
     void asComplexityHigh();
@@ -97,7 +96,7 @@ public Q_SLOTS:
 public:
     void updateRecentFiles(const QString& filename);
     struct Data {
-        StageModel::load_type loadType;
+        StageModel::LoadMode loadMode;
         QStringList arguments;
         QStringList extensions;
         QStringList recentFiles;
@@ -114,7 +113,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadType = StageModel::load_type::load_all;
+    d.loadMode = StageModel::LoadMode::All;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
 
@@ -170,11 +169,11 @@ ViewerPrivate::init()
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->modeFull, &QAction::triggered, this, [this]() {
-        d.loadType = StageModel::load_all;
+        d.loadMode = StageModel::All;
         setSettingsValue("loadType", "all");
     });
     connect(d.ui->modePayload, &QAction::triggered, this, [this]() {
-        d.loadType = StageModel::load_payload;
+        d.loadMode = StageModel::Payload;
         setSettingsValue("loadType", "payload");
     });
     {
@@ -233,21 +232,8 @@ ViewerPrivate::init()
     connect(d.ui->enableDefaultCameraLight, &QCheckBox::toggled, this, &ViewerPrivate::defaultCameraLightEnabled);
     connect(d.ui->enableSceneLights, &QCheckBox::toggled, this, &ViewerPrivate::sceneLightsEnabled);
     connect(d.ui->enableSceneMaterials, &QCheckBox::toggled, this, &ViewerPrivate::sceneMaterialsEnabled);
-    connect(d.ui->drawMode, &QComboBox::currentIndexChanged, this, &ViewerPrivate::drawModeChanged);
-    connect(d.ui->aov, &QComboBox::currentIndexChanged, this, &ViewerPrivate::aovChanged);
+    connect(d.ui->wireframe, &QToolButton::toggled, this, &ViewerPrivate::wireframeChanged);
     connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
-    // draw modes
-    {
-        d.ui->drawMode->addItem("Points", QVariant::fromValue(ImagingGLWidget::Points));
-        d.ui->drawMode->addItem("Wireframe", QVariant::fromValue(ImagingGLWidget::Wireframe));
-        d.ui->drawMode->addItem("Wireframe On Surface", QVariant::fromValue(ImagingGLWidget::WireframeOnSurface));
-        d.ui->drawMode->addItem("Shaded Flat", QVariant::fromValue(ImagingGLWidget::ShadedFlat));
-        d.ui->drawMode->addItem("Shaded Smooth", QVariant::fromValue(ImagingGLWidget::ShadedSmooth));
-        d.ui->drawMode->addItem("Geom Only", QVariant::fromValue(ImagingGLWidget::GeomOnly));
-        d.ui->drawMode->addItem("Geom Flat", QVariant::fromValue(ImagingGLWidget::GeomFlat));
-        d.ui->drawMode->addItem("Geom Smooth", QVariant::fromValue(ImagingGLWidget::GeomSmooth));
-        d.ui->drawMode->setCurrentIndex(d.ui->drawMode->findData(QVariant::fromValue(ImagingGLWidget::ShadedSmooth)));
-    }
     connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
     connect(d.ui->themeDark, &QAction::triggered, this, &ViewerPrivate::dark);
     {
@@ -336,11 +322,11 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settingsValue("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadType = StageModel::load_all;
+        d.loadMode = StageModel::All;
         d.ui->modeFull->setChecked(true);
     }
     else {
-        d.loadType = StageModel::load_payload;
+        d.loadMode = StageModel::Payload;
         d.ui->modePayload->setChecked(true);
     }
     QString theme = settingsValue("theme", "dark").toString();
@@ -359,7 +345,7 @@ ViewerPrivate::loadFile(const QString& filename)
 {
     QFileInfo fileInfo(filename);
     if (d.extensions.contains(fileInfo.suffix().toLower())) {
-        d.stageModel->loadFromFile(filename, d.loadType);
+        d.stageModel->loadFromFile(filename, d.loadMode);
         if (d.stageModel->isLoaded()) {
             d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(fileInfo.fileName()));
             setSettingsValue("openDir", QFileInfo(filename).absolutePath());
@@ -607,9 +593,6 @@ ViewerPrivate::close()
 void
 ViewerPrivate::ready()
 {
-    for (QString aov : renderer()->rendererAovs()) {
-        d.ui->aov->addItem(aov, QVariant::fromValue(aov));  // can only be requested after renderer is ready
-    }
 }
 
 void
@@ -833,18 +816,14 @@ ViewerPrivate::sceneMaterialsEnabled(bool checked)
 }
 
 void
-ViewerPrivate::drawModeChanged(int index)
+ViewerPrivate::wireframeChanged(bool checked)
 {
-    QVariant data = d.ui->drawMode->itemData(index);
-    ImagingGLWidget::DrawMode mode = static_cast<ImagingGLWidget::DrawMode>(data.toInt());
-    renderer()->setDrawMode(mode);
-}
-
-void
-ViewerPrivate::aovChanged(int index)
-{
-    QString aov = d.ui->aov->itemData(index, Qt::UserRole).value<QString>();
-    renderer()->setRendererAov(aov);
+    if (checked) {
+        renderer()->setDrawMode(ImagingGLWidget::DrawMode::WireframeOnSurface);
+    }
+    else {
+        renderer()->setDrawMode(ImagingGLWidget::DrawMode::ShadedSmooth);
+    }
 }
 
 void

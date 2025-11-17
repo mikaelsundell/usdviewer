@@ -50,6 +50,9 @@ SelectionModel::addPaths(const QList<SdfPath>& paths)
 void
 SelectionModel::replacePaths(const QList<SdfPath>& paths)
 {
+    if (p->d.paths == paths)
+        return;
+    
     p->d.paths = paths;
     Q_EMIT selectionChanged(p->d.paths);
 }

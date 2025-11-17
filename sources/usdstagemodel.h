@@ -17,14 +17,14 @@ class StageModelPrivate;
 class StageModel : public QObject {
     Q_OBJECT
 public:
-    enum load_type { load_all, load_payload };
+    enum LoadMode { All, Payload };
 
 public:
     StageModel();
-    StageModel(const QString& filename, load_type loadtype = load_type::load_all);
+    StageModel(const QString& filename, LoadMode loadmode = LoadMode::All);
     StageModel(const StageModel& other);
     ~StageModel();
-    bool loadFromFile(const QString& filename, load_type loadType);
+    bool loadFromFile(const QString& filename, LoadMode loadMode);
     bool loadPayloads(const QList<SdfPath>& paths);
     bool unloadPayloads(const QList<SdfPath>& paths);
     bool saveToFile(const QString& filename);
@@ -35,7 +35,7 @@ public:
     bool isLoaded() const;
     void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive = false);
     void setMask(const QList<SdfPath>& paths);
-    load_type loadType() const;
+    LoadMode loadMode() const;
     GfBBox3d boundingBox();
     GfBBox3d boundingBox(const QList<SdfPath> paths);
     QString filename() const;

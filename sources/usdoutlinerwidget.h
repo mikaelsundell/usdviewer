@@ -31,6 +31,7 @@ public:
     void setFilter(const QString& filter);
 
 protected:
+    void contextMenuEvent(QContextMenuEvent* event);
     void keyPressEvent(QKeyEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;

@@ -7,6 +7,7 @@
 #include <QThreadPool>
 #include <QVariant>
 #include <QtConcurrent>
+#include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/metrics.h>
 
@@ -17,7 +18,7 @@ public:
     StageModelPrivate();
     ~StageModelPrivate();
     bool loadFromFile(const QString& filename, StageModel::LoadMode loadMode);
-    bool loadPayloads(const QList<SdfPath>& paths);
+    bool loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet, const std::string& variantValue);
     bool unloadPayloads(const QList<SdfPath>& paths);
     bool saveToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
@@ -28,6 +29,7 @@ public:
     void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive);
     GfBBox3d boundingBox();
     GfBBox3d boundingBox(const QList<SdfPath> paths);
+    std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive);
 
 public:
     void primsChanged(const QList<SdfPath> paths);
@@ -87,62 +89,84 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::LoadMode lo
 }
 
 bool
-StageModelPrivate::loadPayloads(const QList<SdfPath>& paths)
+StageModelPrivate::loadPayloads(const QList<SdfPath>& paths,
+                                const std::string& variantSet,
+                                const std::string& variantValue)
 {
     if (!isLoaded())
         return false;
 
+    const bool useVariant = (!variantSet.empty() && !variantValue.empty());
+
     Q_EMIT d.stageModel->payloadsRequested(paths);
 
     auto stage = d.stage;
-    auto pool = &d.pool;
-    QFuture<void> future = QtConcurrent::run(pool, [this, stage, paths]() {
-        QList<SdfPath> failed;
+    auto pool  = &d.pool;
+    QFuture<void> future = QtConcurrent::run(pool, [this, stage, paths, variantSet, variantValue, useVariant]() {
         QList<SdfPath> loaded;
+        QList<SdfPath> failed;
         {
             QWriteLocker locker(&d.stageLock);
             for (const SdfPath& path : paths) {
                 UsdPrim prim = stage->GetPrimAtPath(path);
                 if (!prim) {
                     failed.append(path);
-                    continue;
-                }
-                if (prim.IsLoaded()) {
-                    loaded.append(path);
-                    Q_EMIT d.stageModel->payloadsLoaded(path);
+                    Q_EMIT d.stageModel->payloadsFailed(path);
                     continue;
                 }
                 try {
+                    if (useVariant) {
+                        if (prim.IsLoaded())
+                            prim.Unload();
+
+                        UsdVariantSet vs = prim.GetVariantSet(variantSet);
+                        if (!vs.IsValid()) {
+                            failed.append(path);
+                            Q_EMIT d.stageModel->payloadsFailed(path);
+                            continue;
+                        }
+                        auto values = vs.GetVariantNames();
+                        if (std::find(values.begin(), values.end(), variantValue) == values.end()) {
+                            failed.append(path);
+                            Q_EMIT d.stageModel->payloadsFailed(path);
+                            continue;
+                        }
+                        vs.SetVariantSelection(variantValue);
+                    }
+
+                    if (prim.IsLoaded()) {
+                        loaded.append(path);
+                        Q_EMIT d.stageModel->payloadsLoaded(path);
+                        continue;
+                    }
+                    
                     prim.Load();
                     loaded.append(path);
                     Q_EMIT d.stageModel->payloadsLoaded(path);
-                } catch (const std::exception& e) {
-                    qWarning() << "failed to load prim:" << QString::fromStdString(path.GetString())
-                               << "error:" << e.what();
-                    Q_EMIT d.stageModel->payloadsFailed(path);
+                }
+                catch (const std::exception& e) {
                     failed.append(path);
+                    Q_EMIT d.stageModel->payloadsFailed(path);
                 }
             }
         }
-
-        QMetaObject::invokeMethod(
-            d.stageModel,
-            [this, loaded]() {
-                if (!loaded.isEmpty()) {
+        if (!loaded.isEmpty()) {
+            QMetaObject::invokeMethod(
+                d.stageModel,
+                [this, loaded]() {
                     {
                         QWriteLocker locker(&d.stageLock);
-                        d.bboxCache.reset(new UsdGeomBBoxCache(UsdTimeCode::Default(),
-                                                               UsdGeomImageable::GetOrderedPurposeTokens(),
-                                                               true));  // use extents hint
-                        GfBBox3d bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
-                        d.bbox = bbox;
+                        d.bboxCache.reset(new UsdGeomBBoxCache(
+                            UsdTimeCode::Default(),
+                            UsdGeomImageable::GetOrderedPurposeTokens(),
+                            true));
+                        d.bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
                     }
                     primsChanged(loaded);
-                }
-            },
-            Qt::QueuedConnection);
+                },
+                Qt::QueuedConnection);
+        }
     });
-
     return true;
 }
 
@@ -306,11 +330,18 @@ StageModelPrivate::setVisible(const QList<SdfPath>& paths, bool visible, bool re
                     UsdGeomImageable childImageable(child);
                     if (!childImageable)
                         continue;
-                    if (visible)
-                        childImageable.MakeVisible();
-                    else
-                        childImageable.MakeInvisible();
-                    affected.append(child.GetPath());
+
+                    TfToken currentVis;
+                    childImageable.GetVisibilityAttr().Get(&currentVis);
+                    TfToken desiredVis = visible ? UsdGeomTokens->inherited : UsdGeomTokens->invisible;
+
+                    if (currentVis != desiredVis) {
+                        if (visible)
+                            childImageable.MakeVisible();
+                        else
+                            childImageable.MakeInvisible();
+                        affected.append(child.GetPath());
+                    }
                 }
             }
         }
@@ -364,6 +395,79 @@ StageModelPrivate::boundingBox(const QList<SdfPath> paths)
         bbox = GfBBox3d::Combine(bbox, worldbbox);
     }
     return bbox;
+}
+
+std::map<std::string, std::vector<std::string>>
+StageModelPrivate::variantSets(const QList<SdfPath>& paths, bool recursive)
+{
+    QReadLocker locker(&d.stageLock);
+
+    std::map<std::string, std::vector<std::string>> result;
+
+    std::vector<SdfPath> filtered;
+    for (const SdfPath& p : paths) {
+        bool isChild = false;
+        for (const SdfPath& other : paths) {
+            if (p == other) continue;
+            if (p.HasPrefix(other)) {
+                isChild = true;
+                break;
+            }
+        }
+        if (!isChild)
+            filtered.push_back(p);
+    }
+
+    std::vector<UsdPrim> prims;
+
+    for (const SdfPath& path : filtered) {
+        UsdPrim root = d.stage->GetPrimAtPath(path);
+
+        if (!root) {
+            continue;
+        }
+        auto countChildren = [](const UsdPrim& prim) {
+            size_t n = 0;
+            for (const auto& c : prim.GetAllChildren())
+                n++;
+            return n;
+        };
+        prims.push_back(root);
+        if (recursive) {
+            std::stack<UsdPrim> stack;
+            stack.push(root);
+            while (!stack.empty()) {
+                UsdPrim p = stack.top();
+                stack.pop();
+                size_t numChildren = countChildren(p);
+                for (const UsdPrim& child : p.GetAllChildren()) {
+                    prims.push_back(child);
+                    stack.push(child);
+                }
+            }
+        }
+    }
+    for (const UsdPrim& prim : prims) {
+        if (!prim)
+            continue;
+
+        auto sets = prim.GetVariantSets().GetNames();
+
+        for (const std::string& setName : sets) {
+            UsdVariantSet vs = prim.GetVariantSet(setName);
+            auto values = vs.GetVariantNames();
+
+            auto& bucket = result[setName];
+            bucket.insert(bucket.end(), values.begin(), values.end());
+        }
+    }
+    for (auto& it : result) {
+        auto& vec = it.second;
+        std::sort(vec.begin(), vec.end());
+        vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
+    }
+
+    return result;
 }
 
 void
@@ -426,9 +530,9 @@ StageModel::loadFromFile(const QString& filename, LoadMode loadMode)
 }
 
 bool
-StageModel::loadPayloads(const QList<SdfPath>& paths)
+StageModel::loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet, const std::string& variantValue)
 {
-    return p->loadPayloads(paths);
+    return p->loadPayloads(paths, variantSet, variantValue);
 }
 
 bool
@@ -502,6 +606,12 @@ GfBBox3d
 StageModel::boundingBox(const QList<SdfPath> paths)
 {
     return p->boundingBox(paths);
+}
+
+std::map<std::string, std::vector<std::string>>
+StageModel::variantSets(const QList<SdfPath>& paths, bool recursive)
+{
+    return p->variantSets(paths, recursive);
 }
 
 QString

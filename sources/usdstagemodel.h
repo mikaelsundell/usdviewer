@@ -25,7 +25,8 @@ public:
     StageModel(const StageModel& other);
     ~StageModel();
     bool loadFromFile(const QString& filename, LoadMode loadMode);
-    bool loadPayloads(const QList<SdfPath>& paths);
+    bool loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet = std::string(),
+                      const std::string& variantValue = std::string());
     bool unloadPayloads(const QList<SdfPath>& paths);
     bool saveToFile(const QString& filename);
     bool exportToFile(const QString& filename);
@@ -38,6 +39,7 @@ public:
     LoadMode loadMode() const;
     GfBBox3d boundingBox();
     GfBBox3d boundingBox(const QList<SdfPath> paths);
+    std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive = false);
     QString filename() const;
     UsdStageRefPtr stage() const;
     QReadWriteLock* stageLock() const;

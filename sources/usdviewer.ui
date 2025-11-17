@@ -675,10 +675,38 @@
      <addaction name="editHideSelected"/>
      <addaction name="editHideRecursive"/>
     </widget>
+    <widget class="QMenu" name="menuLoad">
+     <property name="title">
+      <string>Load</string>
+     </property>
+     <addaction name="separator"/>
+     <addaction name="editLoadSelected"/>
+     <addaction name="editLoadRecursive"/>
+     <addaction name="separator"/>
+     <addaction name="editLoadVariant1"/>
+     <addaction name="editLoadVariant2"/>
+     <addaction name="editLoadVariant3"/>
+     <addaction name="editLoadVariant4"/>
+     <addaction name="editLoadVariant5"/>
+     <addaction name="editLoadVariant6"/>
+     <addaction name="editLoadVariant7"/>
+     <addaction name="editLoadVariant8"/>
+     <addaction name="editLoadVariant9"/>
+    </widget>
+    <widget class="QMenu" name="menuUnload">
+     <property name="title">
+      <string>Unload</string>
+     </property>
+     <addaction name="editUnloadSelected"/>
+     <addaction name="editUnloadRecursive"/>
+    </widget>
     <addaction name="editCopyImage"/>
     <addaction name="separator"/>
     <addaction name="menu_2"/>
     <addaction name="menu"/>
+    <addaction name="separator"/>
+    <addaction name="menuLoad"/>
+    <addaction name="menuUnload"/>
     <addaction name="separator"/>
     <addaction name="editDelete"/>
    </widget>
@@ -796,9 +824,6 @@
    <property name="text">
     <string>Low</string>
    </property>
-   <property name="shortcut">
-    <string>1</string>
-   </property>
   </action>
   <action name="asComplexityMedium">
    <property name="checkable">
@@ -806,9 +831,6 @@
    </property>
    <property name="text">
     <string>Medium</string>
-   </property>
-   <property name="shortcut">
-    <string>2</string>
    </property>
   </action>
   <action name="asComplexityHigh">
@@ -818,9 +840,6 @@
    <property name="text">
     <string>High</string>
    </property>
-   <property name="shortcut">
-    <string>3</string>
-   </property>
   </action>
   <action name="asComplexityVeryHigh">
    <property name="checkable">
@@ -828,9 +847,6 @@
    </property>
    <property name="text">
     <string>Very high</string>
-   </property>
-   <property name="shortcut">
-    <string>4</string>
    </property>
   </action>
   <action name="editDelete">
@@ -997,6 +1013,110 @@
   <action name="fileSaveAs">
    <property name="text">
     <string>Save as ...</string>
+   </property>
+  </action>
+  <action name="editLoadVariant1">
+   <property name="text">
+    <string>Variant 1</string>
+   </property>
+   <property name="shortcut">
+    <string>1</string>
+   </property>
+  </action>
+  <action name="editLoadVariant2">
+   <property name="text">
+    <string>Variant 2</string>
+   </property>
+   <property name="shortcut">
+    <string>2</string>
+   </property>
+  </action>
+  <action name="editLoadVariant3">
+   <property name="text">
+    <string>Variant 3</string>
+   </property>
+   <property name="shortcut">
+    <string>3</string>
+   </property>
+  </action>
+  <action name="editLoadVariant4">
+   <property name="text">
+    <string>Variant 4</string>
+   </property>
+   <property name="shortcut">
+    <string>4</string>
+   </property>
+  </action>
+  <action name="editLoadVariant5">
+   <property name="text">
+    <string>Variant 5</string>
+   </property>
+   <property name="shortcut">
+    <string>5</string>
+   </property>
+  </action>
+  <action name="editLoadVariant6">
+   <property name="text">
+    <string>Variant 6</string>
+   </property>
+   <property name="shortcut">
+    <string>6</string>
+   </property>
+  </action>
+  <action name="editLoadVariant7">
+   <property name="text">
+    <string>Variant 7</string>
+   </property>
+   <property name="shortcut">
+    <string>7</string>
+   </property>
+  </action>
+  <action name="editLoadVariant8">
+   <property name="text">
+    <string>Variant 8</string>
+   </property>
+   <property name="shortcut">
+    <string>8</string>
+   </property>
+  </action>
+  <action name="editLoadVariant9">
+   <property name="text">
+    <string>Variant 9</string>
+   </property>
+   <property name="shortcut">
+    <string>9</string>
+   </property>
+  </action>
+  <action name="editLoadSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>L</string>
+   </property>
+  </action>
+  <action name="editUnloadSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>U</string>
+   </property>
+  </action>
+  <action name="editUnloadRecursive">
+   <property name="text">
+    <string>Recursive</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+U</string>
+   </property>
+  </action>
+  <action name="editLoadRecursive">
+   <property name="text">
+    <string>Recursive</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+L</string>
    </property>
   </action>
  </widget>

@@ -69,6 +69,11 @@ public Q_SLOTS:
     void showRecursive();
     void hideSelected();
     void hideRecursive();
+    void loadSelected();
+    void loadRecursive();
+    void loadVariant(int variant);
+    void unloadSelected();
+    void unloadRecursive();
     void isolate(bool checked);
     void frameAll();
     void frameSelected();
@@ -199,6 +204,19 @@ ViewerPrivate::init()
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
     connect(d.ui->editHideRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
+    connect(d.ui->editLoadSelected, &QAction::triggered, this, &ViewerPrivate::loadSelected);
+    connect(d.ui->editLoadRecursive, &QAction::triggered, this, &ViewerPrivate::loadRecursive);
+    connect(d.ui->editLoadVariant1, &QAction::triggered, this, [=]() { loadVariant(0); });
+    connect(d.ui->editLoadVariant2, &QAction::triggered, this, [=]() { loadVariant(1); });
+    connect(d.ui->editLoadVariant3, &QAction::triggered, this, [=]() { loadVariant(2); });
+    connect(d.ui->editLoadVariant4, &QAction::triggered, this, [=]() { loadVariant(3); });
+    connect(d.ui->editLoadVariant5, &QAction::triggered, this, [=]() { loadVariant(4); });
+    connect(d.ui->editLoadVariant6, &QAction::triggered, this, [=]() { loadVariant(5); });
+    connect(d.ui->editLoadVariant7, &QAction::triggered, this, [=]() { loadVariant(7); });
+    connect(d.ui->editLoadVariant8, &QAction::triggered, this, [=]() { loadVariant(8); });
+    connect(d.ui->editLoadVariant9, &QAction::triggered, this, [=]() { loadVariant(9); });
+    connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
+    connect(d.ui->editUnloadRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
     connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
     connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
     connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
@@ -365,17 +383,12 @@ ViewerPrivate::loadFile(const QString& filename)
         setSettingsValue("openDir", fileInfo.absolutePath());
         updateRecentFiles(filename);
 
-        updateStatus(
-            QString("Loaded %1 in %2 seconds")
-                .arg(shortName)
-                .arg(QString::number(elapsedSec, 'f', 2)),
-            false);
+        updateStatus(QString("Loaded %1 in %2 seconds").arg(shortName).arg(QString::number(elapsedSec, 'f', 2)), false);
 
         return true;
-    } else {
-        updateStatus(
-            QString("Failed to load file: %1").arg(fileInfo.fileName()),
-            true);
+    }
+    else {
+        updateStatus(QString("Failed to load file: %1").arg(fileInfo.fileName()), true);
         return false;
     }
 }
@@ -611,8 +624,7 @@ ViewerPrivate::close()
 
 void
 ViewerPrivate::ready()
-{
-}
+{}
 
 void
 ViewerPrivate::copyImage()
@@ -747,6 +759,36 @@ ViewerPrivate::hideRecursive()
     if (selectionModel()->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), false, true);
     }
+}
+
+void
+ViewerPrivate::loadSelected()
+{
+    qDebug() << "loadSelected";
+}
+
+void
+ViewerPrivate::loadRecursive()
+{
+    qDebug() << "loadRecursive";
+}
+
+void
+ViewerPrivate::loadVariant(int variant)
+{
+    qDebug() << "loadVariant";
+}
+
+void
+ViewerPrivate::unloadSelected()
+{
+    qDebug() << "unloadSelected";
+}
+
+void
+ViewerPrivate::unloadRecursive()
+{
+    qDebug() << "unloadRecursive";
 }
 
 void
@@ -935,9 +977,7 @@ ViewerPrivate::updateStatus(const QString& message, bool error)
     QString text = error ? QString(" error: %1").arg(message) : QString(" %1").arg(message);
     int timeoutMs = 4000;
     bar->showMessage(text, timeoutMs);
-    QTimer::singleShot(timeoutMs, bar, [bar]() {
-        bar->showMessage(" Ready.");
-    });
+    QTimer::singleShot(timeoutMs, bar, [bar]() { bar->showMessage(" Ready."); });
 }
 
 #include "usdviewer.moc"

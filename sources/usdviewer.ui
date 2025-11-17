@@ -472,7 +472,7 @@
             <disabledoff>:/icons/resources/CollapseDisabled.png</disabledoff>:/icons/resources/Collapse.png</iconset>
           </property>
           <property name="shortcut">
-           <string>C</string>
+           <string/>
           </property>
          </widget>
         </item>
@@ -490,7 +490,7 @@
             <disabledoff>:/icons/resources/ExpandDisabled.png</disabledoff>:/icons/resources/Expand.png</iconset>
           </property>
           <property name="shortcut">
-           <string>E</string>
+           <string/>
           </property>
          </widget>
         </item>

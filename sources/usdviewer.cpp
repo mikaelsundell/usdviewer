@@ -911,7 +911,8 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
     if (paths.size()) {
         d.ui->displayExpand->setEnabled(true);
         d.ui->displayIsolate->setEnabled(true);
-    } else {
+    }
+    else {
         d.ui->displayExpand->setEnabled(false);
         d.ui->displayIsolate->setEnabled(false);
     }

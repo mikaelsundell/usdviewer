@@ -44,7 +44,7 @@ public:
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
     void wheelEvent(QWheelEvent* event);
-    
+
 public Q_SLOTS:
     void loaded(const QString& filename);
     void selectionChanged(const QList<SdfPath>& paths);
@@ -399,17 +399,12 @@ ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
     QPointF mousePosDevice = event->pos() * deviceRatio;
     GfVec4d viewport = widgetViewport();
 
-    GfVec2d pos(
-        (mousePosDevice.x() - viewport[0]) / static_cast<double>(viewport[2]),
-        (mousePosDevice.y() - viewport[1]) / static_cast<double>(viewport[3])
-    );
+    GfVec2d pos((mousePosDevice.x() - viewport[0]) / static_cast<double>(viewport[2]),
+                (mousePosDevice.y() - viewport[1]) / static_cast<double>(viewport[3]));
     pos[0] = pos[0] * 2.0 - 1.0;
     pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
 
-    GfVec2d size(
-        1.0 / static_cast<double>(viewport[2]),
-        1.0 / static_cast<double>(viewport[3])
-    );
+    GfVec2d size(1.0 / static_cast<double>(viewport[2]), 1.0 / static_cast<double>(viewport[3]));
 
     GfCamera camera = d.viewCamera.camera();
     GfFrustum frustum = camera.GetFrustum();
@@ -418,25 +413,13 @@ ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
     GfVec3d hitPoint, hitNormal;
     SdfPath hitPrimPath, hitInstancerPath;
 
-    bool hit = d.glEngine->TestIntersection(
-        pickFrustum.ComputeViewMatrix(),
-        pickFrustum.ComputeProjectionMatrix(),
-        d.stageModel->stage()->GetPseudoRoot(),
-        d.params,
-        &hitPoint,
-        &hitNormal,
-        &hitPrimPath,
-        &hitInstancerPath);
+    bool hit = d.glEngine->TestIntersection(pickFrustum.ComputeViewMatrix(), pickFrustum.ComputeProjectionMatrix(),
+                                            d.stageModel->stage()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
+                                            &hitPrimPath, &hitInstancerPath);
 
     if (hit) {
-        qDebug() << "Focus set to hit point:"
-                 << hitPoint[0] << hitPoint[1] << hitPoint[2]
-                 << "on prim" << QString::fromStdString(hitPrimPath.GetString());
-
         d.viewCamera.setFocusPoint(hitPoint);
         d.glwidget->update();
-    } else {
-        qDebug() << "No hit under cursor for focus event.";
     }
 }
 
@@ -446,28 +429,27 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     d.glwidget->makeCurrent();
     if (!d.stageModel || !d.stageModel->isLoaded() || !d.glEngine)
         return;
-    
+
 #ifdef WIN32
     glDepthMask(GL_TRUE);
 #endif
     QPoint tl = deviceRatio(rect.topLeft());
     QPoint br = deviceRatio(rect.bottomRight());
 
-    if (br.x() < tl.x()) std::swap(tl.rx(), br.rx());
-    if (br.y() < tl.y()) std::swap(tl.ry(), br.ry());
+    if (br.x() < tl.x())
+        std::swap(tl.rx(), br.rx());
+    if (br.y() < tl.y())
+        std::swap(tl.ry(), br.ry());
     const QRect r(tl, br);
-    
+
     GfVec4d viewport = widgetViewport();
 
-    GfVec2d center(
-        ((r.left() + r.right()) * 0.5 - viewport[0]) / static_cast<double>(viewport[2]),
-        ((r.top()  + r.bottom())* 0.5 - viewport[1]) / static_cast<double>(viewport[3]));
+    GfVec2d center(((r.left() + r.right()) * 0.5 - viewport[0]) / static_cast<double>(viewport[2]),
+                   ((r.top() + r.bottom()) * 0.5 - viewport[1]) / static_cast<double>(viewport[3]));
     center[0] = center[0] * 2.0 - 1.0;
     center[1] = -1.0 * (center[1] * 2.0 - 1.0);
 
-    GfVec2d size(
-        static_cast<double>(r.width())  / viewport[2],
-        static_cast<double>(r.height()) / viewport[3]);
+    GfVec2d size(static_cast<double>(r.width()) / viewport[2], static_cast<double>(r.height()) / viewport[3]);
 
     const bool click = (r.width() < 3 && r.height() < 3);
 
@@ -479,13 +461,9 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     GfFrustum pickFr = fr.ComputeNarrowedFrustum(center, size);
 
     UsdImagingGLEngine::IntersectionResultVector results;
-    const bool hit = d.glEngine->TestIntersection(
-        pickParams,
-        pickFr.ComputeViewMatrix(),
-        pickFr.ComputeProjectionMatrix(),
-        d.stageModel->stage()->GetPseudoRoot(),
-        d.params,
-        &results);
+    const bool hit = d.glEngine->TestIntersection(pickParams, pickFr.ComputeViewMatrix(),
+                                                  pickFr.ComputeProjectionMatrix(),
+                                                  d.stageModel->stage()->GetPseudoRoot(), d.params, &results);
 
     QList<SdfPath> selectedPaths;
     if (hit) {
@@ -496,12 +474,12 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {
             d.selectionModel->togglePaths(selectedPaths);
-        } else {
+        }
+        else {
             d.selectionModel->replacePaths(selectedPaths);
         }
     }
-    else
-    {
+    else {
         d.selectionModel->clear();
     }
     d.glwidget->update();

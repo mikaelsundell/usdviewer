@@ -31,7 +31,7 @@ public:
 
     double aspectRatio() const;
     void setAspectRatio(double aspectRatio);
-    
+
     GfVec3d focusPoint() const;
     void setFocusPoint(const GfVec3d& point);
 

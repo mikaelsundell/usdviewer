@@ -166,6 +166,7 @@ QTreeView
 {
     font-size: $defaultsize;
     color: $text;
+    outline: none;
     background-color: $base;
     selection-background-color: $highlight;
     alternate-background-color: $base;
@@ -180,8 +181,8 @@ QTreeView QHeaderView:section
 }
 
 QTreeView::indicator {
-    width: 18px;
-    height: 18px;
+    width: 12px;
+    height: 12px;
     background-color: $basealt;
     border: 1px solid $border;
 }
@@ -194,7 +195,27 @@ QTreeView::indicator:indeterminate {
     image: url(":/icons/resources/PartiallyChecked.png");
 }
 
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:has-children:has-siblings:closed {
+    image: url(":/icons/resources/Closed.png");
+    background: transparent;    
+}
+
+QTreeView::branch:has-children:!has-siblings:open,
+QTreeView::branch:has-children:has-siblings:open {
+    image: url(":/icons/resources/Open.png");
+    background: transparent;    
+}
+
 QTreeView::item {
-    height: 26px;
-    padding: 4px;
+    height: 32px;
+    background: $base;
+}
+
+QTreeView::item:alternate {
+    background: $basealt;
+}
+
+QTreeView::item:selected:active {
+    background: $highlight;
 }

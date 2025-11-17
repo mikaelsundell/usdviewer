@@ -42,8 +42,8 @@ source_group ("Resource Files" FILES ${project_resources})
 
 set (project_copyright "Copyright 2025-present Contributors to the ${project_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
-set (project_long_version "1.2.57")
-set (project_short_version "1.2")
+set (project_long_version "1.3.2")
+set (project_short_version "1.3")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
 if (APPLE)

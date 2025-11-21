@@ -160,7 +160,7 @@ Stylesheet::setTheme(Theme theme)
     else {
         map(Base, QColor::fromHsl(0, 0, 220));
         map(BaseAlt, QColor::fromHsl(0, 0, 180));
-        map(Dock, QColor::fromHsl(0, 0, 200));
+        map(Dock, QColor::fromHsl(0, 0, 210));
         map(DockAlt, QColor::fromHsl(0, 0, 180));
         map(Accent, QColor::fromHsl(210, 10, 92));
         map(AccentAlt, QColor::fromHsl(210, 10, 88));

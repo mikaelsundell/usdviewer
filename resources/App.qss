@@ -85,7 +85,8 @@ QDockWidget {
     background: $dock;
 }
 
-QWidget#dockWidgetContents {
+QWidget#leftDockWidgetContents,
+QWidget#rightDockWidgetContents {
     background: $dock;
 }
 

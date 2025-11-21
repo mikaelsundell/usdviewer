@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1280</width>
+    <width>1576</width>
     <height>800</height>
    </rect>
   </property>
@@ -423,7 +423,7 @@
    <attribute name="dockWidgetArea">
     <number>1</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents">
+   <widget class="QWidget" name="leftDockWidgetContents">
     <layout class="QVBoxLayout" name="verticalLayout_4">
      <property name="topMargin">
       <number>8</number>
@@ -611,7 +611,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1280</width>
+     <width>1576</width>
      <height>22</height>
     </rect>
    </property>
@@ -755,6 +755,108 @@
    <addaction name="menuDisplay"/>
    <addaction name="menuView"/>
    <addaction name="menuHelp"/>
+  </widget>
+  <widget class="usd::DockWidget" name="dockWidget">
+   <property name="minimumSize">
+    <size>
+     <width>400</width>
+     <height>387</height>
+    </size>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="rightDockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout_7">
+     <property name="topMargin">
+      <number>8</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item>
+      <widget class="QWidget" name="widget_5" native="true">
+       <layout class="QVBoxLayout" name="verticalLayout_8">
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Payloads</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QProgressBar" name="progressBar">
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>0</number>
+          </property>
+          <property name="textVisible">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="usd::PayloadWidget" name="payloadWidget">
+          <column>
+           <property name="text">
+            <string notr="true">1</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_5">
+          <property name="text">
+           <string>Time: 00:00:00 (Files: 0 / 0, 0 MB loaded)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="widget_6" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>0</height>
+           </size>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_5">
+           <item>
+            <widget class="QPushButton" name="pushButton">
+             <property name="text">
+              <string>Cancel</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_3">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButton_2">
+             <property name="text">
+              <string>Clear</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </widget>
   </widget>
   <action name="displayFrameAll">
    <property name="text">
@@ -1165,6 +1267,11 @@
    <class>usd::InspectorWidget</class>
    <extends>QTreeWidget</extends>
    <header>../../../sources/usdinspectorwidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>usd::PayloadWidget</class>
+   <extends>QTreeWidget</extends>
+   <header>../../../sources/usdpayloadwidget.h</header>
   </customwidget>
  </customwidgets>
  <resources>

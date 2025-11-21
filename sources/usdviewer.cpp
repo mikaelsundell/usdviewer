@@ -9,6 +9,7 @@
 #include "stylesheet.h"
 #include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
+#include "usdpayloadwidget.h"
 #include "usdpayloaddialog.h"
 #include "usdstagemodel.h"
 #include <QActionGroup>
@@ -41,6 +42,7 @@ public:
     ImagingGLWidget* renderer();
     InspectorWidget* inspector();
     OutlinerWidget* outliner();
+    PayloadWidget* payload();
     StageModel* stageModel();
     SelectionModel* selectionModel();
     bool eventFilter(QObject* object, QEvent* event);
@@ -157,19 +159,20 @@ ViewerPrivate::init()
     renderer()->setSelectionModel(d.selectionModel.data());
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
-                                            << "Type"
-                                            << "Vis");
+                                              << "Type"
+                                              << "Vis");
     outliner()->setStageModel(d.stageModel.data());
     outliner()->setSelectionModel(d.selectionModel.data());
     // inspector
     inspector()->setHeaderLabels(QStringList() << "Name"
-                                            << "Value");
+                                               << "Value");
     inspector()->setStageModel(d.stageModel.data());
     inspector()->setSelectionModel(d.selectionModel.data());
     // payload
-    d.payloadDialog = new PayloadDialog(d.viewer);
-    d.payloadDialog->setStageModel(d.stageModel.data());
-    d.payloadDialog->setSelectionModel(d.selectionModel.data());
+    payload()->setHeaderLabels(QStringList() << "Name"
+                                             << "Filename");
+    payload()->setStageModel(d.stageModel.data());
+    payload()->setSelectionModel(d.selectionModel.data());
     // connect
     connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
@@ -415,6 +418,12 @@ OutlinerWidget*
 ViewerPrivate::outliner()
 {
     return d.ui->outlinerWidget;
+}
+
+PayloadWidget*
+ViewerPrivate::payload()
+{
+    return d.ui->payloadWidget;
 }
 
 StageModel*

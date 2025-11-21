@@ -5,13 +5,11 @@
 #include "platform.h"
 #include "test.h"
 #include "usdviewer.h"
-#include <QApplication>
-#include <QDir>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/setenv.h>
-
-#include <iostream>
+#include <QApplication>
+#include <QDir>
 
 int
 main(int argc, char* argv[])

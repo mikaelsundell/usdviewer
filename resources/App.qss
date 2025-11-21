@@ -5,15 +5,14 @@
 
 /* Top-level widgets */
 QMainWindow,
-QDialog,
-QDockWidget
+QDialog
 {
     font-size: $defaultsize;
     background-color: $base;
 }
 
 QMainWindow::separator {
-    background: $border;
+    background: $base;
     width: 6px;
 }
 
@@ -29,7 +28,7 @@ QCheckBox::indicator {
     width: 18px;
     height: 18px;
     background-color: $basealt;
-    border: 1px solid $border;
+    border: 1px solid $borderalt;
 }
 
 QCheckBox::indicator:checked {
@@ -80,6 +79,14 @@ QComboBox::item {
 
 QComboBox::item:selected {
     background: $highlight;
+}
+
+QDockWidget {
+    background: $dock;
+}
+
+QWidget#dockWidgetContents {
+    background: $dock;
 }
 
 QLabel
@@ -153,6 +160,93 @@ QPushButton:pressed
     );
 }
 
+QScrollBar:horizontal {
+    background: $base;
+    height: 16px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background: $scrollbar;
+    min-width: 40px;
+    border-radius: 4px;
+    margin: 4px 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: $scrollbar;
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: none;
+    width: 0;
+}
+
+QScrollBar::left-arrow:horizontal,
+QScrollBar::right-arrow:horizontal {
+    background: none;
+    width: 0;
+    height: 0;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
+QScrollBar:vertical {
+    background: $base;
+    width: 16px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background: $scrollbar;
+    min-width: 20px;
+    border-radius: 4px;
+    margin: 4px 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background:$scrollbar;;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: none;
+    height: 0;
+}
+
+QScrollBar::up-arrow:vertical,
+QScrollBar::down-arrow:vertical {
+    background: none;
+    width: 0;
+    height: 0;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QAbstractScrollArea::corner { 
+    background: $base;
+}
+
+QSplitter::handle {
+    background-color: $dock;
+    height: 5px;
+}
+
+QStatusBar {
+    font-size: $defaultsize;
+    color: $text;
+    background: $dock;
+}
+
 QTextBrowser
 {
     font-size: $defaultsize;
@@ -162,21 +256,41 @@ QTextBrowser
     alternate-background-color: $base;
 }
 
+QToolButton
+{
+    color: $text;
+    font-size: $defaultsize;
+    background-color: 
+    QLinearGradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 $button,
+        stop: 1.0 $buttonalt
+    );
+    height: 20px;     
+    border: 1px solid $borderalt;
+    border-radius: 0px;        
+    padding: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
 QTreeView
 {
     font-size: $defaultsize;
     color: $text;
     outline: none;
+    border: 0px;
     background-color: $base;
     selection-background-color: $highlight;
-    alternate-background-color: $base;
+    alternate-background-color: $highlight;
 }
 
 QTreeView QHeaderView:section
 {
+    font-size: $defaultsize;
     color: $text;
-    background-color: $basealt;
-    border: 1px solid $border;
+    background-color: $dockalt;
+    border: none;
     padding: 4px 6px;
 }
 
@@ -209,13 +323,7 @@ QTreeView::branch:has-children:has-siblings:open {
 
 QTreeView::item {
     height: 32px;
-    background: $base;
-}
-
-QTreeView::item:alternate {
-    background: $basealt;
-}
-
-QTreeView::item:selected:active {
-    background: $highlight;
+    font-size: $defaultsize;
+    color: $text;
+    border: none;
 }

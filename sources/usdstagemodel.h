@@ -4,11 +4,11 @@
 
 #pragma once
 
+#include <pxr/base/gf/bbox3d.h>
+#include <pxr/usd/usd/stage.h>
 #include <QExplicitlySharedDataPointer>
 #include <QObject>
 #include <QReadWriteLock>
-#include <pxr/base/gf/bbox3d.h>
-#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

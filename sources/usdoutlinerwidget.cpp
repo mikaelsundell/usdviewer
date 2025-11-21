@@ -6,15 +6,16 @@
 #include "usdoutlineritem.h"
 #include "usdselectionmodel.h"
 #include "usdutils.h"
-
+#include "stylesheet.h"
+#include <pxr/usd/usd/prim.h>
 #include <QApplication>
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QPainter>
 #include <QPointer>
 #include <QStyledItemDelegate>
 #include <QTimer>
-#include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -99,9 +100,19 @@ public:
                 }
                 return false;
             };
+
+            opt.state &= ~QStyle::State_HasFocus;
+            auto ss = Stylesheet::instance();
+            if (opt.state & QStyle::State_Selected) {
+                painter->fillRect(opt.rect, ss->color(Stylesheet::ColorRole::Highlight));
+            }
+
             if (hasSelectedChildren(item)) {
                 opt.font.setBold(true);
                 opt.font.setItalic(true);
+                painter->save();
+                painter->fillRect(opt.rect, ss->color(Stylesheet::ColorRole::HighlightAlt));
+                painter->restore();
             }
             QStyledItemDelegate::paint(painter, opt, index);
         }

@@ -7,7 +7,6 @@
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
-
 #include <QColor>
 
 GfVec4f

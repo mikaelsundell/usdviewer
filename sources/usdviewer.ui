@@ -21,7 +21,7 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="focusPolicy">
-    <enum>Qt::FocusPolicy::ClickFocus</enum>
+    <enum>Qt::ClickFocus</enum>
    </property>
    <property name="styleSheet">
     <string notr="true"/>
@@ -49,16 +49,16 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <property name="leftMargin">
-        <number>12</number>
+        <number>0</number>
        </property>
        <property name="topMargin">
-        <number>2</number>
+        <number>0</number>
        </property>
        <property name="rightMargin">
-        <number>12</number>
+        <number>0</number>
        </property>
        <property name="bottomMargin">
-        <number>12</number>
+        <number>0</number>
        </property>
        <item>
         <widget class="QWidget" name="widget_3" native="true">
@@ -88,7 +88,7 @@
            <number>8</number>
           </property>
           <property name="topMargin">
-           <number>8</number>
+           <number>4</number>
           </property>
           <item>
            <widget class="QPushButton" name="open">
@@ -129,7 +129,7 @@
           <item>
            <spacer name="horizontalSpacer">
             <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
+             <enum>Qt::Horizontal</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
@@ -190,10 +190,10 @@
           <string notr="true"/>
          </property>
          <property name="frameShape">
-          <enum>QFrame::Shape::NoFrame</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
+          <enum>QFrame::Raised</enum>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_3">
           <property name="spacing">
@@ -239,7 +239,13 @@
           <property name="leftMargin">
            <number>8</number>
           </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
           <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
            <number>0</number>
           </property>
           <item>
@@ -299,7 +305,7 @@
           <item>
            <spacer name="horizontalSpacer_2">
             <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
+             <enum>Qt::Horizontal</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
@@ -350,22 +356,40 @@
            </widget>
           </item>
           <item>
-           <widget class="QFrame" name="clearcolor">
+           <widget class="QWidget" name="widget_4" native="true">
             <property name="minimumSize">
              <size>
-              <width>30</width>
-              <height>16</height>
+              <width>32</width>
+              <height>32</height>
              </size>
             </property>
-            <property name="styleSheet">
-             <string notr="true"/>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::Shape::NoFrame</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Shadow::Plain</enum>
-            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_6">
+             <property name="topMargin">
+              <number>14</number>
+             </property>
+             <property name="bottomMargin">
+              <number>14</number>
+             </property>
+             <item>
+              <widget class="QFrame" name="clearColor">
+               <property name="minimumSize">
+                <size>
+                 <width>32</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">background-color: green;</string>
+               </property>
+               <property name="frameShape">
+                <enum>QFrame::StyledPanel</enum>
+               </property>
+               <property name="frameShadow">
+                <enum>QFrame::Raised</enum>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
          </layout>
@@ -405,7 +429,7 @@
       <number>8</number>
      </property>
      <property name="bottomMargin">
-      <number>8</number>
+      <number>0</number>
      </property>
      <item>
       <widget class="QWidget" name="filterWidget" native="true">
@@ -521,7 +545,7 @@
         <item>
          <widget class="QSplitter" name="splitter">
           <property name="orientation">
-           <enum>Qt::Orientation::Vertical</enum>
+           <enum>Qt::Vertical</enum>
           </property>
           <widget class="usd::OutlinerWidget" name="outlinerWidget">
            <property name="minimumSize">
@@ -542,7 +566,7 @@
             </font>
            </property>
            <property name="selectionMode">
-            <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+            <enum>QAbstractItemView::ExtendedSelection</enum>
            </property>
            <column>
             <property name="text">
@@ -588,7 +612,7 @@
      <x>0</x>
      <y>0</y>
      <width>1280</width>
-     <height>24</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuDisplay">

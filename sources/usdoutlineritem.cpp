@@ -3,10 +3,10 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdoutlineritem.h"
-#include <QPointer>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
+#include <QPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

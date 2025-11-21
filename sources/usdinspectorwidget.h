@@ -6,8 +6,8 @@
 
 #include "usdselectionmodel.h"
 #include "usdstagemodel.h"
-#include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
+#include <QTreeWidget>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

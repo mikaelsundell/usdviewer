@@ -3,14 +3,14 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
-#include "icctransform.h"
-#include "mouseevent.h"
-#include "platform.h"
-#include "stylesheet.h"
 #include "usdinspectoritem.h"
 #include "usdoutlineritem.h"
 #include "usdpayloaddialog.h"
 #include "usdstagemodel.h"
+#include "icctransform.h"
+#include "mouseevent.h"
+#include "platform.h"
+#include "stylesheet.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
@@ -140,9 +140,9 @@ ViewerPrivate::init()
     loadSettings();
     // clear color
     d.clearColor = QColor(settingsValue("clearColor", "#4f4f4f").toString());
-    d.ui->clearcolor->setStyleSheet("background-color: " + d.clearColor.name() + ";");
+    d.ui->clearColor->setStyleSheet("background-color: " + d.clearColor.name() + ";");
     d.clearColorFilter.reset(new MouseEvent);
-    d.ui->clearcolor->installEventFilter(d.clearColorFilter.data());
+    d.ui->clearColor->installEventFilter(d.clearColorFilter.data());
     // event filter
     d.viewer->installEventFilter(this);
     // models
@@ -640,7 +640,7 @@ ViewerPrivate::clearColor()
     QColor color = QColorDialog::getColor(d.clearColor, d.viewer.data(), "Select color");
     if (color.isValid()) {
         renderer()->setClearColor(color);
-        d.ui->clearcolor->setStyleSheet("background-color: " + color.name() + ";");
+        d.ui->clearColor->setStyleSheet("background-color: " + color.name() + ";");
         setSettingsValue("clearColor", color.name());
         d.clearColor = color;
     }

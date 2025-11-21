@@ -140,13 +140,16 @@ Stylesheet::setTheme(Theme theme)
     };
 
     if (theme == Dark) {
-        map(Base, QColor::fromHsl(220, 76, 6));
-        map(BaseAlt, QColor::fromHsl(220, 30, 12));
+        map(Base, QColor::fromHsl(220, 6, 48));
+        map(BaseAlt, QColor::fromHsl(220, 6, 52));
+        map(Dock, QColor::fromHsl(220, 6, 80));
+        map(DockAlt, QColor::fromHsl(220, 6, 40));
         map(Accent, QColor::fromHsl(220, 6, 20));
         map(AccentAlt, QColor::fromHsl(220, 6, 24));
         map(Text, QColor::fromHsl(0, 0, 180));
         map(TextDisabled, QColor::fromHsl(0, 0, 40));
-        map(Highlight, QColor::fromHsl(216, 82, 40));
+        map(Highlight, QColor::fromHsl(216, 82, 80));
+        map(HighlightAlt, QColor::fromHsl(216, 20, 60));
         map(Border, QColor::fromHsl(220, 3, 32));
         map(BorderAlt, QColor::fromHsl(220, 3, 64));
         map(Scrollbar, QColor::fromHsl(0, 0, 70));
@@ -157,11 +160,14 @@ Stylesheet::setTheme(Theme theme)
     else {
         map(Base, QColor::fromHsl(0, 0, 220));
         map(BaseAlt, QColor::fromHsl(0, 0, 180));
+        map(Dock, QColor::fromHsl(0, 0, 180));
+        map(DockAlt, QColor::fromHsl(0, 0, 160));
         map(Accent, QColor::fromHsl(210, 10, 92));
         map(AccentAlt, QColor::fromHsl(210, 10, 88));
         map(Text, QColor::fromHsl(0, 0, 15));
         map(TextDisabled, QColor::fromHsl(0, 0, 65));
         map(Highlight, QColor::fromHsl(210, 90, 120));
+        map(HighlightAlt, QColor::fromHsl(210, 60, 160));
         map(Border, QColor::fromHsl(0, 0, 200));
         map(BorderAlt, QColor::fromHsl(0, 0, 220));
         map(Scrollbar, QColor::fromHsl(0, 0, 85));

@@ -5,8 +5,6 @@
 #include "usdinspectorwidget.h"
 #include "usdinspectoritem.h"
 #include "usdselectionmodel.h"
-#include <QFileInfo>
-#include <QPointer>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/range3d.h>
@@ -22,7 +20,8 @@
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
-
+#include <QFileInfo>
+#include <QPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

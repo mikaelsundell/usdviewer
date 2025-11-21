@@ -3,16 +3,9 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdimagingglwidget.h"
-#include "platform.h"
 #include "usdutils.h"
 #include "usdviewcamera.h"
-#include <QColor>
-#include <QMouseEvent>
-#include <QObject>
-#include <QPainter>
-#include <QPen>
-#include <QPoint>
-#include <QPointer>
+#include "platform.h"
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/diagnostic.h>
@@ -25,6 +18,13 @@
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
+#include <QColor>
+#include <QMouseEvent>
+#include <QObject>
+#include <QPainter>
+#include <QPen>
+#include <QPoint>
+#include <QPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -249,7 +249,7 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.enableSceneLights = d.sceneLightsEnabled;
             d.params.enableSceneMaterials = d.sceneMaterialsEnabled;
             d.params.flipFrontFacing = true;
-            d.params.gammaCorrectColors = false;
+            d.params.gammaCorrectColors = true;
             d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;

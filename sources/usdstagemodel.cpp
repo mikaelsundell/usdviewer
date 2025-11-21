@@ -3,13 +3,14 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdstagemodel.h"
+#include <pxr/usd/usd/variantSets.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
+#include <pxr/usd/usdGeom/metrics.h>
 #include <QMap>
 #include <QThreadPool>
 #include <QVariant>
 #include <QtConcurrent>
-#include <pxr/usd/usd/variantSets.h>
-#include <pxr/usd/usdGeom/bboxCache.h>
-#include <pxr/usd/usdGeom/metrics.h>
+#include <stack>
 
 namespace usd {
 

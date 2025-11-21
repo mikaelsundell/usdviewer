@@ -4,7 +4,6 @@
 
 #include "usdviewcamera.h"
 #include "usdutils.h"
-#include <QDebug>
 #include <pxr/base/gf/frustum.h>
 #include <pxr/base/gf/range1d.h>
 #include <pxr/base/gf/rotation.h>

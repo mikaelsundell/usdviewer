@@ -5,7 +5,6 @@
 #pragma once
 
 #include <lcms2.h>
-
 #include <QImage>
 #include <QObject>
 #include <QPixmap>

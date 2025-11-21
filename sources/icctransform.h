@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include <lcms2.h>
 #include <QImage>
 #include <QObject>
 #include <QPixmap>
 #include <QScopedPointer>
+#include <lcms2.h>
 
 class ICCTransformPrivate;
 class ICCTransform : public QObject {

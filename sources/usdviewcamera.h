@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <pxr/usd/usdGeom/camera.h>
 #include <QExplicitlySharedDataPointer>
 #include <QObject>
+#include <pxr/usd/usdGeom/camera.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

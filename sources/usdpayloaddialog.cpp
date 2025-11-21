@@ -3,6 +3,10 @@
 // https://github.com/mikaelsundell/specviz
 
 #include "usdpayloaddialog.h"
+#include <QDir>
+#include <QFileInfo>
+#include <QPointer>
+#include <QTimer>
 #include <pxr/usd/ar/resolver.h>
 #include <pxr/usd/pcp/arc.h>
 #include <pxr/usd/sdf/payload.h>
@@ -10,10 +14,6 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primCompositionQuery.h>
 #include <pxr/usd/usd/stage.h>
-#include <QDir>
-#include <QFileInfo>
-#include <QPointer>
-#include <QTimer>
 
 // generated files
 #include "ui_usdpayloaddialog.h"

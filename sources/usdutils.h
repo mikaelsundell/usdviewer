@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <QOpenGLFunctions>
 #include <pxr/base/gf/frustum.h>
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/quaternion.h>
@@ -16,7 +17,6 @@
 #include <pxr/usd/usd/timeCode.h>
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usdImaging/usdImagingGL/renderParams.h>
-#include <QOpenGLFunctions>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

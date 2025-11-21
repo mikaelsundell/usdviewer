@@ -3,9 +3,16 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdimagingglwidget.h"
+#include "platform.h"
 #include "usdutils.h"
 #include "usdviewcamera.h"
-#include "platform.h"
+#include <QColor>
+#include <QMouseEvent>
+#include <QObject>
+#include <QPainter>
+#include <QPen>
+#include <QPoint>
+#include <QPointer>
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/diagnostic.h>
@@ -18,13 +25,6 @@
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
-#include <QColor>
-#include <QMouseEvent>
-#include <QObject>
-#include <QPainter>
-#include <QPen>
-#include <QPoint>
-#include <QPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -181,6 +181,12 @@ ImagingGLWidgetPrivate::paintGL()
 
     if (d.stageModel && d.stageModel->isLoaded()) {
         if (d.glEngine) {
+            if (!d.glEngine->IsColorCorrectionCapable()) {
+                glEnable(GL_FRAMEBUFFER_SRGB);
+            }
+            else {
+                glDisable(GL_FRAMEBUFFER_SRGB);
+            }
             Q_ASSERT("aov is not set and is required" && d.aov.size());
             TfToken aovtoken(QString_TfToken(d.aov));
             d.glEngine->SetRendererAov(aovtoken);
@@ -250,6 +256,7 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.enableSceneMaterials = d.sceneMaterialsEnabled;
             d.params.flipFrontFacing = true;
             d.params.gammaCorrectColors = true;
+            d.params.colorCorrectionMode = TfToken("sRGB");
             d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;

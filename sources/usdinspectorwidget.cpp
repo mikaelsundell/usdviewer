@@ -5,6 +5,10 @@
 #include "usdinspectorwidget.h"
 #include "usdinspectoritem.h"
 #include "usdselectionmodel.h"
+#include <QFileInfo>
+#include <QHeaderView>
+#include <QKeyEvent>
+#include <QPointer>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/range3d.h>
@@ -20,8 +24,6 @@
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
-#include <QFileInfo>
-#include <QPointer>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -31,6 +33,7 @@ public:
     void init();
     void initStageModel();
     void initSelection();
+    bool eventFilter(QObject* obj, QEvent* event);
 
 public Q_SLOTS:
     void selectionChanged(const QList<SdfPath>& paths);
@@ -47,7 +50,9 @@ public:
 
 void
 InspectorWidgetPrivate::init()
-{}
+{
+    d.widget->installEventFilter(this);
+}
 
 void
 InspectorWidgetPrivate::initStageModel()
@@ -62,6 +67,21 @@ InspectorWidgetPrivate::initSelection()
             &InspectorWidgetPrivate::selectionChanged);
 }
 
+bool
+InspectorWidgetPrivate::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::Show) {
+        static bool init = false;
+        if (!init) {
+            init = true;
+            d.widget->setColumnWidth(InspectorItem::Name, 200);
+            d.widget->setColumnWidth(InspectorItem::Value, 80);
+            d.widget->header()->setSectionResizeMode(InspectorItem::Value, QHeaderView::Stretch);
+        }
+    }
+    return QObject::eventFilter(obj, event);
+}
+
 void
 InspectorWidgetPrivate::stageChanged()
 {
@@ -69,13 +89,13 @@ InspectorWidgetPrivate::stageChanged()
     if (d.stageModel->isLoaded()) {
         UsdStageRefPtr stage = d.stageModel->stage();
         InspectorItem* stageItem = new InspectorItem(d.widget.data());
-        stageItem->setText(InspectorItem::Key, "Stage");
+        stageItem->setText(InspectorItem::Name, "Stage");
         d.widget->addTopLevelItem(stageItem);
         stageItem->setExpanded(true);
 
-        auto addChild = [&](const QString& key, const QString& value) {
+        auto addChild = [&](const QString& name, const QString& value) {
             InspectorItem* item = new InspectorItem(stageItem);
-            item->setText(InspectorItem::Key, key);
+            item->setText(InspectorItem::Name, name);
             item->setText(InspectorItem::Value, value);
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
         };
@@ -127,7 +147,7 @@ InspectorWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
     }
     if (paths.size() > 1) {
         InspectorItem* multiItem = new InspectorItem(d.widget.data());
-        multiItem->setText(InspectorItem::Key, "[Multiple selection]");
+        multiItem->setText(InspectorItem::Name, "[Multiple selection]");
         d.widget->addTopLevelItem(multiItem);
         multiItem->setExpanded(true);
         return;
@@ -139,13 +159,13 @@ InspectorWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
         return;
 
     InspectorItem* primItem = new InspectorItem(d.widget.data());
-    primItem->setText(InspectorItem::Key, QString::fromStdString(path.GetString()));
+    primItem->setText(InspectorItem::Name, QString::fromStdString(path.GetString()));
     primItem->setExpanded(true);
     d.widget->addTopLevelItem(primItem);
 
-    auto addChild = [&](const QString& key, const QString& value) {
+    auto addChild = [&](const QString& name, const QString& value) {
         InspectorItem* item = new InspectorItem(primItem);
-        item->setText(InspectorItem::Key, key);
+        item->setText(InspectorItem::Name, name);
         item->setText(InspectorItem::Value, value);
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
     };

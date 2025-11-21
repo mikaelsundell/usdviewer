@@ -3,11 +3,11 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdutils.h"
+#include <QColor>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
-#include <QColor>
 
 GfVec4f
 QColor_GfVec4f(const QColor& color)

@@ -63,7 +63,6 @@ ViewCameraPrivate::init()
     d.axispitch = 0;
     d.axisroll = 0;
     d.inverseUp = mapToCameraUp();
-    frameAll();
 }
 
 void
@@ -255,7 +254,17 @@ void
 ViewCamera::setFocusPoint(const GfVec3d& point)
 {
     if (p->d.focusPoint != point) {
+        GfCamera cam = p->d.camera;
+        GfMatrix4d oldXf = cam.GetTransform();
+        GfVec3d oldPos = oldXf.ExtractTranslation();
+        GfVec3d viewDir = (p->d.focusPoint - oldPos).GetNormalized();
+        double dist = p->d.distance;
+        GfVec3d newPos = point - viewDir * dist;
+        GfMatrix4d xf = oldXf;
+        xf.SetTranslate(newPos);
+        cam.SetTransform(xf);
         p->d.focusPoint = point;
+        p->d.camera = cam;
         p->d.valid = false;
     }
 }

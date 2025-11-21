@@ -10,7 +10,7 @@ namespace usd {
 class InspectorItemPrivate;
 class InspectorItem : public QTreeWidgetItem {
 public:
-    enum Column { Key = 0, Value };
+    enum Column { Name = 0, Value };
     InspectorItem(QTreeWidget* parent);
     InspectorItem(QTreeWidgetItem* parent);
     virtual ~InspectorItem();

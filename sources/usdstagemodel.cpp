@@ -3,13 +3,13 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdstagemodel.h"
-#include <pxr/usd/usd/variantSets.h>
-#include <pxr/usd/usdGeom/bboxCache.h>
-#include <pxr/usd/usdGeom/metrics.h>
 #include <QMap>
 #include <QThreadPool>
 #include <QVariant>
 #include <QtConcurrent>
+#include <pxr/usd/usd/variantSets.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
+#include <pxr/usd/usdGeom/metrics.h>
 #include <stack>
 
 namespace usd {
@@ -29,7 +29,7 @@ public:
     void setMask(const QList<SdfPath>& paths);
     void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive);
     GfBBox3d boundingBox();
-    GfBBox3d boundingBox(const QList<SdfPath> paths);
+    GfBBox3d boundingBox(const QList<SdfPath>& paths);
     std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive);
 
 public:
@@ -68,21 +68,21 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::LoadMode lo
         else
             d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadNone);
         d.loadMode = loadMode;
-        if (d.stage) {
-            d.bboxCache.reset(new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(),
-                                                   true));  // use extents hint
-            d.bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
-            d.filename = filename;
-        }
-        else {
-            d.bboxCache.reset();
-            return false;
-        }
+        d.mask = QList<SdfPath>();
+    }
+    if (d.stage) {
+        d.bboxCache.reset();
+        d.bbox = boundingBox();
+        d.filename = filename;
+    }
+    else {
+        d.bboxCache.reset();
+        return false;
     }
     QMetaObject::invokeMethod(
         d.stageModel,
         [this]() {
-            setMask(QList<SdfPath>());
+            setMask(d.mask);
             stageChanged();
         },
         Qt::QueuedConnection);
@@ -90,8 +90,7 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::LoadMode lo
 }
 
 bool
-StageModelPrivate::loadPayloads(const QList<SdfPath>& paths,
-                                const std::string& variantSet,
+StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet,
                                 const std::string& variantValue)
 {
     if (!isLoaded())
@@ -102,7 +101,7 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths,
     Q_EMIT d.stageModel->payloadsRequested(paths);
 
     auto stage = d.stage;
-    auto pool  = &d.pool;
+    auto pool = &d.pool;
     QFuture<void> future = QtConcurrent::run(pool, [this, stage, paths, variantSet, variantValue, useVariant]() {
         QList<SdfPath> loaded;
         QList<SdfPath> failed;
@@ -140,12 +139,11 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths,
                         Q_EMIT d.stageModel->payloadsLoaded(path);
                         continue;
                     }
-                    
+
                     prim.Load();
                     loaded.append(path);
                     Q_EMIT d.stageModel->payloadsLoaded(path);
-                }
-                catch (const std::exception& e) {
+                } catch (const std::exception& e) {
                     failed.append(path);
                     Q_EMIT d.stageModel->payloadsFailed(path);
                 }
@@ -157,11 +155,8 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths,
                 [this, loaded]() {
                     {
                         QWriteLocker locker(&d.stageLock);
-                        d.bboxCache.reset(new UsdGeomBBoxCache(
-                            UsdTimeCode::Default(),
-                            UsdGeomImageable::GetOrderedPurposeTokens(),
-                            true));
-                        d.bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
+                        d.bboxCache.reset();
+                        d.bbox = boundingBox();
                     }
                     primsChanged(loaded);
                 },
@@ -202,11 +197,8 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
                 if (!unloaded.isEmpty()) {
                     {
                         QWriteLocker locker(&d.stageLock);
-                        d.bboxCache.reset(new UsdGeomBBoxCache(UsdTimeCode::Default(),
-                                                               UsdGeomImageable::GetOrderedPurposeTokens(),
-                                                               true));  // use extents hint
-                        GfBBox3d bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
-                        d.bbox = bbox;
+                        d.bboxCache.reset();
+                        d.bbox = boundingBox();
                     }
                     primsChanged(unloaded);
                 }
@@ -240,7 +232,6 @@ StageModelPrivate::saveToFile(const QString& filename)
         return false;
     }
 }
-
 
 bool
 StageModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
@@ -289,9 +280,8 @@ StageModelPrivate::reload()
         QWriteLocker locker(&d.stageLock);
         if (d.stage) {
             d.stage->Reload();
-            d.bboxCache.reset(
-                new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
-            d.bbox = d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
+            d.bboxCache.reset();
+            d.bbox = boundingBox();
         }
     }
     QMetaObject::invokeMethod(
@@ -378,22 +368,18 @@ StageModelPrivate::boundingBox()
 }
 
 GfBBox3d
-StageModelPrivate::boundingBox(const QList<SdfPath> paths)
+StageModelPrivate::boundingBox(const QList<SdfPath>& paths)
 {
     QReadLocker locker(&d.stageLock);
     Q_ASSERT("stage is not loaded" && isLoaded());
-    if (!d.bboxCache) {
-        d.bboxCache.reset(
-            new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
-    }
-
+    UsdGeomBBoxCache cache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true);
     GfBBox3d bbox;
     for (const SdfPath& path : paths) {
         UsdPrim prim = d.stage->GetPrimAtPath(path);
         if (!prim || !prim.IsA<UsdGeomImageable>())
             continue;
-        GfBBox3d worldbbox = d.bboxCache->ComputeWorldBound(prim);
-        bbox = GfBBox3d::Combine(bbox, worldbbox);
+
+        bbox = GfBBox3d::Combine(bbox, cache.ComputeWorldBound(prim));
     }
     return bbox;
 }
@@ -409,7 +395,8 @@ StageModelPrivate::variantSets(const QList<SdfPath>& paths, bool recursive)
     for (const SdfPath& p : paths) {
         bool isChild = false;
         for (const SdfPath& other : paths) {
-            if (p == other) continue;
+            if (p == other)
+                continue;
             if (p.HasPrefix(other)) {
                 isChild = true;
                 break;
@@ -604,7 +591,7 @@ StageModel::loadMode() const
 }
 
 GfBBox3d
-StageModel::boundingBox(const QList<SdfPath> paths)
+StageModel::boundingBox(const QList<SdfPath>& paths)
 {
     return p->boundingBox(paths);
 }

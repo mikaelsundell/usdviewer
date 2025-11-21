@@ -3,14 +3,14 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
-#include "usdinspectoritem.h"
-#include "usdoutlineritem.h"
-#include "usdpayloaddialog.h"
-#include "usdstagemodel.h"
 #include "icctransform.h"
 #include "mouseevent.h"
 #include "platform.h"
 #include "stylesheet.h"
+#include "usdinspectoritem.h"
+#include "usdoutlineritem.h"
+#include "usdpayloaddialog.h"
+#include "usdstagemodel.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
@@ -98,11 +98,13 @@ public Q_SLOTS:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
+    void stageChanged();
 
 public:
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
     struct Data {
+        bool loadInit;
         StageModel::LoadMode loadMode;
         QStringList arguments;
         QStringList extensions;
@@ -120,6 +122,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
+    d.loadInit = false;
     d.loadMode = StageModel::LoadMode::All;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
@@ -154,18 +157,13 @@ ViewerPrivate::init()
     renderer()->setSelectionModel(d.selectionModel.data());
     // outliner
     outliner()->setHeaderLabels(QStringList() << "Name"
-                                              << "Type"
-                                              << "Vis");
-    outliner()->setColumnWidth(OutlinerItem::Name, 180);
-    outliner()->setColumnWidth(OutlinerItem::Type, 60);
-    outliner()->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
+                                            << "Type"
+                                            << "Vis");
     outliner()->setStageModel(d.stageModel.data());
     outliner()->setSelectionModel(d.selectionModel.data());
     // inspector
-    inspector()->setHeaderLabels(QStringList() << "Key"
-                                               << "Value");
-    inspector()->setColumnWidth(InspectorItem::Key, 180);
-    inspector()->header()->setSectionResizeMode(InspectorItem::Value, QHeaderView::Stretch);
+    inspector()->setHeaderLabels(QStringList() << "Name"
+                                            << "Value");
     inspector()->setStageModel(d.stageModel.data());
     inspector()->setSelectionModel(d.selectionModel.data());
     // payload
@@ -502,6 +500,7 @@ void
 ViewerPrivate::loadSettings()
 {
     d.recentFiles = settingsValue("recentFiles", QStringList()).toStringList();
+    initRecentFiles();
 }
 
 void
@@ -942,7 +941,10 @@ ViewerPrivate::openGithubIssues()
 void
 ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
 {
-    frameAll();
+    if (!d.loadInit) {
+        frameAll();
+        d.loadInit = true;
+    }
 }
 
 void
@@ -956,6 +958,12 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
         d.ui->displayExpand->setEnabled(false);
         d.ui->displayIsolate->setEnabled(false);
     }
+}
+
+void
+ViewerPrivate::stageChanged()
+{
+    d.loadInit = false;
 }
 
 void

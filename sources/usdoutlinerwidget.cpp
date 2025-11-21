@@ -3,11 +3,10 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdoutlinerwidget.h"
+#include "stylesheet.h"
 #include "usdoutlineritem.h"
 #include "usdselectionmodel.h"
 #include "usdutils.h"
-#include "stylesheet.h"
-#include <pxr/usd/usd/prim.h>
 #include <QApplication>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -16,6 +15,7 @@
 #include <QPointer>
 #include <QStyledItemDelegate>
 #include <QTimer>
+#include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -24,7 +24,6 @@ class OutlinerWidgetPrivate : public QObject {
 public:
     OutlinerWidgetPrivate();
     void init();
-    void initController();
     void initStageModel();
     void initSelection();
     void initTree();
@@ -36,6 +35,7 @@ public:
     void updateFilter();
     void itemCheckState(QTreeWidgetItem* item, bool checkable, bool recursive = false);
     void treeCheckState(QTreeWidgetItem* item);
+    bool eventFilter(QObject* obj, QEvent* event);
 
 public Q_SLOTS:
     void updateSelection();
@@ -155,6 +155,22 @@ OutlinerWidgetPrivate::init()
             checkStateChanged(outlinerItem);
         }
     });
+
+    d.widget->installEventFilter(this);
+}
+
+
+void
+OutlinerWidgetPrivate::initStageModel()
+{
+    connect(d.stageModel.data(), &StageModel::stageChanged, this, &OutlinerWidgetPrivate::stageChanged);
+    connect(d.stageModel.data(), &StageModel::primsChanged, this, &OutlinerWidgetPrivate::primsChanged);
+}
+
+void
+OutlinerWidgetPrivate::initSelection()
+{
+    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
 }
 
 void
@@ -187,17 +203,19 @@ OutlinerWidgetPrivate::treeCheckState(QTreeWidgetItem* item)
     itemCheckState(item, true, true);
 }
 
-void
-OutlinerWidgetPrivate::initStageModel()
+bool
+OutlinerWidgetPrivate::eventFilter(QObject* obj, QEvent* event)
 {
-    connect(d.stageModel.data(), &StageModel::stageChanged, this, &OutlinerWidgetPrivate::stageChanged);
-    connect(d.stageModel.data(), &StageModel::primsChanged, this, &OutlinerWidgetPrivate::primsChanged);
-}
-
-void
-OutlinerWidgetPrivate::initSelection()
-{
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &OutlinerWidgetPrivate::selectionChanged);
+    if (event->type() == QEvent::Show) {
+        static bool initx = false;
+        if (!initx) {
+            initx = true;
+            d.widget->setColumnWidth(OutlinerItem::Name, 200);
+            d.widget->setColumnWidth(OutlinerItem::Type, 80);
+            d.widget->header()->setSectionResizeMode(OutlinerItem::Visible, QHeaderView::Stretch);
+        }
+    }
+    return QObject::eventFilter(obj, event);
 }
 
 void
@@ -230,7 +248,6 @@ OutlinerWidgetPrivate::collapse()
 void
 OutlinerWidgetPrivate::expand()
 {
-    collapse();
     const QList<QTreeWidgetItem*> selected = d.widget->selectedItems();
     for (QTreeWidgetItem* item : selected) {
         item->setExpanded(true);
@@ -240,7 +257,9 @@ OutlinerWidgetPrivate::expand()
             parent = parent->parent();
         }
     }
-    //d.widget->scrollToItem(selected.first(), QAbstractItemView::PositionAtCenter);
+    if (selected.size()) {
+        d.widget->scrollToItem(selected.first(), QAbstractItemView::PositionAtCenter);
+    }
 }
 
 void
@@ -367,21 +386,18 @@ OutlinerWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
     d.widget->update();
 }
 
-void OutlinerWidgetPrivate::primsChanged(const QList<SdfPath>& paths)
+void
+OutlinerWidgetPrivate::primsChanged(const QList<SdfPath>& paths)
 {
     QSignalBlocker blocker(d.widget);
-    std::function<void(QTreeWidgetItem*)> updateItem =
-        [&](QTreeWidgetItem* item)
-    {
+    std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* item) {
         QString itemPath = item->data(0, Qt::UserRole).toString();
         if (!itemPath.isEmpty()) {
             for (const SdfPath& changed : paths) {
                 if (itemPath == QString::fromStdString(changed.GetString())) {
                     UsdPrim prim = d.stageModel->stage()->GetPrimAtPath(changed);
                     if (prim && prim.HasPayload()) {
-                        Qt::CheckState want = prim.IsLoaded()
-                                              ? Qt::Checked
-                                              : Qt::Unchecked;
+                        Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
 
                         if (item->checkState(0) != want)
                             item->setCheckState(0, want);
@@ -493,7 +509,8 @@ OutlinerWidget::keyPressEvent(QKeyEvent* event)
     }
 }
 
-void OutlinerWidget::contextMenuEvent(QContextMenuEvent* event)
+void
+OutlinerWidget::contextMenuEvent(QContextMenuEvent* event)
 {
     QTreeWidgetItem* item = itemAt(event->pos());
     if (!item)
@@ -513,7 +530,8 @@ void OutlinerWidget::contextMenuEvent(QContextMenuEvent* event)
     for (const SdfPath& p : paths) {
         bool isChild = false;
         for (const SdfPath& other : paths) {
-            if (p == other) continue;
+            if (p == other)
+                continue;
             if (p.HasPrefix(other)) {
                 isChild = true;
                 break;
@@ -522,13 +540,11 @@ void OutlinerWidget::contextMenuEvent(QContextMenuEvent* event)
         if (!isChild)
             filtered.push_back(p);
     }
-    
+
     QList<SdfPath> payloadPaths;
     UsdStageRefPtr stage = p->d.stageModel->stage();
 
-    std::function<void(const UsdPrim&)> collectPayloads =
-        [&](const UsdPrim& prim)
-    {
+    std::function<void(const UsdPrim&)> collectPayloads = [&](const UsdPrim& prim) {
         if (!prim)
             return;
 
@@ -546,7 +562,7 @@ void OutlinerWidget::contextMenuEvent(QContextMenuEvent* event)
     }
     auto variantSets = p->d.stageModel->variantSets(paths, true);
     QMenu menu(this);
-    
+
     QMenu* loadMenu = menu.addMenu("Load");
 
     QAction* loadSelected = loadMenu->addAction("Selected");
@@ -554,15 +570,17 @@ void OutlinerWidget::contextMenuEvent(QContextMenuEvent* event)
 
     loadMenu->addSeparator();
 
-    struct VariantSelection { std::string setName; std::string value; };
+    struct VariantSelection {
+        std::string setName;
+        std::string value;
+    };
     QMap<QAction*, VariantSelection> variantActions;
 
     for (const auto& it : variantSets) {
         const std::string& setName = it.first;
         const auto& values = it.second;
 
-        QString submenuName = QString("Recursive (%1)")
-                                  .arg(QString::fromStdString(setName));
+        QString submenuName = QString("Recursive (%1)").arg(QString::fromStdString(setName));
         QMenu* variantMenu = loadMenu->addMenu(submenuName);
 
         for (const std::string& value : values) {

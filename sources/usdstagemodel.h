@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include <pxr/base/gf/bbox3d.h>
-#include <pxr/usd/usd/stage.h>
 #include <QExplicitlySharedDataPointer>
 #include <QObject>
 #include <QReadWriteLock>
+#include <pxr/base/gf/bbox3d.h>
+#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -38,7 +38,7 @@ public:
     void setMask(const QList<SdfPath>& paths);
     LoadMode loadMode() const;
     GfBBox3d boundingBox();
-    GfBBox3d boundingBox(const QList<SdfPath> paths);
+    GfBBox3d boundingBox(const QList<SdfPath>& paths);
     std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive = false);
     QString filename() const;
     UsdStageRefPtr stage() const;

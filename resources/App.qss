@@ -279,7 +279,7 @@ QTreeView
     font-size: $defaultsize;
     color: $text;
     outline: none;
-    border: 0px;
+    border: 1px solid $borderalt;
     background-color: $base;
     selection-background-color: $highlight;
     alternate-background-color: $highlight;

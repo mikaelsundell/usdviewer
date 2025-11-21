@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include <pxr/usd/sdf/path.h>
-#include <pxr/usd/usd/stage.h>
 #include <QList>
 #include <QObject>
 #include <QScopedPointer>
+#include <pxr/usd/sdf/path.h>
+#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

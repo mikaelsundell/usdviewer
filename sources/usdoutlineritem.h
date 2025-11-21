@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <pxr/usd/usd/prim.h>
 #include <QTreeWidgetItem>
+#include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

@@ -18,7 +18,7 @@ class StageModelPrivate : public QSharedData {
 public:
     StageModelPrivate();
     ~StageModelPrivate();
-    bool loadFromFile(const QString& filename, StageModel::LoadMode loadMode);
+    bool loadFromFile(const QString& filename, StageModel::load_policy loadPolicy);
     bool loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet, const std::string& variantValue);
     bool unloadPayloads(const QList<SdfPath>& paths);
     bool saveToFile(const QString& filename);
@@ -33,11 +33,12 @@ public:
     std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive);
 
 public:
-    void primsChanged(const QList<SdfPath> paths);
-    void stageChanged();
+    void updatePrims(const QList<SdfPath> paths);
+    void updateStage();
     struct Data {
         UsdStageRefPtr stage;
-        StageModel::LoadMode loadMode;
+        StageModel::load_policy loadPolicy;
+        StageModel::stage_status stageStatus;
         QString filename;
         GfBBox3d bbox;
         QList<SdfPath> mask;
@@ -51,7 +52,7 @@ public:
 
 StageModelPrivate::StageModelPrivate()
 {
-    d.loadMode = StageModel::LoadMode::All;
+    d.loadPolicy = StageModel::load_policy::load_all;
     d.pool.setMaxThreadCount(QThread::idealThreadCount());
     d.pool.setThreadPriority(QThread::HighPriority);
 }
@@ -59,23 +60,28 @@ StageModelPrivate::StageModelPrivate()
 StageModelPrivate::~StageModelPrivate() {}
 
 bool
-StageModelPrivate::loadFromFile(const QString& filename, StageModel::LoadMode loadMode)
+StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_policy policy)
 {
     {
         QWriteLocker locker(&d.stageLock);
-        if (loadMode == StageModel::LoadMode::All)
+        if (policy == StageModel::load_all) {
             d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadAll);
-        else
-            d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadNone);
-        d.loadMode = loadMode;
+        }
+        else {
+            d.stage = UsdStage::Open(filename.toStdString(),
+                                     UsdStage::LoadNone);  // load stage without loading payloads
+        }
+        d.loadPolicy = policy;
         d.mask = QList<SdfPath>();
     }
     if (d.stage) {
+        d.stageStatus = StageModel::stage_status::stage_loaded;
         d.bboxCache.reset();
         d.bbox = boundingBox();
         d.filename = filename;
     }
     else {
+        d.stageStatus = StageModel::stage_status::stage_failed;
         d.bboxCache.reset();
         return false;
     }
@@ -83,7 +89,7 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::LoadMode lo
         d.stageModel,
         [this]() {
             setMask(d.mask);
-            stageChanged();
+            updateStage();
         },
         Qt::QueuedConnection);
     return true;
@@ -111,7 +117,7 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const std::string& 
                 UsdPrim prim = stage->GetPrimAtPath(path);
                 if (!prim) {
                     failed.append(path);
-                    Q_EMIT d.stageModel->payloadsFailed(path);
+                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
                     continue;
                 }
                 try {
@@ -122,13 +128,13 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const std::string& 
                         UsdVariantSet vs = prim.GetVariantSet(variantSet);
                         if (!vs.IsValid()) {
                             failed.append(path);
-                            Q_EMIT d.stageModel->payloadsFailed(path);
+                            Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
                             continue;
                         }
                         auto values = vs.GetVariantNames();
                         if (std::find(values.begin(), values.end(), variantValue) == values.end()) {
                             failed.append(path);
-                            Q_EMIT d.stageModel->payloadsFailed(path);
+                            Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
                             continue;
                         }
                         vs.SetVariantSelection(variantValue);
@@ -136,16 +142,16 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const std::string& 
 
                     if (prim.IsLoaded()) {
                         loaded.append(path);
-                        Q_EMIT d.stageModel->payloadsLoaded(path);
+                        Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_loaded);
                         continue;
                     }
 
                     prim.Load();
                     loaded.append(path);
-                    Q_EMIT d.stageModel->payloadsLoaded(path);
+                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_loaded);
                 } catch (const std::exception& e) {
                     failed.append(path);
-                    Q_EMIT d.stageModel->payloadsFailed(path);
+                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
                 }
             }
         }
@@ -154,11 +160,10 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const std::string& 
                 d.stageModel,
                 [this, loaded]() {
                     {
-                        QWriteLocker locker(&d.stageLock);
                         d.bboxCache.reset();
                         d.bbox = boundingBox();
                     }
-                    primsChanged(loaded);
+                    updatePrims(loaded);
                 },
                 Qt::QueuedConnection);
         }
@@ -188,7 +193,7 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
                 prim.Unload();
                 unloaded.append(path);
 
-                Q_EMIT d.stageModel->payloadsUnloaded(path);
+                Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_unloaded);
             }
         }
         QMetaObject::invokeMethod(
@@ -196,11 +201,10 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
             [this, unloaded]() {
                 if (!unloaded.isEmpty()) {
                     {
-                        QWriteLocker locker(&d.stageLock);
                         d.bboxCache.reset();
                         d.bbox = boundingBox();
                     }
-                    primsChanged(unloaded);
+                    updatePrims(unloaded);
                 }
             },
             Qt::QueuedConnection);
@@ -268,8 +272,7 @@ StageModelPrivate::close()
         d.bboxCache.reset();
     }
     QMetaObject::invokeMethod(
-        d.stageModel, [this]() { stageChanged(); }, Qt::QueuedConnection);
-
+        d.stageModel, [this]() { updateStage(); }, Qt::QueuedConnection);
     return true;
 }
 
@@ -285,7 +288,7 @@ StageModelPrivate::reload()
         }
     }
     QMetaObject::invokeMethod(
-        d.stageModel, [this]() { stageChanged(); }, Qt::QueuedConnection);
+        d.stageModel, [this]() { updateStage(); }, Qt::QueuedConnection);
 
     return true;
 }
@@ -339,7 +342,7 @@ StageModelPrivate::setVisible(const QList<SdfPath>& paths, bool visible, bool re
     }
     if (!affected.isEmpty()) {
         QMetaObject::invokeMethod(
-            d.stageModel, [this, affected]() { primsChanged(affected); }, Qt::QueuedConnection);
+            d.stageModel, [this, affected]() { updatePrims(affected); }, Qt::QueuedConnection);
     }
 }
 
@@ -459,7 +462,7 @@ StageModelPrivate::variantSets(const QList<SdfPath>& paths, bool recursive)
 }
 
 void
-StageModelPrivate::primsChanged(const QList<SdfPath> paths)
+StageModelPrivate::updatePrims(const QList<SdfPath> paths)
 {
     Q_EMIT d.stageModel->primsChanged(paths);
     Q_EMIT d.stageModel->boundingBoxChanged(d.bbox);
@@ -486,9 +489,9 @@ StageModelPrivate::primsChanged(const QList<SdfPath> paths)
 }
 
 void
-StageModelPrivate::stageChanged()
+StageModelPrivate::updateStage()
 {
-    Q_EMIT d.stageModel->stageChanged();
+    Q_EMIT d.stageModel->stageChanged(d.stage, d.loadPolicy, d.stageStatus);
     Q_EMIT d.stageModel->boundingBoxChanged(d.bbox);
 }
 
@@ -498,11 +501,11 @@ StageModel::StageModel()
     p->d.stageModel = this;
 }
 
-StageModel::StageModel(const QString& filename, LoadMode loadMode)
+StageModel::StageModel(const QString& filename, StageModel::load_policy loadPolicy)
     : p(new StageModelPrivate())
 {
     p->d.stageModel = this;
-    loadFromFile(filename, loadMode);
+    loadFromFile(filename, loadPolicy);
 }
 
 StageModel::StageModel(const StageModel& other)
@@ -512,9 +515,9 @@ StageModel::StageModel(const StageModel& other)
 StageModel::~StageModel() {}
 
 bool
-StageModel::loadFromFile(const QString& filename, LoadMode loadMode)
+StageModel::loadFromFile(const QString& filename, StageModel::load_policy loadPolicy)
 {
-    return p->loadFromFile(filename, loadMode);
+    return p->loadFromFile(filename, loadPolicy);
 }
 
 bool
@@ -584,10 +587,10 @@ StageModel::boundingBox()
     return p->boundingBox();
 }
 
-StageModel::LoadMode
-StageModel::loadMode() const
+StageModel::load_policy
+StageModel::loadPolicy() const
 {
-    return p->d.loadMode;
+    return p->d.loadPolicy;
 }
 
 GfBBox3d

@@ -3,14 +3,15 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewer.h"
+#include "commanddispatcher.h"
+#include "commandstack.h"
 #include "icctransform.h"
 #include "mouseevent.h"
 #include "platform.h"
 #include "stylesheet.h"
-#include "usdinspectoritem.h"
-#include "usdoutlineritem.h"
-#include "usdpayloadwidget.h"
-#include "usdpayloaddialog.h"
+#include "usdoutlinerview.h"
+#include "usdpayloadview.h"
+#include "usdrenderview.h"
 #include "usdstagemodel.h"
 #include <QActionGroup>
 #include <QClipboard>
@@ -38,13 +39,9 @@ public:
     void initRecentFiles();
     void initSettings();
     bool loadFile(const QString& filename);
-    ViewCamera camera();
-    ImagingGLWidget* renderer();
-    InspectorWidget* inspector();
-    OutlinerWidget* outliner();
-    PayloadWidget* payload();
-    StageModel* stageModel();
-    SelectionModel* selectionModel();
+    OutlinerView* outlinerView();
+    PayloadView* payloadView();
+    RenderView* renderView();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
     void profile();
@@ -63,7 +60,7 @@ public Q_SLOTS:
     void close();
     void ready();
     void copyImage();
-    void clearColor();
+    void backgroundColor();
     void exportAll();
     void exportSelected();
     void exportImage();
@@ -80,18 +77,12 @@ public Q_SLOTS:
     void frameAll();
     void frameSelected();
     void resetView();
-    void clear();
-    void expand();
     void collapse();
-    void filterChanged(const QString& filter);
+    void expand();
     void defaultCameraLightEnabled(bool checked);
     void sceneLightsEnabled(bool checked);
     void sceneMaterialsEnabled(bool checked);
     void wireframeChanged(bool checked);
-    void asComplexityLow();
-    void asComplexityMedium();
-    void asComplexityHigh();
-    void asComplexityVeryHigh();
     void light();
     void dark();
     void openGithubReadme();
@@ -100,23 +91,23 @@ public Q_SLOTS:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
-    void stageChanged();
+    void stageChanged(UsdStageRefPtr stage);
 
 public:
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
     struct Data {
         bool loadInit;
-        StageModel::LoadMode loadMode;
+        StageModel::load_policy loadPolicy;
         QStringList arguments;
         QStringList extensions;
         QStringList recentFiles;
-        QColor clearColor;
-        QScopedPointer<MouseEvent> clearColorFilter;
+        QColor backgroundColor;
+        QScopedPointer<MouseEvent> backgroundColorFilter;
         QScopedPointer<StageModel> stageModel;
         QScopedPointer<SelectionModel> selectionModel;
+        QScopedPointer<CommandStack> commandStack;
         QScopedPointer<Ui_UsdViewer> ui;
-        QPointer<PayloadDialog> payloadDialog;
         QPointer<Viewer> viewer;
     };
     Data d;
@@ -125,7 +116,7 @@ public:
 ViewerPrivate::ViewerPrivate()
 {
     d.loadInit = false;
-    d.loadMode = StageModel::LoadMode::All;
+    d.loadPolicy = StageModel::load_policy::load_all;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
 
@@ -143,53 +134,46 @@ ViewerPrivate::init()
     d.ui->setupUi(d.viewer.data());
     // settings
     loadSettings();
-    // clear color
-    d.clearColor = QColor(settingsValue("clearColor", "#4f4f4f").toString());
-    d.ui->clearColor->setStyleSheet("background-color: " + d.clearColor.name() + ";");
-    d.clearColorFilter.reset(new MouseEvent);
-    d.ui->clearColor->installEventFilter(d.clearColorFilter.data());
+    // background color
+    d.backgroundColor = QColor(settingsValue("backgroundColor", "#4f4f4f").toString());
+    d.ui->backgroundColor->setStyleSheet("background-color: " + d.backgroundColor.name() + ";");
+    d.backgroundColorFilter.reset(new MouseEvent);
+    d.ui->backgroundColor->installEventFilter(d.backgroundColorFilter.data());
     // event filter
     d.viewer->installEventFilter(this);
     // models
     d.stageModel.reset(new StageModel());
     d.selectionModel.reset(new SelectionModel());
-    // renderer
-    renderer()->setClearColor(d.clearColor);
-    renderer()->setStageModel(d.stageModel.data());
-    renderer()->setSelectionModel(d.selectionModel.data());
-    // outliner
-    outliner()->setHeaderLabels(QStringList() << "Name"
-                                              << "Type"
-                                              << "Vis");
-    outliner()->setStageModel(d.stageModel.data());
-    outliner()->setSelectionModel(d.selectionModel.data());
-    // inspector
-    inspector()->setHeaderLabels(QStringList() << "Name"
-                                               << "Value");
-    inspector()->setStageModel(d.stageModel.data());
-    inspector()->setSelectionModel(d.selectionModel.data());
-    // payload
-    payload()->setHeaderLabels(QStringList() << "Name"
-                                             << "Filename");
-    payload()->setStageModel(d.stageModel.data());
-    payload()->setSelectionModel(d.selectionModel.data());
+    // command
+    d.commandStack.reset(new CommandStack());
+    d.commandStack->setStageModel(d.stageModel.data());
+    d.commandStack->setSelectionModel(d.selectionModel.data());
+    CommandDispatcher::setCommandStack(d.commandStack.data());
+    // views
+    outlinerView()->setStageModel(d.stageModel.data());
+    outlinerView()->setSelectionModel(d.selectionModel.data());
+    payloadView()->setStageModel(d.stageModel.data());
+    payloadView()->setSelectionModel(d.selectionModel.data());
+    renderView()->setBackgroundColor(d.backgroundColor);
+    renderView()->setStageModel(d.stageModel.data());
+    renderView()->setSelectionModel(d.selectionModel.data());
     // connect
-    connect(d.ui->imagingglWidget, &ImagingGLWidget::rendererReady, this, &ViewerPrivate::ready);
+    connect(renderView(), &RenderView::renderReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
-    connect(d.ui->modeFull, &QAction::triggered, this, [this]() {
-        d.loadMode = StageModel::All;
+    connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
+        d.loadPolicy = StageModel::load_all;
         setSettingsValue("loadType", "all");
     });
-    connect(d.ui->modePayload, &QAction::triggered, this, [this]() {
-        d.loadMode = StageModel::Payload;
+    connect(d.ui->policyPayload, &QAction::triggered, this, [this]() {
+        d.loadPolicy = StageModel::load_payload;
         setSettingsValue("loadType", "payload");
     });
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         {
-            actions->addAction(d.ui->modeFull);
-            actions->addAction(d.ui->modePayload);
+            actions->addAction(d.ui->policyAll);
+            actions->addAction(d.ui->policyPayload);
         }
     }
     connect(d.ui->fileSave, &QAction::triggered, this, &ViewerPrivate::save);
@@ -218,10 +202,6 @@ ViewerPrivate::init()
     connect(d.ui->editLoadVariant9, &QAction::triggered, this, [=]() { loadVariant(9); });
     connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
     connect(d.ui->editUnloadRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
-    connect(d.ui->asComplexityLow, &QAction::triggered, this, &ViewerPrivate::asComplexityLow);
-    connect(d.ui->asComplexityMedium, &QAction::triggered, this, &ViewerPrivate::asComplexityMedium);
-    connect(d.ui->asComplexityHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityHigh);
-    connect(d.ui->asComplexityVeryHigh, &QAction::triggered, this, &ViewerPrivate::asComplexityVeryHigh);
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
@@ -246,15 +226,11 @@ ViewerPrivate::init()
     connect(d.ui->frameAll, &QPushButton::clicked, this, &ViewerPrivate::frameAll);
     connect(d.ui->frameSelected, &QPushButton::clicked, this, &ViewerPrivate::frameSelected);
     connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
-    connect(d.ui->filter, &QLineEdit::textChanged, this, &ViewerPrivate::filterChanged);
-    connect(d.ui->clear, &QPushButton::pressed, this, &ViewerPrivate::clear);
-    connect(d.ui->collapse, &QPushButton::pressed, this, &ViewerPrivate::collapse);
-    connect(d.ui->expand, &QPushButton::pressed, this, &ViewerPrivate::expand);
     connect(d.ui->enableDefaultCameraLight, &QCheckBox::toggled, this, &ViewerPrivate::defaultCameraLightEnabled);
     connect(d.ui->enableSceneLights, &QCheckBox::toggled, this, &ViewerPrivate::sceneLightsEnabled);
     connect(d.ui->enableSceneMaterials, &QCheckBox::toggled, this, &ViewerPrivate::sceneMaterialsEnabled);
     connect(d.ui->wireframe, &QToolButton::toggled, this, &ViewerPrivate::wireframeChanged);
-    connect(d.clearColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::clearColor);
+    connect(d.backgroundColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::backgroundColor);
     connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
     connect(d.ui->themeDark, &QAction::triggered, this, &ViewerPrivate::dark);
     {
@@ -267,29 +243,15 @@ ViewerPrivate::init()
     }
     // models
     connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
-    connect(d.stageModel.data(), &StageModel::payloadsRequested, d.payloadDialog, &PayloadDialog::payloadsRequested);
-    connect(d.stageModel.data(), &StageModel::payloadsFailed, d.payloadDialog, &PayloadDialog::payloadsFailed);
-    connect(d.stageModel.data(), &StageModel::payloadsLoaded, d.payloadDialog, &PayloadDialog::payloadsLoaded);
-    connect(d.stageModel.data(), &StageModel::payloadsUnloaded, d.payloadDialog, &PayloadDialog::payloadsUnloaded);
     connect(d.stageModel.data(), &StageModel::stageChanged, this, [=]() { enable(true); });
-    connect(d.payloadDialog, &PayloadDialog::cancelRequested, [&]() { qWarning() << "user canceled loading."; });
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this,
             [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
-    // payload
-    connect(d.ui->viewPayload, &QAction::toggled, this, [=](bool checked) {
-        if (checked) {
-            d.payloadDialog->show();
-            d.payloadDialog->raise();
-        }
-        else {
-            if (d.payloadDialog)
-                d.payloadDialog->hide();
-        }
-    });
-    connect(d.payloadDialog, &PayloadDialog::finished, this, [=]() { d.ui->viewPayload->setChecked(false); });
+    connect(d.ui->payloadDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewPayload->setChecked(visible); });
+    connect(d.ui->viewPayload, &QAction::toggled, this, [=](bool checked) { d.ui->payloadDock->setVisible(checked); });
     // settings
     initSettings();
     enable(false);
@@ -343,12 +305,12 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settingsValue("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadMode = StageModel::All;
-        d.ui->modeFull->setChecked(true);
+        d.loadPolicy = StageModel::load_all;
+        d.ui->policyAll->setChecked(true);
     }
     else {
-        d.loadMode = StageModel::Payload;
-        d.ui->modePayload->setChecked(true);
+        d.loadPolicy = StageModel::load_payload;
+        d.ui->policyPayload->setChecked(true);
     }
     QString theme = settingsValue("theme", "dark").toString();
     if (theme == "dark") {
@@ -373,7 +335,7 @@ ViewerPrivate::loadFile(const QString& filename)
     QElapsedTimer timer;
     timer.start();
 
-    d.stageModel->loadFromFile(filename, d.loadMode);
+    d.stageModel->loadFromFile(filename, d.loadPolicy);
 
     if (d.stageModel->isLoaded()) {
         qint64 elapsedMs = timer.elapsed();
@@ -383,9 +345,7 @@ ViewerPrivate::loadFile(const QString& filename)
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(shortName));
         setSettingsValue("openDir", fileInfo.absolutePath());
         updateRecentFiles(filename);
-
         updateStatus(QString("Loaded %1 in %2 seconds").arg(shortName).arg(QString::number(elapsedSec, 'f', 2)), false);
-
         return true;
     }
     else {
@@ -394,48 +354,22 @@ ViewerPrivate::loadFile(const QString& filename)
     }
 }
 
-
-ViewCamera
-ViewerPrivate::camera()
+RenderView*
+ViewerPrivate::renderView()
 {
-    return d.ui->imagingglWidget->viewCamera();
+    return d.ui->renderView;
 }
 
-
-ImagingGLWidget*
-ViewerPrivate::renderer()
+OutlinerView*
+ViewerPrivate::outlinerView()
 {
-    return d.ui->imagingglWidget;
+    return d.ui->outlinerView;
 }
 
-InspectorWidget*
-ViewerPrivate::inspector()
+PayloadView*
+ViewerPrivate::payloadView()
 {
-    return d.ui->inspectorWidget;
-}
-
-OutlinerWidget*
-ViewerPrivate::outliner()
-{
-    return d.ui->outlinerWidget;
-}
-
-PayloadWidget*
-ViewerPrivate::payload()
-{
-    return d.ui->payloadWidget;
-}
-
-StageModel*
-ViewerPrivate::stageModel()
-{
-    return d.stageModel.data();
-}
-
-SelectionModel*
-ViewerPrivate::selectionModel()
-{
-    return d.selectionModel.data();
+    return d.ui->payloadView;
 }
 
 bool
@@ -445,31 +379,23 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
         profile();
         stylesheet();
     }
-    if (event->type() == QEvent::Close) {
-        if (d.payloadDialog && d.payloadDialog->isVisible()) {
-            d.payloadDialog->close();
-        }
-        saveSettings();
-        return true;
-    }
     return QObject::eventFilter(object, event);
 }
 
 void
 ViewerPrivate::enable(bool enable)
 {
-    d.ui->fileReload->setEnabled(enable);
-    d.ui->fileClose->setEnabled(enable);
-    d.ui->fileSave->setEnabled(enable);
-    d.ui->fileSaveCopy->setEnabled(enable);
-    d.ui->fileExportAll->setEnabled(enable);
-    d.ui->fileExportSelected->setEnabled(enable);
-    d.ui->fileExportImage->setEnabled(enable);
-    d.ui->menuEdit->setEnabled(enable);
-    d.ui->menuDisplay->setEnabled(enable);
-    d.ui->menuComplexity->setEnabled(enable);
-    d.ui->collapse->setEnabled(enable);
-    d.ui->expand->setEnabled(enable);
+    QList<QAction*> actions = { d.ui->fileReload,       d.ui->fileClose,       d.ui->fileSave,
+                                d.ui->fileSaveCopy,     d.ui->fileExportAll,   d.ui->fileExportSelected,
+                                d.ui->fileExportImage,  d.ui->editCopyImage,   d.ui->editDelete,
+                                d.ui->displayIsolate,   d.ui->displayFrameAll, d.ui->displayFrameSelected,
+                                d.ui->displayResetView, d.ui->displayExpand,   d.ui->displayCollapse };
+    for (QAction* action : actions) {
+        if (action)
+            action->setEnabled(enable);
+    }
+    d.ui->editShow->setEnabled(enable);
+    d.ui->editHide->setEnabled(enable);
 }
 
 void
@@ -637,20 +563,20 @@ ViewerPrivate::ready()
 void
 ViewerPrivate::copyImage()
 {
-    QImage image = renderer()->image();
+    QImage image = renderView()->captureImage();
     QClipboard* clipboard = QGuiApplication::clipboard();
     clipboard->setImage(image);
 }
 
 void
-ViewerPrivate::clearColor()
+ViewerPrivate::backgroundColor()
 {
-    QColor color = QColorDialog::getColor(d.clearColor, d.viewer.data(), "Select color");
+    QColor color = QColorDialog::getColor(d.backgroundColor, d.viewer.data(), "Select color");
     if (color.isValid()) {
-        renderer()->setClearColor(color);
-        d.ui->clearColor->setStyleSheet("background-color: " + color.name() + ";");
-        setSettingsValue("clearColor", color.name());
-        d.clearColor = color;
+        renderView()->setBackgroundColor(color);
+        d.ui->backgroundColor->setStyleSheet("background-color: " + color.name() + ";");
+        setSettingsValue("backgroundColor", color.name());
+        d.backgroundColor = color;
     }
 }
 
@@ -702,7 +628,7 @@ void
 ViewerPrivate::exportImage()
 {
     QString exportImageDir = settingsValue("exportImageDir", QDir::homePath()).toString();
-    QImage image = renderer()->image();
+    QImage image = renderView()->captureImage();
     QStringList filters;
     QList<QByteArray> formats = QImageWriter::supportedImageFormats();
     QString defaultFormat = "png";
@@ -740,7 +666,7 @@ ViewerPrivate::exportImage()
 void
 ViewerPrivate::showSelected()
 {
-    if (selectionModel()->paths().size()) {
+    if (d.selectionModel->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), true);
     }
 }
@@ -748,7 +674,7 @@ ViewerPrivate::showSelected()
 void
 ViewerPrivate::showRecursive()
 {
-    if (selectionModel()->paths().size()) {
+    if (d.selectionModel->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), true, true);
     }
 }
@@ -756,7 +682,7 @@ ViewerPrivate::showRecursive()
 void
 ViewerPrivate::hideSelected()
 {
-    if (selectionModel()->paths().size()) {
+    if (d.selectionModel->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), false);
     }
 }
@@ -764,7 +690,7 @@ ViewerPrivate::hideSelected()
 void
 ViewerPrivate::hideRecursive()
 {
-    if (selectionModel()->paths().size()) {
+    if (d.selectionModel->paths().size()) {
         d.stageModel->setVisible(d.selectionModel->paths(), false, true);
     }
 }
@@ -803,7 +729,7 @@ void
 ViewerPrivate::isolate(bool checked)
 {
     if (checked) {
-        if (selectionModel()->paths().size()) {
+        if (d.selectionModel->paths().size()) {
             d.stageModel->setMask(d.selectionModel->paths());
         }
     }
@@ -816,107 +742,65 @@ void
 ViewerPrivate::frameAll()
 {
     if (d.stageModel->isLoaded()) {
-        camera().setBoundingBox(d.stageModel->boundingBox());
-        camera().frameAll();
-        renderer()->update();
+        renderView()->frameAll();
     }
 }
 
 void
 ViewerPrivate::frameSelected()
 {
-    if (selectionModel()->paths().size()) {
-        camera().setBoundingBox(d.stageModel->boundingBox(selectionModel()->paths()));
-        camera().frameAll();
-        renderer()->update();
+    if (d.selectionModel->paths().size()) {
+        renderView()->frameSelected();
     }
 }
 
 void
 ViewerPrivate::resetView()
 {
-    camera().resetView();
-    renderer()->update();
-}
-
-void
-ViewerPrivate::clear()
-{
-    d.ui->clear->setText(QString());
-}
-
-void
-ViewerPrivate::expand()
-{
-    if (selectionModel()->paths().size()) {
-        outliner()->expand();
-    }
+    renderView()->resetView();
 }
 
 void
 ViewerPrivate::collapse()
 {
-    outliner()->collapse();
+    outlinerView()->collapse();
 }
 
 void
-ViewerPrivate::filterChanged(const QString& filter)
+ViewerPrivate::expand()
 {
-    outliner()->setFilter(filter);
-    d.ui->filter->setEnabled(filter.size());
+    if (d.selectionModel->paths().size()) {
+        outlinerView()->expand();
+    }
 }
 
 void
 ViewerPrivate::defaultCameraLightEnabled(bool checked)
 {
-    renderer()->setDefaultCameraLightEnabled(checked);
+    renderView()->setDefaultCameraLightEnabled(checked);
 }
 
 void
 ViewerPrivate::sceneLightsEnabled(bool checked)
 {
-    renderer()->setSceneLightsEnabled(checked);
+    renderView()->setSceneLightsEnabled(checked);
 }
 
 void
 ViewerPrivate::sceneMaterialsEnabled(bool checked)
 {
-    renderer()->setSceneMaterialsEnabled(checked);
+    renderView()->setSceneMaterialsEnabled(checked);
 }
 
 void
 ViewerPrivate::wireframeChanged(bool checked)
 {
     if (checked) {
-        renderer()->setDrawMode(ImagingGLWidget::DrawMode::WireframeOnSurface);
+        renderView()->setDrawMode(RenderView::render_mode::render_wireframe);
     }
     else {
-        renderer()->setDrawMode(ImagingGLWidget::DrawMode::ShadedSmooth);
+        renderView()->setDrawMode(RenderView::render_mode::render_shaded);
     }
-}
-
-void
-ViewerPrivate::asComplexityLow()
-{
-    renderer()->setComplexity(ImagingGLWidget::Low);
-}
-
-void
-ViewerPrivate::asComplexityMedium()
-{
-    renderer()->setComplexity(ImagingGLWidget::Medium);
-}
-
-void
-ViewerPrivate::asComplexityHigh()
-{
-    renderer()->setComplexity(ImagingGLWidget::High);
-}
-
-void
-ViewerPrivate::asComplexityVeryHigh()
-{
-    renderer()->setComplexity(ImagingGLWidget::VeryHigh);
 }
 
 void
@@ -970,7 +854,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 }
 
 void
-ViewerPrivate::stageChanged()
+ViewerPrivate::stageChanged(UsdStageRefPtr stage)
 {
     d.loadInit = false;
 }

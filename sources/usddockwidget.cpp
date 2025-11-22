@@ -22,7 +22,7 @@ DockWidgetPrivate::init()
 {
     QWidget* title = new QWidget;
     title->setFixedHeight(0);
-    title->setStyleSheet("background: transparent;");
+    title->setStyleSheet("background: green;");
     d.widget->setTitleBarWidget(title);
     QPointer<QDockWidget> dock = d.widget;
     QObject::connect(dock, &QDockWidget::topLevelChanged, [dock, title](bool floating) {

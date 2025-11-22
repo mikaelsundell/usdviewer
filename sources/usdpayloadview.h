@@ -12,14 +12,12 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class OutlinerWidgetPrivate;
-class OutlinerWidget : public QTreeWidget {
+class PayloadViewPrivate;
+class PayloadView : public QWidget {
     Q_OBJECT
 public:
-    OutlinerWidget(QWidget* parent = nullptr);
-    virtual ~OutlinerWidget();
-    void collapse();
-    void expand();
+    PayloadView(QWidget* parent = nullptr);
+    virtual ~PayloadView();
 
     StageModel* stageModel() const;
     void setStageModel(StageModel* stageModel);
@@ -27,16 +25,7 @@ public:
     SelectionModel* selectionModel();
     void setSelectionModel(SelectionModel* selectionModel);
 
-    QString filter() const;
-    void setFilter(const QString& filter);
-
-protected:
-    void contextMenuEvent(QContextMenuEvent* event);
-    void keyPressEvent(QKeyEvent* event) override;
-    void mousePressEvent(QMouseEvent* event) override;
-    void mouseMoveEvent(QMouseEvent* event) override;
-
 private:
-    QScopedPointer<OutlinerWidgetPrivate> p;
+    QScopedPointer<PayloadViewPrivate> p;
 };
 }  // namespace usd

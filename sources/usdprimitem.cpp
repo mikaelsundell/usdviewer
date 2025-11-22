@@ -2,7 +2,7 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdoutlineritem.h"
+#include "usdprimitem.h"
 #include <QPointer>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/imageable.h>
@@ -11,24 +11,24 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class OutlinerItemPrivate {
+class PrimItemPrivate {
 public:
     void init();
     struct Data {
         UsdStageRefPtr stage;
         SdfPath path;
-        OutlinerItem* item;
+        PrimItem* item;
     };
     Data d;
 };
 
 void
-OutlinerItemPrivate::init()
+PrimItemPrivate::init()
 {}
 
-OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path)
+PrimItem::PrimItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path)
     : QTreeWidgetItem(parent)
-    , p(new OutlinerItemPrivate())
+    , p(new PrimItemPrivate())
 {
     p->d.item = this;
     p->d.stage = stage;
@@ -38,9 +38,9 @@ OutlinerItem::OutlinerItem(QTreeWidget* parent, const UsdStageRefPtr& stage, con
     p->init();
 }
 
-OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path)
+PrimItem::PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path)
     : QTreeWidgetItem(parent)
-    , p(new OutlinerItemPrivate())
+    , p(new PrimItemPrivate())
 {
     p->d.item = this;
     p->d.stage = stage;
@@ -49,10 +49,10 @@ OutlinerItem::OutlinerItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage,
     setCheckState(0, Qt::Unchecked);
     p->init();
 }
-OutlinerItem::~OutlinerItem() {}
+PrimItem::~PrimItem() {}
 
 QVariant
-OutlinerItem::data(int column, int role) const
+PrimItem::data(int column, int role) const
 {
     if (!p->d.stage)
         return QVariant();
@@ -91,7 +91,7 @@ OutlinerItem::data(int column, int role) const
 }
 
 bool
-OutlinerItem::isVisible() const
+PrimItem::isVisible() const
 {
     if (!p->d.stage)
         return false;

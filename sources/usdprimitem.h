@@ -5,22 +5,22 @@
 #pragma once
 
 #include <QTreeWidgetItem>
-#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class OutlinerItemPrivate;
-class OutlinerItem : public QTreeWidgetItem {
+class PrimItemPrivate;
+class PrimItem : public QTreeWidgetItem {
 public:
     enum Column { Name = 0, Type = 1, Visible = 2 };
-    OutlinerItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path);
-    OutlinerItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path);
-    virtual ~OutlinerItem();
+    PrimItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path);
+    PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path);
+    virtual ~PrimItem();
     QVariant data(int column, int role) const override;
     bool isVisible() const;
 
 private:
-    QScopedPointer<OutlinerItemPrivate> p;
+    QScopedPointer<PrimItemPrivate> p;
 };
 }  // namespace usd

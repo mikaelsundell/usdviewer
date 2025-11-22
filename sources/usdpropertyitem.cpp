@@ -2,33 +2,33 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdinspectoritem.h"
+#include "usdpropertyitem.h"
 #include <QPointer>
 
 namespace usd {
-class InspectorItemPrivate {
+class PropertyItemPrivate {
 public:
     void init();
     struct Data {
-        InspectorItem* item;
+        PropertyItem* item;
     };
     Data d;
 };
 
 void
-InspectorItemPrivate::init()
+PropertyItemPrivate::init()
 {}
 
-InspectorItem::InspectorItem(QTreeWidget* parent)
+PropertyItem::PropertyItem(QTreeWidget* parent)
     : QTreeWidgetItem(parent)
-    , p(new InspectorItemPrivate())
+    , p(new PropertyItemPrivate())
 {}
 
-InspectorItem::InspectorItem(QTreeWidgetItem* parent)
+PropertyItem::PropertyItem(QTreeWidgetItem* parent)
     : QTreeWidgetItem(parent)
-    , p(new InspectorItemPrivate())
+    , p(new PropertyItemPrivate())
 {}
 
-InspectorItem::~InspectorItem() {}
+PropertyItem::~PropertyItem() {}
 
 }  // namespace usd

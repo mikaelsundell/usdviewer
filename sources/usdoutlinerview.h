@@ -6,17 +6,18 @@
 
 #include "usdselectionmodel.h"
 #include "usdstagemodel.h"
-#include <QDialog>
+#include <QTreeWidget>
+#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class PayloadDialogPrivate;
-class PayloadDialog : public QDialog {
+class OutlinerViewPrivate;
+class OutlinerView : public QWidget {
     Q_OBJECT
 public:
-    PayloadDialog(QWidget* parent = nullptr);
-    virtual ~PayloadDialog();
+    OutlinerView(QWidget* parent = nullptr);
+    virtual ~OutlinerView();
 
     StageModel* stageModel() const;
     void setStageModel(StageModel* stageModel);
@@ -25,16 +26,10 @@ public:
     void setSelectionModel(SelectionModel* selectionModel);
 
 public Q_SLOTS:
-    void payloadsRequested(const QList<SdfPath>& paths);
-    void payloadsFailed(const SdfPath& paths);
-    void payloadsLoaded(const SdfPath& paths);
-    void payloadsUnloaded(const SdfPath& paths);
-    void cancel();
-
-Q_SIGNALS:
-    void cancelRequested();
+    void collapse();
+    void expand();
 
 private:
-    QScopedPointer<PayloadDialogPrivate> p;
+    QScopedPointer<OutlinerViewPrivate> p;
 };
 }  // namespace usd

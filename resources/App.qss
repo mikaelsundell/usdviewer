@@ -85,9 +85,8 @@ QDockWidget {
     background: $dock;
 }
 
-QWidget#leftDockWidgetContents,
-QWidget#rightDockWidgetContents {
-    background: $dock;
+QWidget[DockWidget="true"] {
+    background-color: $dock;
 }
 
 QLabel

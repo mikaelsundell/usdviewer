@@ -7,15 +7,15 @@
 #include <QTreeWidgetItem>
 
 namespace usd {
-class InspectorItemPrivate;
-class InspectorItem : public QTreeWidgetItem {
+class PropertyItemPrivate;
+class PropertyItem : public QTreeWidgetItem {
 public:
     enum Column { Name = 0, Value };
-    InspectorItem(QTreeWidget* parent);
-    InspectorItem(QTreeWidgetItem* parent);
-    virtual ~InspectorItem();
+    PropertyItem(QTreeWidget* parent);
+    PropertyItem(QTreeWidgetItem* parent);
+    virtual ~PropertyItem();
 
 private:
-    QScopedPointer<InspectorItemPrivate> p;
+    QScopedPointer<PropertyItemPrivate> p;
 };
 }  // namespace usd

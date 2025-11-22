@@ -4,20 +4,20 @@
 
 #pragma once
 
+#include "command.h"
 #include "usdselectionmodel.h"
 #include "usdstagemodel.h"
-#include <QTreeWidget>
-#include <pxr/usd/usd/stage.h>
-
-PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class PayloadWidgetPrivate;
-class PayloadWidget : public QTreeWidget {
+class CommandStackPrivate;
+class CommandStack : public QObject {
     Q_OBJECT
 public:
-    PayloadWidget(QWidget* parent = nullptr);
-    virtual ~PayloadWidget();
+    CommandStack(QObject* parent = nullptr);
+    virtual ~CommandStack();
+    void execute(Command* command);
+    bool canUndo() const;
+    bool canRedo() const;
 
     StageModel* stageModel() const;
     void setStageModel(StageModel* stageModel);
@@ -25,7 +25,15 @@ public:
     SelectionModel* selectionModel();
     void setSelectionModel(SelectionModel* selectionModel);
 
+public Q_SLOTS:
+    void undo();
+    void redo();
+
+Q_SIGNALS:
+    void commandExecuted(Command* command);
+    void changed();
+
 private:
-    QScopedPointer<PayloadWidgetPrivate> p;
+    QScopedPointer<CommandStackPrivate> p;
 };
-}  // namespace usd
+};  // namespace usd

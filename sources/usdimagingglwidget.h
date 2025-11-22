@@ -15,20 +15,27 @@ class ImagingGLWidgetPrivate;
 class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     Q_OBJECT
 public:
-    enum Complexity { Low, Medium, High, VeryHigh };
-    enum DrawMode { Points, Wireframe, WireframeOnSurface, ShadedFlat, ShadedSmooth, GeomOnly, GeomFlat, GeomSmooth };
+    enum complexity_level { complexity_low, complexity_medium, complexity_high, complexity_veryhigh };
+    enum draw_mode {
+        draw_points,
+        draw_wireframe,
+        draw_wireframeonsurface,
+        draw_shadedflat,
+        draw_shadedsmooth,
+        draw_geomonly,
+        draw_geomflat,
+        draw_geomsmooth
+    };
 
 public:
     ImagingGLWidget(QWidget* parent = nullptr);
     virtual ~ImagingGLWidget();
     ViewCamera viewCamera() const;
-    QImage image();
+    QImage captureImage();
+    void clear();
 
-    ImagingGLWidget::Complexity complexity() const;
-    void setComplexity(ImagingGLWidget::Complexity complexity);
-
-    DrawMode drawMode() const;
-    void setDrawMode(ImagingGLWidget::DrawMode drawMode);
+    draw_mode drawMode() const;
+    void setDrawMode(draw_mode drawMode);
 
     QColor clearColor() const;
     void setClearColor(const QColor& color);
@@ -45,19 +52,19 @@ public:
     QList<QString> rendererAovs() const;
     void setRendererAov(const QString& aov);
 
-    StageModel* stageModel() const;
-    void setStageModel(StageModel* stageModel);
-
-    SelectionModel* selectionModel();
-    void setSelectionModel(SelectionModel* selectionModel);
+    void updateStage(UsdStageRefPtr stage);
+    void updateBoundingBox(const GfBBox3d& bbox);
+    void updateMask(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths);
+    void updateSelection(const QList<SdfPath>& paths);
 
 Q_SIGNALS:
-    void rendererReady();
+    void renderReady();
 
 protected:
     void initializeGL() override;
     void paintGL() override;
-    void paintEvent(QPaintEvent* event);
+    void paintEvent(QPaintEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;

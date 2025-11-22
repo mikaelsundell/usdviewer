@@ -3,6 +3,8 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdimagingglwidget.h"
+#include "command.h"
+#include "commanddispatcher.h"
 #include "platform.h"
 #include "usdutils.h"
 #include "usdviewcamera.h"
@@ -34,28 +36,23 @@ public:
     void init();
     void initGL();
     void initCamera();
-    void initController();
-    void initStageModel();
-    void initSelection();
+    void clear();
     void paintGL();
     void paintEvent(QPaintEvent* event);
+    void focusEvent(QMouseEvent* event);
     void mouseDoubleClickEvent(QMouseEvent* event);
     void mousePressEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
+    void sweepEvent(const QRect& rect, QMouseEvent* event);
     void wheelEvent(QWheelEvent* event);
-
-public Q_SLOTS:
-    void loaded(const QString& filename);
-    void selectionChanged(const QList<SdfPath>& paths);
-    void maskChanged(const QList<SdfPath>& paths);
-    void primsChanged(const QList<SdfPath>& paths);
-    void stageChanged();
+    void updateStage(UsdStageRefPtr stage);
+    void updateBoundingBox(const GfBBox3d& bbox);
+    void updateMask(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths);
+    void updateSelection(const QList<SdfPath>& paths);
 
 public:
-    void focusEvent(QMouseEvent* event);
-    void sweepEvent(const QRect& rect, QMouseEvent* event);
-    double complexityRefinement(ImagingGLWidget::Complexity complexity);
     QPoint deviceRatio(QPoint value) const;
     double deviceRatio(double value) const;
     double widgetAspectRatio() const;
@@ -80,13 +77,13 @@ public:
         QPoint mousepos;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
-        ImagingGLWidget::Complexity complexity;
-        ImagingGLWidget::DrawMode drawMode;
+        ImagingGLWidget::draw_mode drawMode;
+        UsdStageRefPtr stage;
         UsdImagingGLRenderParams params;
+        GfBBox3d bbox;
         QList<SdfPath> mask;
+        QList<SdfPath> selection;
         QScopedPointer<UsdImagingGLEngine> glEngine;
-        QPointer<StageModel> stageModel;
-        QPointer<SelectionModel> selectionModel;
         QPointer<ImagingGLWidget> glwidget;
     };
     Data d;
@@ -111,8 +108,8 @@ ImagingGLWidgetPrivate::init()
     d.sceneLightsEnabled = true;
     d.sceneMaterialsEnabled = true;
     d.drag = false;
-    d.complexity = ImagingGLWidget::Low;
-    d.drawMode = ImagingGLWidget::ShadedSmooth;
+    d.drawMode = ImagingGLWidget::draw_shadedsmooth;
+    clear();
 }
 
 void
@@ -132,17 +129,17 @@ ImagingGLWidgetPrivate::initGL()
             qWarning() << "could not initialize gl engine, no hydra driver found.";
             d.glEngine.reset();
         }
-        d.glwidget->rendererReady();
+        d.glwidget->renderReady();
     }
 }
 
 void
 ImagingGLWidgetPrivate::initCamera()
 {
-    Q_ASSERT("stage is not loaded" && d.stageModel->isLoaded());
+    Q_ASSERT("stage is not loaded" && d.stage);
     d.viewCamera = ViewCamera();
-    d.viewCamera.setBoundingBox(d.stageModel->boundingBox());
-    TfToken upAxis = UsdGeomGetStageUpAxis(d.stageModel->stage());
+    d.viewCamera.setBoundingBox(d.bbox);
+    TfToken upAxis = UsdGeomGetStageUpAxis(d.stage);
     if (upAxis == TfToken("X")) {
         d.viewCamera.setCameraUp(ViewCamera::X);
     }
@@ -156,18 +153,14 @@ ImagingGLWidgetPrivate::initCamera()
 }
 
 void
-ImagingGLWidgetPrivate::initStageModel()
+ImagingGLWidgetPrivate::clear()
 {
-    connect(d.stageModel.data(), &StageModel::stageChanged, this, &ImagingGLWidgetPrivate::stageChanged);
-    connect(d.stageModel.data(), &StageModel::maskChanged, this, &ImagingGLWidgetPrivate::maskChanged);
-    connect(d.stageModel.data(), &StageModel::primsChanged, this, &ImagingGLWidgetPrivate::primsChanged);
-}
-
-void
-ImagingGLWidgetPrivate::initSelection()
-{
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this,
-            &ImagingGLWidgetPrivate::selectionChanged);
+    d.mask.clear();
+    d.glEngine.reset();
+    initGL();
+    d.glwidget->update();
+    d.stage = nullptr;
+    d.selection = QList<SdfPath>();
 }
 
 void
@@ -179,7 +172,7 @@ ImagingGLWidgetPrivate::paintGL()
     // paintGL() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
 
-    if (d.stageModel && d.stageModel->isLoaded()) {
+    if (d.stage) {
         if (d.glEngine) {
             if (!d.glEngine->IsColorCorrectionCapable()) {
                 glEnable(GL_FRAMEBUFFER_SRGB);
@@ -210,19 +203,20 @@ ImagingGLWidgetPrivate::paintGL()
             GfMatrix4d projectionMatrix = frustum.ComputeProjectionMatrix();
             d.glEngine->SetCameraState(viewModel, projectionMatrix);
             d.params.clearColor = QColor_GfVec4f(d.clearColor);
-            d.params.complexity = complexityRefinement(d.complexity);
             // drawmode
             {
                 UsdImagingGLDrawMode mode;
                 switch (d.drawMode) {
-                case ImagingGLWidget::Points: mode = UsdImagingGLDrawMode::DRAW_POINTS; break;
-                case ImagingGLWidget::Wireframe: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME; break;
-                case ImagingGLWidget::WireframeOnSurface: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE; break;
-                case ImagingGLWidget::ShadedFlat: mode = UsdImagingGLDrawMode::DRAW_SHADED_FLAT; break;
-                case ImagingGLWidget::ShadedSmooth: mode = UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH; break;
-                case ImagingGLWidget::GeomOnly: mode = UsdImagingGLDrawMode::DRAW_GEOM_ONLY; break;
-                case ImagingGLWidget::GeomFlat: mode = UsdImagingGLDrawMode::DRAW_GEOM_FLAT; break;
-                case ImagingGLWidget::GeomSmooth: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH; break;
+                case ImagingGLWidget::draw_points: mode = UsdImagingGLDrawMode::DRAW_POINTS; break;
+                case ImagingGLWidget::draw_wireframe: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME; break;
+                case ImagingGLWidget::draw_wireframeonsurface:
+                    mode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE;
+                    break;
+                case ImagingGLWidget::draw_shadedflat: mode = UsdImagingGLDrawMode::DRAW_SHADED_FLAT; break;
+                case ImagingGLWidget::draw_shadedsmooth: mode = UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH; break;
+                case ImagingGLWidget::draw_geomonly: mode = UsdImagingGLDrawMode::DRAW_GEOM_ONLY; break;
+                case ImagingGLWidget::draw_geomflat: mode = UsdImagingGLDrawMode::DRAW_GEOM_FLAT; break;
+                case ImagingGLWidget::draw_geomsmooth: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH; break;
                 default: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH;
                 }
                 d.params.drawMode = mode;
@@ -264,8 +258,7 @@ ImagingGLWidgetPrivate::paintGL()
             TfErrorMark mark;
             Hgi* hgi = d.glEngine->GetHgi();
             hgi->StartFrame();
-            QReadLocker locker(d.stageModel->stageLock());
-            UsdPrim root = d.stageModel->stage()->GetPseudoRoot();
+            UsdPrim root = d.stage->GetPseudoRoot();
             if (!d.mask.isEmpty()) {
                 SdfPathVector paths;
                 for (const SdfPath& path : d.mask)
@@ -303,6 +296,45 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
 }
 
 void
+ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
+{
+    d.glwidget->makeCurrent();
+    if (!d.stage || !d.glEngine)
+        return;
+
+#ifdef WIN32
+    glDepthMask(GL_TRUE);
+#endif
+
+    const qreal deviceRatio = d.glwidget->devicePixelRatioF();
+    QPointF mousePosDevice = event->pos() * deviceRatio;
+    GfVec4d viewport = widgetViewport();
+
+    GfVec2d pos((mousePosDevice.x() - viewport[0]) / static_cast<double>(viewport[2]),
+                (mousePosDevice.y() - viewport[1]) / static_cast<double>(viewport[3]));
+    pos[0] = pos[0] * 2.0 - 1.0;
+    pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
+
+    GfVec2d size(1.0 / static_cast<double>(viewport[2]), 1.0 / static_cast<double>(viewport[3]));
+
+    GfCamera camera = d.viewCamera.camera();
+    GfFrustum frustum = camera.GetFrustum();
+    GfFrustum pickFrustum = frustum.ComputeNarrowedFrustum(pos, size);
+
+    GfVec3d hitPoint, hitNormal;
+    SdfPath hitPrimPath, hitInstancerPath;
+
+    bool hit = d.glEngine->TestIntersection(pickFrustum.ComputeViewMatrix(), pickFrustum.ComputeProjectionMatrix(),
+                                            d.stage->GetPseudoRoot(), d.params, &hitPoint, &hitNormal, &hitPrimPath,
+                                            &hitInstancerPath);
+
+    if (hit) {
+        d.viewCamera.setFocusPoint(hitPoint);
+        d.glwidget->update();
+    }
+}
+
+void
 ImagingGLWidgetPrivate::mouseDoubleClickEvent(QMouseEvent* event)
 {
     if (event->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) {
@@ -313,7 +345,7 @@ ImagingGLWidgetPrivate::mouseDoubleClickEvent(QMouseEvent* event)
 void
 ImagingGLWidgetPrivate::mousePressEvent(QMouseEvent* event)
 {
-    if (d.stageModel->isLoaded()) {
+    if (d.stage) {
         if (event->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) {
             d.drag = true;
             if (event->button() == Qt::LeftButton) {
@@ -338,7 +370,7 @@ ImagingGLWidgetPrivate::mousePressEvent(QMouseEvent* event)
 void
 ImagingGLWidgetPrivate::mouseMoveEvent(QMouseEvent* event)
 {
-    if (d.stageModel->isLoaded()) {
+    if (d.stage) {
         QPoint pos = event->pos();
         if (d.drag) {
             QPoint delta = deviceRatio(pos) - deviceRatio(d.mousepos);
@@ -367,7 +399,7 @@ ImagingGLWidgetPrivate::mouseMoveEvent(QMouseEvent* event)
 void
 ImagingGLWidgetPrivate::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (d.stageModel->isLoaded()) {
+    if (d.stage) {
         if (d.drag) {
             d.drag = false;
             d.viewCamera.setCameraMode(ViewCamera::None);
@@ -382,59 +414,10 @@ ImagingGLWidgetPrivate::mouseReleaseEvent(QMouseEvent* event)
 }
 
 void
-ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
-{
-    double delta = static_cast<double>(event->angleDelta().y()) / 1000.0;
-    double clamped = std::max(-0.5, std::min(0.5, delta));
-    double factor = 1.0 - clamped;
-    d.viewCamera.distance(factor);
-    d.glwidget->update();
-}
-
-void
-ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
-{
-    d.glwidget->makeCurrent();
-    if (!d.stageModel || !d.stageModel->isLoaded() || !d.glEngine)
-        return;
-
-#ifdef WIN32
-    glDepthMask(GL_TRUE);
-#endif
-
-    const qreal deviceRatio = d.glwidget->devicePixelRatioF();
-    QPointF mousePosDevice = event->pos() * deviceRatio;
-    GfVec4d viewport = widgetViewport();
-
-    GfVec2d pos((mousePosDevice.x() - viewport[0]) / static_cast<double>(viewport[2]),
-                (mousePosDevice.y() - viewport[1]) / static_cast<double>(viewport[3]));
-    pos[0] = pos[0] * 2.0 - 1.0;
-    pos[1] = -1.0 * (pos[1] * 2.0 - 1.0);
-
-    GfVec2d size(1.0 / static_cast<double>(viewport[2]), 1.0 / static_cast<double>(viewport[3]));
-
-    GfCamera camera = d.viewCamera.camera();
-    GfFrustum frustum = camera.GetFrustum();
-    GfFrustum pickFrustum = frustum.ComputeNarrowedFrustum(pos, size);
-
-    GfVec3d hitPoint, hitNormal;
-    SdfPath hitPrimPath, hitInstancerPath;
-
-    bool hit = d.glEngine->TestIntersection(pickFrustum.ComputeViewMatrix(), pickFrustum.ComputeProjectionMatrix(),
-                                            d.stageModel->stage()->GetPseudoRoot(), d.params, &hitPoint, &hitNormal,
-                                            &hitPrimPath, &hitInstancerPath);
-
-    if (hit) {
-        d.viewCamera.setFocusPoint(hitPoint);
-        d.glwidget->update();
-    }
-}
-
-void
 ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
 {
     d.glwidget->makeCurrent();
-    if (!d.stageModel || !d.stageModel->isLoaded() || !d.glEngine)
+    if (!d.stage || !d.glEngine)
         return;
 
 #ifdef WIN32
@@ -469,8 +452,8 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
 
     UsdImagingGLEngine::IntersectionResultVector results;
     const bool hit = d.glEngine->TestIntersection(pickParams, pickFr.ComputeViewMatrix(),
-                                                  pickFr.ComputeProjectionMatrix(),
-                                                  d.stageModel->stage()->GetPseudoRoot(), d.params, &results);
+                                                  pickFr.ComputeProjectionMatrix(), d.stage->GetPseudoRoot(), d.params,
+                                                  &results);
 
     QList<SdfPath> selectedPaths;
     if (hit) {
@@ -478,22 +461,83 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
             if (!rItem.hitPrimPath.IsEmpty())
                 selectedPaths.append(rItem.hitPrimPath);
     }
+
+    bool changed = false;
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {
-            d.selectionModel->togglePaths(selectedPaths);
+            for (const SdfPath& path : selectedPaths) {
+                qsizetype index = d.selection.indexOf(path);
+                if (index != -1) {
+                    d.selection.removeAt(index);
+                    changed = true;
+                }
+                else {
+                    d.selection.append(path);
+                    changed = true;
+                }
+            }
         }
         else {
-            d.selectionModel->replacePaths(selectedPaths);
+            if (d.selection != selectedPaths) {
+                d.selection = selectedPaths;
+                changed = true;
+            }
         }
     }
     else {
-        d.selectionModel->clear();
+        if (!d.selection.isEmpty()) {
+            d.selection.clear();
+            changed = true;
+        }
+    }
+    if (changed) {
+        CommandDispatcher::run(new Command(setSelection(d.selection)));
     }
     d.glwidget->update();
 }
 
 void
-ImagingGLWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
+ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
+{
+    double delta = static_cast<double>(event->angleDelta().y()) / 1000.0;
+    double clamped = std::max(-0.5, std::min(0.5, delta));
+    double factor = 1.0 - clamped;
+    d.viewCamera.distance(factor);
+    d.glwidget->update();
+}
+
+
+void
+ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
+{
+    d.stage = stage;
+    d.mask.clear();
+    d.glEngine.reset();
+    initCamera();
+    initGL();
+}
+
+void
+ImagingGLWidgetPrivate::updateBoundingBox(const GfBBox3d& bbox)
+{
+    d.bbox = bbox;
+}
+
+void
+ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
+{
+    d.mask = paths;
+    d.glwidget->update();
+}
+
+void
+ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths)
+{
+    d.glwidget->update();
+}
+
+void
+ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
     d.glEngine->ClearSelected();
@@ -501,46 +545,7 @@ ImagingGLWidgetPrivate::selectionChanged(const QList<SdfPath>& paths)
         d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
     }
     d.glwidget->update();
-}
-
-void
-ImagingGLWidgetPrivate::maskChanged(const QList<SdfPath>& paths)
-{
-    d.mask = paths;
-    d.glwidget->update();
-}
-
-void
-ImagingGLWidgetPrivate::primsChanged(const QList<SdfPath>& paths)
-{
-    d.glwidget->update();
-}
-
-void
-ImagingGLWidgetPrivate::stageChanged()
-{
-    d.mask.clear();
-    d.glEngine.reset();
-    if (d.stageModel->isLoaded()) {
-        initCamera();
-        initGL();
-    }
-    else {
-        initGL();
-        d.glwidget->update();
-    }
-}
-
-double
-ImagingGLWidgetPrivate::complexityRefinement(ImagingGLWidget::Complexity complexity)
-{
-    switch (complexity) {
-    case ImagingGLWidget::Low: return 1.0;
-    case ImagingGLWidget::Medium: return 1.1;
-    case ImagingGLWidget::High: return 1.2;
-    case ImagingGLWidget::VeryHigh: return 1.3;
-    default: Q_ASSERT("complexity value not defined"); return 1.0;
-    }
+    d.selection = paths;
 }
 
 QPoint
@@ -599,34 +604,25 @@ ImagingGLWidget::viewCamera() const
 }
 
 QImage
-ImagingGLWidget::image()
+ImagingGLWidget::captureImage()
 {
     return QOpenGLWidget::grabFramebuffer();
 }
 
-ImagingGLWidget::Complexity
-ImagingGLWidget::complexity() const
-{
-    return p->d.complexity;
-}
-
 void
-ImagingGLWidget::setComplexity(ImagingGLWidget::Complexity complexity)
+ImagingGLWidget::clear()
 {
-    if (p->d.complexity != complexity) {
-        p->d.complexity = complexity;
-        update();
-    }
+    p->clear();
 }
 
-ImagingGLWidget::DrawMode
+ImagingGLWidget::draw_mode
 ImagingGLWidget::drawMode() const
 {
     return p->d.drawMode;
 }
 
 void
-ImagingGLWidget::setDrawMode(DrawMode drawMode)
+ImagingGLWidget::setDrawMode(draw_mode drawMode)
 {
     if (drawMode != p->d.drawMode) {
         p->d.drawMode = drawMode;
@@ -710,36 +706,34 @@ ImagingGLWidget::setRendererAov(const QString& aov)
     }
 }
 
-StageModel*
-ImagingGLWidget::stageModel() const
+void
+ImagingGLWidget::updateStage(UsdStageRefPtr stage)
 {
-    return p->d.stageModel;
+    p->updateStage(stage);
 }
 
 void
-ImagingGLWidget::setStageModel(StageModel* stageModel)
+ImagingGLWidget::updateBoundingBox(const GfBBox3d& bbox)
 {
-    if (p->d.stageModel != stageModel) {
-        p->d.stageModel = stageModel;
-        p->initStageModel();
-        update();
-    }
-}
-
-SelectionModel*
-ImagingGLWidget::selectionModel()
-{
-    return p->d.selectionModel;
+    p->updateBoundingBox(bbox);
 }
 
 void
-ImagingGLWidget::setSelectionModel(SelectionModel* selectionModel)
+ImagingGLWidget::updateMask(const QList<SdfPath>& paths)
 {
-    if (p->d.selectionModel != selectionModel) {
-        p->d.selectionModel = selectionModel;
-        p->initSelection();
-        update();
-    }
+    p->updateMask(paths);
+}
+
+void
+ImagingGLWidget::updatePrims(const QList<SdfPath>& paths)
+{
+    p->updatePrims(paths);
+}
+
+void
+ImagingGLWidget::updateSelection(const QList<SdfPath>& paths)
+{
+    p->updateSelection(paths);
 }
 
 void

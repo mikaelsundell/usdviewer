@@ -42,19 +42,8 @@ SelectionModel::addPaths(const QList<SdfPath>& paths)
             changed = true;
         }
     }
-
     if (changed)
         Q_EMIT selectionChanged(p->d.paths);
-}
-
-void
-SelectionModel::replacePaths(const QList<SdfPath>& paths)
-{
-    if (p->d.paths == paths)
-        return;
-
-    p->d.paths = paths;
-    Q_EMIT selectionChanged(p->d.paths);
 }
 
 void
@@ -85,6 +74,15 @@ SelectionModel::togglePaths(const QList<SdfPath>& paths)
     }
     if (changed)
         Q_EMIT selectionChanged(p->d.paths);
+}
+
+void
+SelectionModel::updatePaths(const QList<SdfPath>& paths)
+{
+    if (p->d.paths == paths)
+        return;
+    p->d.paths = paths;
+    Q_EMIT selectionChanged(p->d.paths);
 }
 
 QList<SdfPath>

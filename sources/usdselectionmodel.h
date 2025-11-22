@@ -21,16 +21,16 @@ public:
     ~SelectionModel();
     bool isSelected(const SdfPath& path) const;
     void addPaths(const QList<SdfPath>& path);
-    void replacePaths(const QList<SdfPath>& paths);
     void removePaths(const QList<SdfPath>& paths);
     void togglePaths(const QList<SdfPath>& paths);
+    void updatePaths(const QList<SdfPath>& paths);
     QList<SdfPath> paths() const;
     void clear();
     bool isEmpty() const;
     bool isValid() const;
 
 Q_SIGNALS:
-    void selectionChanged(const QList<SdfPath>& paths) const;
+    void selectionChanged(const QList<SdfPath>& paths);
 
 private:
     QScopedPointer<SelectionModelPrivate> p;

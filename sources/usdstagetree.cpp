@@ -193,9 +193,9 @@ bool
 StageTreePrivate::eventFilter(QObject* obj, QEvent* event)
 {
     if (event->type() == QEvent::Show) {
-        static bool initx = false;
-        if (!initx) {
-            initx = true;
+        static bool inittree = false;
+        if (!inittree) {
+            inittree = true;
             d.tree->setColumnWidth(PrimItem::Name, 200);
             d.tree->setColumnWidth(PrimItem::Type, 80);
             d.tree->header()->setSectionResizeMode(PrimItem::Visible, QHeaderView::Stretch);

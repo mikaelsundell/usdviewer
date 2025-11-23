@@ -24,6 +24,7 @@ public:
     bool loadFromFile(const QString& filename, StageModel::load_policy loadPolicy);
     bool loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet, const std::string& variantValue);
     bool unloadPayloads(const QList<SdfPath>& paths);
+    void cancelPayloads();
     bool saveToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool close();
@@ -76,6 +77,8 @@ public:
         StageModel::stage_status stageStatus;
         QString filename;
         GfBBox3d bbox;
+        QFuture<void> payloadJob;
+        std::atomic<bool> cancelRequested { false };
         QList<SdfPath> mask;
         QThreadPool pool;
         QReadWriteLock stageLock;
@@ -149,17 +152,21 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const std::string& 
         return false;
 
     const bool useVariant = (!variantSet.empty() && !variantValue.empty());
-
-    Q_EMIT d.stageModel->payloadsRequested(paths);
+    Q_EMIT d.stageModel->payloadsRequested(paths, StageModel::payload_loaded);
 
     auto stage = d.stage;
     auto pool = &d.pool;
-    QFuture<void> future = QtConcurrent::run(pool, [this, stage, paths, variantSet, variantValue, useVariant]() {
+    
+    d.cancelRequested = false;
+    d.payloadJob = QtConcurrent::run(pool, [this, stage, paths, variantSet, variantValue, useVariant]() {
         QList<SdfPath> loaded;
         QList<SdfPath> failed;
         {
             QWriteLocker locker(&d.stageLock);
             for (const SdfPath& path : paths) {
+                if (d.cancelRequested)
+                    break;
+                
                 UsdPrim prim = stage->GetPrimAtPath(path);
                 if (!prim) {
                     failed.append(path);
@@ -223,7 +230,7 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
     if (!isLoaded())
         return false;
 
-    Q_EMIT d.stageModel->payloadsRequested(paths);
+    Q_EMIT d.stageModel->payloadsRequested(paths, StageModel::payload_unloaded);
 
     auto stage = d.stage;
     auto pool = &d.pool;
@@ -256,6 +263,14 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
             Qt::QueuedConnection);
     });
     return true;
+}
+
+void
+StageModelPrivate::cancelPayloads()
+{
+    if (!d.payloadJob.isRunning())
+        return false;
+    d.cancelRequested = true;
 }
 
 bool
@@ -529,6 +544,12 @@ bool
 StageModel::unloadPayloads(const QList<SdfPath>& paths)
 {
     return p->unloadPayloads(paths);
+}
+
+void
+StageModel::cancelPayloads()
+{
+    p->cancelPayloads();
 }
 
 bool

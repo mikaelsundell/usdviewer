@@ -46,7 +46,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QProgressBar" name="progressBar">
+       <widget class="QProgressBar" name="progress">
         <property name="maximum">
          <number>100</number>
         </property>
@@ -55,6 +55,18 @@
         </property>
         <property name="textVisible">
          <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="status">
+        <property name="font">
+         <font>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Time: 00:00:00 (Files: 0 / 0, 0 MB loaded)</string>
         </property>
        </widget>
       </item>
@@ -68,13 +80,6 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Time: 00:00:00 (Files: 0 / 0, 0 MB loaded)</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QWidget" name="widget_6" native="true">
         <property name="minimumSize">
          <size>
@@ -84,7 +89,7 @@
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
-          <widget class="QPushButton" name="pushButton">
+          <widget class="QPushButton" name="cancel">
            <property name="text">
             <string>Cancel</string>
            </property>
@@ -104,7 +109,7 @@
           </spacer>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_2">
+          <widget class="QPushButton" name="clear">
            <property name="text">
             <string>Clear</string>
            </property>

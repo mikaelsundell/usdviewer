@@ -431,6 +431,9 @@
      <bool>true</bool>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_4">
+     <property name="spacing">
+      <number>0</number>
+     </property>
      <property name="leftMargin">
       <number>4</number>
      </property>
@@ -441,7 +444,7 @@
       <number>4</number>
      </property>
      <property name="bottomMargin">
-      <number>4</number>
+      <number>0</number>
      </property>
      <item>
       <widget class="usd::OutlinerView" name="outlinerView" native="true"/>
@@ -609,6 +612,9 @@
      <bool>true</bool>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_3">
+     <property name="spacing">
+      <number>0</number>
+     </property>
      <property name="leftMargin">
       <number>4</number>
      </property>
@@ -619,7 +625,7 @@
       <number>4</number>
      </property>
      <property name="bottomMargin">
-      <number>4</number>
+      <number>0</number>
      </property>
      <item>
       <widget class="usd::PayloadView" name="payloadView" native="true"/>

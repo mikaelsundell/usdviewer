@@ -18,7 +18,7 @@ class StageModel : public QObject {
     Q_OBJECT
 public:
     enum load_policy { load_all, load_payload };
-    enum payload_mode { payload_loaded, payload_failed, payload_unloaded };
+    enum payload_mode { payload_loaded, payload_unloaded, payload_failed };
     enum stage_status { stage_loaded, stage_failed, stage_closed };
 
 public:
@@ -30,6 +30,7 @@ public:
     bool loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet = std::string(),
                       const std::string& variantValue = std::string());
     bool unloadPayloads(const QList<SdfPath>& paths);
+    void cancelPayloads();
     bool saveToFile(const QString& filename);
     bool exportToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
@@ -49,7 +50,7 @@ Q_SIGNALS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
-    void payloadsRequested(const QList<SdfPath>& paths);
+    void payloadsRequested(const QList<SdfPath>& paths, payload_mode mode);
     void payloadChanged(const SdfPath& path, payload_mode mode);
     void stageChanged(UsdStageRefPtr stage, load_policy policy, stage_status status);
 

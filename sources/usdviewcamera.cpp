@@ -250,23 +250,23 @@ ViewCamera::focusPoint() const
     return p->d.focusPoint;
 }
 
-void
-ViewCamera::setFocusPoint(const GfVec3d& point)
+void ViewCamera::setFocusPoint(const GfVec3d& point)
 {
-    if (p->d.focusPoint != point) {
-        GfCamera cam = p->d.camera;
-        GfMatrix4d oldXf = cam.GetTransform();
-        GfVec3d oldPos = oldXf.ExtractTranslation();
-        GfVec3d viewDir = (p->d.focusPoint - oldPos).GetNormalized();
-        double dist = p->d.distance;
-        GfVec3d newPos = point - viewDir * dist;
-        GfMatrix4d xf = oldXf;
-        xf.SetTranslate(newPos);
-        cam.SetTransform(xf);
-        p->d.focusPoint = point;
-        p->d.camera = cam;
-        p->d.valid = false;
-    }
+    GfCamera cam = p->camera();
+    GfMatrix4d oldXf = cam.GetTransform();
+    GfVec3d oldPos = oldXf.ExtractTranslation();
+
+    GfVec3d viewDir = -oldXf.GetRow3(2);
+    viewDir.Normalize();
+
+    double dist = p->d.distance;
+    GfVec3d newPos = point - viewDir * dist;
+    GfMatrix4d xf = oldXf;
+    xf.SetTranslate(newPos);
+    cam.SetTransform(xf);
+    p->d.camera = cam;
+    p->d.focusPoint = point;
+    p->d.valid = false;
 }
 
 GfBBox3d

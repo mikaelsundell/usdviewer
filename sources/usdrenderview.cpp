@@ -50,6 +50,8 @@ void
 RenderViewPrivate::initStageModel()
 {
     connect(d.stageModel.data(), &StageModel::stageChanged, this, &RenderViewPrivate::stageChanged);
+    connect(d.stageModel.data(), &StageModel::maskChanged, this, &RenderViewPrivate::maskChanged);
+    connect(d.stageModel.data(), &StageModel::primsChanged, this, &RenderViewPrivate::primsChanged);
 }
 
 void
@@ -128,7 +130,7 @@ RenderViewPrivate::stageChanged(UsdStageRefPtr stage, StageModel::load_policy po
         imageGLWidget()->updateStage(stage);
     }
     else {
-        imageGLWidget()->clear();
+        imageGLWidget()->close();
     }
 }
 

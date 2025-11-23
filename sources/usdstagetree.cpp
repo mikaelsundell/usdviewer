@@ -279,7 +279,12 @@ StageTreePrivate::toggleVisible(PrimItem* item)
     QString pathString = item->data(0, Qt::UserRole).toString();
     if (!pathString.isEmpty())
         paths.append(SdfPath(pathString.toStdString()));
-    CommandDispatcher::run(new Command(setVisible(paths, !item->isVisible())));
+    if (item->isVisible()) {
+        CommandDispatcher::run(new Command(show(paths)));
+    }
+    else {
+        CommandDispatcher::run(new Command(hide(paths)));
+    }
 }
 
 void
@@ -319,7 +324,6 @@ StageTreePrivate::updateStage(UsdStageRefPtr stage)
     initTree();
     if (d.payloadEnabled)
         itemCheckState(rootItem, true, true);
-
 }
 
 void
@@ -376,7 +380,7 @@ StageTreePrivate::itemSelectionChanged()
         if (!pathString.isEmpty())
             paths.append(SdfPath(pathString.toStdString()));
     }
-    CommandDispatcher::run(new Command(setSelection(paths)));
+    CommandDispatcher::run(new Command(select(paths)));
 }
 
 void

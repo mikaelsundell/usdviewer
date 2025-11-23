@@ -41,7 +41,9 @@ loadPayload(const QList<SdfPath>& paths);
 Command
 unloadPayload(const QList<SdfPath>& paths);
 Command
-setSelection(const QList<SdfPath>& paths);
+select(const QList<SdfPath>& paths);
 Command
-setVisible(const QList<SdfPath>& paths, bool visible);
+show(const QList<SdfPath>& paths);
+Command
+hide(const QList<SdfPath>& paths);
 }  // namespace usd

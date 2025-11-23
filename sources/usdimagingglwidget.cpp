@@ -9,6 +9,7 @@
 #include "usdutils.h"
 #include "usdviewcamera.h"
 #include <QColor>
+#include <QColorSpace>
 #include <QMouseEvent>
 #include <QObject>
 #include <QPainter>
@@ -36,7 +37,7 @@ public:
     void init();
     void initGL();
     void initCamera();
-    void clear();
+    void close();
     void paintGL();
     void paintEvent(QPaintEvent* event);
     void focusEvent(QMouseEvent* event);
@@ -97,6 +98,7 @@ ImagingGLWidgetPrivate::init()
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
     format.setAlphaBufferSize(8);
+    format.setColorSpace(QColorSpace::SRgb);
     d.glwidget->setFormat(format);
     d.count = 0;
     d.frame = 0;
@@ -109,7 +111,6 @@ ImagingGLWidgetPrivate::init()
     d.sceneMaterialsEnabled = true;
     d.drag = false;
     d.drawMode = ImagingGLWidget::draw_shadedsmooth;
-    clear();
 }
 
 void
@@ -153,7 +154,7 @@ ImagingGLWidgetPrivate::initCamera()
 }
 
 void
-ImagingGLWidgetPrivate::clear()
+ImagingGLWidgetPrivate::close()
 {
     d.mask.clear();
     d.glEngine.reset();
@@ -249,8 +250,6 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.enableSceneLights = d.sceneLightsEnabled;
             d.params.enableSceneMaterials = d.sceneMaterialsEnabled;
             d.params.flipFrontFacing = true;
-            d.params.gammaCorrectColors = true;
-            d.params.colorCorrectionMode = TfToken("sRGB");
             d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;
@@ -462,36 +461,36 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
                 selectedPaths.append(rItem.hitPrimPath);
     }
 
-    bool changed = false;
+    bool update = false;
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {
             for (const SdfPath& path : selectedPaths) {
                 qsizetype index = d.selection.indexOf(path);
                 if (index != -1) {
                     d.selection.removeAt(index);
-                    changed = true;
+                    update = true;
                 }
                 else {
                     d.selection.append(path);
-                    changed = true;
+                    update = true;
                 }
             }
         }
         else {
             if (d.selection != selectedPaths) {
                 d.selection = selectedPaths;
-                changed = true;
+                update = true;
             }
         }
     }
     else {
         if (!d.selection.isEmpty()) {
             d.selection.clear();
-            changed = true;
+            update = true;
         }
     }
-    if (changed) {
-        CommandDispatcher::run(new Command(setSelection(d.selection)));
+    if (update) {
+        CommandDispatcher::run(new Command(select(d.selection)));
     }
     d.glwidget->update();
 }
@@ -511,9 +510,8 @@ void
 ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
 {
     d.stage = stage;
-    d.mask.clear();
-    d.glEngine.reset();
     initCamera();
+    d.glEngine.reset();
     initGL();
 }
 
@@ -610,9 +608,9 @@ ImagingGLWidget::captureImage()
 }
 
 void
-ImagingGLWidget::clear()
+ImagingGLWidget::close()
 {
-    p->clear();
+    p->close();
 }
 
 ImagingGLWidget::draw_mode

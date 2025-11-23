@@ -28,7 +28,7 @@ unloadPayload(const QList<SdfPath>& paths)
         [paths](StageModel* stageModel, SelectionModel*) { stageModel->loadPayloads(paths); });
 }
 Command
-setSelection(const QList<SdfPath>& paths)
+select(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
@@ -38,17 +38,22 @@ setSelection(const QList<SdfPath>& paths)
 }
 
 Command
-setVisible(const QList<SdfPath>& paths, bool visible)
+show(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths, visible](StageModel* stageModel, SelectionModel*) {
-            stageModel->setVisible(paths, visible);
-        },
+        [paths](StageModel* stageModel, SelectionModel*) { stageModel->setVisible(paths, true); },
         // undo
-        [paths, visible](StageModel* stageModel, SelectionModel*) {
-            stageModel->setVisible(paths, !visible);
-        }
-    );
+        [paths](StageModel* stageModel, SelectionModel*) { stageModel->setVisible(paths, false); });
+}
+
+Command
+hide(const QList<SdfPath>& paths)
+{
+    return Command(
+        // redo
+        [paths](StageModel* stageModel, SelectionModel*) { stageModel->setVisible(paths, false); },
+        // undo
+        [paths](StageModel* stageModel, SelectionModel*) { stageModel->setVisible(paths, true); });
 }
 }  // namespace usd

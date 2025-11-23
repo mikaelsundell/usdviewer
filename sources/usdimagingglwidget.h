@@ -32,7 +32,7 @@ public:
     virtual ~ImagingGLWidget();
     ViewCamera viewCamera() const;
     QImage captureImage();
-    void clear();
+    void close();
 
     draw_mode drawMode() const;
     void setDrawMode(draw_mode drawMode);

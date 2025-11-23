@@ -89,15 +89,12 @@ public Q_SLOTS:
     void openGithubIssues();
 
 public Q_SLOTS:
-    void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
-    void stageChanged(UsdStageRefPtr stage);
 
 public:
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
     struct Data {
-        bool loadInit;
         StageModel::load_policy loadPolicy;
         QStringList arguments;
         QStringList extensions;
@@ -115,7 +112,6 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadInit = false;
     d.loadPolicy = StageModel::load_policy::load_all;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
@@ -242,7 +238,6 @@ ViewerPrivate::init()
         }
     }
     // models
-    connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
     connect(d.stageModel.data(), &StageModel::stageChanged, this, [=]() { enable(true); });
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
@@ -558,7 +553,9 @@ ViewerPrivate::close()
 
 void
 ViewerPrivate::ready()
-{}
+{
+    frameAll();
+}
 
 void
 ViewerPrivate::copyImage()
@@ -832,15 +829,6 @@ ViewerPrivate::openGithubIssues()
 }
 
 void
-ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
-{
-    if (!d.loadInit) {
-        frameAll();
-        d.loadInit = true;
-    }
-}
-
-void
 ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 {
     if (paths.size()) {
@@ -851,12 +839,6 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
         d.ui->displayExpand->setEnabled(false);
         d.ui->displayIsolate->setEnabled(false);
     }
-}
-
-void
-ViewerPrivate::stageChanged(UsdStageRefPtr stage)
-{
-    d.loadInit = false;
 }
 
 void
@@ -876,7 +858,7 @@ ViewerPrivate::updateStatus(const QString& message, bool error)
 {
     QStatusBar* bar = d.ui->statusbar;
     QString text = error ? QString(" error: %1").arg(message) : QString(" %1").arg(message);
-    int timeoutMs = 4000;
+    int timeoutMs = 6000;
     bar->showMessage(text, timeoutMs);
     QTimer::singleShot(timeoutMs, bar, [bar]() { bar->showMessage(" Ready."); });
 }

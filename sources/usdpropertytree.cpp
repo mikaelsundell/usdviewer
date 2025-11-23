@@ -115,62 +115,67 @@ void
 PropertyTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
     d.tree->clear();
-    if (paths.size() > 1) {
-        PropertyItem* multiItem = new PropertyItem(d.tree.data());
-        multiItem->setText(PropertyItem::Name, "[Multiple selection]");
-        d.tree->addTopLevelItem(multiItem);
-        multiItem->setExpanded(true);
-        return;
-    }
-    SdfPath path = paths.first();
-    UsdPrim prim = d.stage->GetPrimAtPath(path);
-    if (!prim)
-        return;
-
-    PropertyItem* primItem = new PropertyItem(d.tree.data());
-    primItem->setText(PropertyItem::Name, QString::fromStdString(path.GetString()));
-    primItem->setExpanded(true);
-    d.tree->addTopLevelItem(primItem);
-
-    auto addChild = [&](const QString& name, const QString& value) {
-        PropertyItem* item = new PropertyItem(primItem);
-        item->setText(PropertyItem::Name, name);
-        item->setText(PropertyItem::Value, value);
-        item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-    };
-
-
-    /*
-    addChild("Type", QString::fromStdString(prim.GetTypeName().GetString()));
-    addChild("Active", prim.IsActive() ? "true" : "false");
-    addChild("Visibility",
-             QString::fromStdString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
-
-    addChild("Kind", QString::fromStdString(UsdModelAPI(prim).GetKind()));
-
-    if (prim.IsA<UsdGeomXformable>()) {
-        GfMatrix4d worldXf;
-        UsdGeomXformable(prim).GetLocalTransformation(&worldXf);
-        addChild("LocalToWorldXform", QString::fromStdString(GfMatrixToString(worldXf)));
-    }
-
-    if (UsdGeomImageable imageable = UsdGeomImageable(prim)) {
-        GfBBox3d bbox = imageable.ComputeWorldBound(UsdTimeCode::Default());
-        GfRange3d range = bbox.ComputeAlignedRange();
-        QString bboxString = QString("[%1, %2]").arg(range.GetMin().GetString().c_str(), range.GetMax().GetString().c_str());
-        addChild("WorldBoundingBox", bboxString);
-    }
-    */
-
-    for (const UsdAttribute& attr : prim.GetAttributes()) {
-        std::string name = attr.GetName().GetString();
-        VtValue value;
-        if (attr.Get(&value)) {
-            addChild(QString::fromStdString(name), QString::fromStdString(value.GetTypeName()));
+    if (paths.size()) {
+        if (paths.size() > 1) {
+            PropertyItem* multiItem = new PropertyItem(d.tree.data());
+            multiItem->setText(PropertyItem::Name, "[Multiple selection]");
+            d.tree->addTopLevelItem(multiItem);
+            multiItem->setExpanded(true);
+            return;
         }
+        SdfPath path = paths.first();
+        UsdPrim prim = d.stage->GetPrimAtPath(path);
+        if (!prim)
+            return;
+
+        PropertyItem* primItem = new PropertyItem(d.tree.data());
+        primItem->setText(PropertyItem::Name, QString::fromStdString(path.GetString()));
+        primItem->setExpanded(true);
+        d.tree->addTopLevelItem(primItem);
+
+        auto addChild = [&](const QString& name, const QString& value) {
+            PropertyItem* item = new PropertyItem(primItem);
+            item->setText(PropertyItem::Name, name);
+            item->setText(PropertyItem::Value, value);
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        };
+
+
+        /*
+         addChild("Type", QString::fromStdString(prim.GetTypeName().GetString()));
+         addChild("Active", prim.IsActive() ? "true" : "false");
+         addChild("Visibility",
+         QString::fromStdString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
+         
+         addChild("Kind", QString::fromStdString(UsdModelAPI(prim).GetKind()));
+         
+         if (prim.IsA<UsdGeomXformable>()) {
+         GfMatrix4d worldXf;
+         UsdGeomXformable(prim).GetLocalTransformation(&worldXf);
+         addChild("LocalToWorldXform", QString::fromStdString(GfMatrixToString(worldXf)));
+         }
+         
+         if (UsdGeomImageable imageable = UsdGeomImageable(prim)) {
+         GfBBox3d bbox = imageable.ComputeWorldBound(UsdTimeCode::Default());
+         GfRange3d range = bbox.ComputeAlignedRange();
+         QString bboxString = QString("[%1, %2]").arg(range.GetMin().GetString().c_str(), range.GetMax().GetString().c_str());
+         addChild("WorldBoundingBox", bboxString);
+         }
+         */
+
+        for (const UsdAttribute& attr : prim.GetAttributes()) {
+            std::string name = attr.GetName().GetString();
+            VtValue value;
+            if (attr.Get(&value)) {
+                addChild(QString::fromStdString(name), QString::fromStdString(value.GetTypeName()));
+            }
+        }
+        d.tree->expandAll();
+        d.path = path;
     }
-    d.tree->expandAll();
-    d.path = path;
+    else {
+        updateStage(d.stage);
+    }
 }
 
 std::string

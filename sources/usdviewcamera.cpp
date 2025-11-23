@@ -250,7 +250,8 @@ ViewCamera::focusPoint() const
     return p->d.focusPoint;
 }
 
-void ViewCamera::setFocusPoint(const GfVec3d& point)
+void
+ViewCamera::setFocusPoint(const GfVec3d& point)
 {
     GfCamera cam = p->camera();
     GfMatrix4d oldXf = cam.GetTransform();

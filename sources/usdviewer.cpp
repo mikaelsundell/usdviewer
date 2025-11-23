@@ -663,32 +663,36 @@ ViewerPrivate::exportImage()
 void
 ViewerPrivate::showSelected()
 {
-    if (d.selectionModel->paths().size()) {
-        d.stageModel->setVisible(d.selectionModel->paths(), true);
+    QList<SdfPath> paths = d.selectionModel->paths();
+    if (paths.size()) {
+        CommandDispatcher::run(new Command(show(paths, false)));
     }
 }
 
 void
 ViewerPrivate::showRecursive()
 {
-    if (d.selectionModel->paths().size()) {
-        d.stageModel->setVisible(d.selectionModel->paths(), true, true);
+    QList<SdfPath> paths = d.selectionModel->paths();
+    if (paths.size()) {
+        CommandDispatcher::run(new Command(show(paths, true)));
     }
 }
 
 void
 ViewerPrivate::hideSelected()
 {
-    if (d.selectionModel->paths().size()) {
-        d.stageModel->setVisible(d.selectionModel->paths(), false);
+    QList<SdfPath> paths = d.selectionModel->paths();
+    if (paths.size()) {
+        CommandDispatcher::run(new Command(hide(paths, false)));
     }
 }
 
 void
 ViewerPrivate::hideRecursive()
 {
-    if (d.selectionModel->paths().size()) {
-        d.stageModel->setVisible(d.selectionModel->paths(), false, true);
+    QList<SdfPath> paths = d.selectionModel->paths();
+    if (paths.size()) {
+        CommandDispatcher::run(new Command(hide(paths, true)));
     }
 }
 

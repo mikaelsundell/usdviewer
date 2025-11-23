@@ -280,10 +280,10 @@ StageTreePrivate::toggleVisible(PrimItem* item)
     if (!pathString.isEmpty())
         paths.append(SdfPath(pathString.toStdString()));
     if (item->isVisible()) {
-        CommandDispatcher::run(new Command(show(paths)));
+        CommandDispatcher::run(new Command(show(paths, false)));
     }
     else {
-        CommandDispatcher::run(new Command(hide(paths)));
+        CommandDispatcher::run(new Command(hide(paths, false)));
     }
 }
 

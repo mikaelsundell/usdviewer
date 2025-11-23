@@ -36,7 +36,6 @@ public:
     bool reload();
     bool close();
     bool isLoaded() const;
-    void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive = false);
     void setMask(const QList<SdfPath>& paths);
     load_policy loadPolicy() const;
     GfBBox3d boundingBox();

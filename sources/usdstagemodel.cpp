@@ -3,21 +3,24 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdstagemodel.h"
+#include "usdstagewatcher.h"
 #include <QMap>
 #include <QThreadPool>
 #include <QVariant>
 #include <QtConcurrent>
+#include <pxr/base/tf/weakBase.h>
+#include <pxr/usd/usd/notice.h>
 #include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/metrics.h>
 #include <stack>
 
 namespace usd {
-
 class StageModelPrivate : public QSharedData {
 public:
     StageModelPrivate();
     ~StageModelPrivate();
+    void initStage();
     bool loadFromFile(const QString& filename, StageModel::load_policy loadPolicy);
     bool loadPayloads(const QList<SdfPath>& paths, const std::string& variantSet, const std::string& variantValue);
     bool unloadPayloads(const QList<SdfPath>& paths);
@@ -35,6 +38,38 @@ public:
 public:
     void updatePrims(const QList<SdfPath> paths);
     void updateStage();
+
+public:
+    class StageWatcher : public TfWeakBase {
+    public:
+        StageWatcher(StageModelPrivate* parent)
+            : d { TfNotice::Key(), parent }
+        {}
+        void init()
+        {
+            if (d.key.IsValid())
+                TfNotice::Revoke(d.key);
+        }
+        void objectsChanged(const UsdNotice::ObjectsChanged& notice, const UsdStageWeakPtr& sender)
+        {
+            QList<SdfPath> updated;
+            for (const auto& p : notice.GetResyncedPaths())
+                updated.append(p);
+            for (const auto& p : notice.GetChangedInfoOnlyPaths())
+                updated.append(p);
+            if (updated.isEmpty())
+                return;
+            QMetaObject::invokeMethod(
+                d.parent->d.stageModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::QueuedConnection);
+        }
+        struct Data {
+            TfNotice::Key key;
+            StageModelPrivate* parent;
+        };
+        Data d;
+    };
+
+public:
     struct Data {
         UsdStageRefPtr stage;
         StageModel::load_policy loadPolicy;
@@ -45,6 +80,7 @@ public:
         QThreadPool pool;
         QReadWriteLock stageLock;
         QScopedPointer<UsdGeomBBoxCache> bboxCache;
+        QScopedPointer<StageWatcher> stageWatcher;
         QPointer<StageModel> stageModel;
     };
     Data d;
@@ -55,9 +91,21 @@ StageModelPrivate::StageModelPrivate()
     d.loadPolicy = StageModel::load_policy::load_all;
     d.pool.setMaxThreadCount(QThread::idealThreadCount());
     d.pool.setThreadPriority(QThread::HighPriority);
+    d.stageWatcher.reset(new StageWatcher(this));
 }
 
 StageModelPrivate::~StageModelPrivate() {}
+
+void
+StageModelPrivate::initStage()
+{
+    d.stageStatus = StageModel::stage_status::stage_loaded;
+    d.bboxCache.reset();
+    d.bbox = boundingBox();
+    d.stageWatcher->init();
+    d.stageWatcher->d.key = TfNotice::Register(TfWeakPtr<StageWatcher>(d.stageWatcher.data()),
+                                               &StageWatcher::objectsChanged, d.stage);
+}
 
 bool
 StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_policy policy)
@@ -75,9 +123,7 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_policy
         d.mask = QList<SdfPath>();
     }
     if (d.stage) {
-        d.stageStatus = StageModel::stage_status::stage_loaded;
-        d.bboxCache.reset();
-        d.bbox = boundingBox();
+        initStage();
         d.filename = filename;
     }
     else {
@@ -297,53 +343,6 @@ bool
 StageModelPrivate::isLoaded() const
 {
     return d.stage != nullptr;
-}
-
-void
-StageModelPrivate::setVisible(const QList<SdfPath>& paths, bool visible, bool recursive)
-{
-    QList<SdfPath> affected;
-    {
-        QWriteLocker locker(&d.stageLock);
-        Q_ASSERT("stage is not loaded" && isLoaded());
-        for (const SdfPath& path : paths) {
-            UsdPrim prim = d.stage->GetPrimAtPath(path);
-            if (!prim)
-                continue;
-
-            UsdGeomImageable imageable(prim);
-            if (imageable) {
-                if (visible)
-                    imageable.MakeVisible();
-                else
-                    imageable.MakeInvisible();
-                affected.append(path);
-            }
-            if (recursive) {
-                for (const UsdPrim& child : prim.GetAllDescendants()) {
-                    UsdGeomImageable childImageable(child);
-                    if (!childImageable)
-                        continue;
-
-                    TfToken currentVis;
-                    childImageable.GetVisibilityAttr().Get(&currentVis);
-                    TfToken desiredVis = visible ? UsdGeomTokens->inherited : UsdGeomTokens->invisible;
-
-                    if (currentVis != desiredVis) {
-                        if (visible)
-                            childImageable.MakeVisible();
-                        else
-                            childImageable.MakeInvisible();
-                        affected.append(child.GetPath());
-                    }
-                }
-            }
-        }
-    }
-    if (!affected.isEmpty()) {
-        QMetaObject::invokeMethod(
-            d.stageModel, [this, affected]() { updatePrims(affected); }, Qt::QueuedConnection);
-    }
 }
 
 void
@@ -573,12 +572,6 @@ void
 StageModel::setMask(const QList<SdfPath>& paths)
 {
     p->setMask(paths);
-}
-
-void
-StageModel::setVisible(const QList<SdfPath>& paths, bool visible, bool recursive)
-{
-    p->setVisible(paths, visible, recursive);
 }
 
 GfBBox3d

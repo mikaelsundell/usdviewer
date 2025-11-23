@@ -43,7 +43,7 @@ unloadPayload(const QList<SdfPath>& paths);
 Command
 select(const QList<SdfPath>& paths);
 Command
-show(const QList<SdfPath>& paths);
+show(const QList<SdfPath>& paths, bool recursive);
 Command
-hide(const QList<SdfPath>& paths);
+hide(const QList<SdfPath>& paths, bool recursive);
 }  // namespace usd

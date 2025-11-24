@@ -286,7 +286,7 @@ void
 StageModelPrivate::cancelPayloads()
 {
     if (!d.payloadJob.isRunning())
-        return false;
+        return;
     d.cancelRequested = true;
 }
 

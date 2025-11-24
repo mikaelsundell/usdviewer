@@ -147,7 +147,7 @@ RenderView::~RenderView() {}
 QImage
 RenderView::captureImage()
 {
-    p->imageGLWidget()->captureImage();
+    return p->imageGLWidget()->captureImage();
 }
 
 void

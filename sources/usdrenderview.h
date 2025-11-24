@@ -41,6 +41,9 @@ public:
     bool sceneMaterialsEnabled() const;
     void setSceneMaterialsEnabled(bool enabled);
 
+    bool statisticsEnabled() const;
+    void setStatisticsEnabled(bool enabled);
+
     render_mode renderMode() const;
     void setDrawMode(render_mode renderMode);
 

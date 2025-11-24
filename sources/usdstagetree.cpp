@@ -7,8 +7,9 @@
 #include "commanddispatcher.h"
 #include "stylesheet.h"
 #include "usdprimitem.h"
+#include "usdqtutils.h"
 #include "usdselectionmodel.h"
-#include "usdutils.h"
+#include "usdstageutils.h"
 #include <QApplication>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -39,6 +40,7 @@ public:
     void itemCheckState(QTreeWidgetItem* item, bool checkable, bool recursive = false);
     void treeCheckState(QTreeWidgetItem* item);
     bool eventFilter(QObject* obj, QEvent* event);
+    void contextMenuEvent(QContextMenuEvent* event);
     void updateStage(UsdStageRefPtr stage);
     void updatePrims(const QList<SdfPath>& paths);
     void updateSelection(const QList<SdfPath>& paths);
@@ -313,65 +315,6 @@ StageTreePrivate::updateFilter()
 }
 
 void
-StageTreePrivate::updateStage(UsdStageRefPtr stage)
-{
-    close();
-    d.stage = stage;
-    UsdPrim prim = stage->GetPseudoRoot();
-    PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
-    itemCheckState(rootItem, false, true);
-    addChildren(rootItem, prim.GetPath());
-    initTree();
-    if (d.payloadEnabled)
-        itemCheckState(rootItem, true, true);
-}
-
-void
-StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
-{
-    QSignalBlocker blocker(d.tree);
-    std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* item) {
-        QString itemPath = item->data(0, Qt::UserRole).toString();
-        if (!itemPath.isEmpty()) {
-            for (const SdfPath& changed : paths) {
-                if (itemPath == QString::fromStdString(changed.GetString())) {
-                    UsdPrim prim = d.stage->GetPrimAtPath(changed);
-                    if (prim && prim.HasPayload()) {
-                        Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
-
-                        if (item->checkState(0) != want)
-                            item->setCheckState(0, want);
-                    }
-                }
-            }
-        }
-        for (int i = 0; i < item->childCount(); ++i)
-            updateItem(item->child(i));
-    };
-    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
-        updateItem(d.tree->topLevelItem(i));
-    d.tree->update();
-}
-
-void
-StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
-{
-    QSignalBlocker blocker(d.tree);
-    std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
-        QString pathString = item->data(0, Qt::UserRole).toString();
-        if (!pathString.isEmpty()) {
-            SdfPath path(pathString.toStdString());
-            item->setSelected(paths.contains(path));
-        }
-        for (int i = 0; i < item->childCount(); ++i)
-            selectItems(item->child(i));
-    };
-    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
-        selectItems(d.tree->topLevelItem(i));
-    d.tree->update();
-}
-
-void
 StageTreePrivate::itemSelectionChanged()
 {
     QList<SdfPath> paths;
@@ -410,16 +353,202 @@ StageTreePrivate::checkStateChanged(PrimItem* item)
     QTimer::singleShot(0, d.tree, [this]() {
         if (--d.pending <= 0) {
             if (!d.loadPaths.isEmpty()) {
-                CommandDispatcher::run(new Command(loadPayload(d.loadPaths)));
+                CommandDispatcher::run(new Command(loadPayloads(d.loadPaths)));
                 d.loadPaths.clear();
             }
             if (!d.unloadPaths.isEmpty()) {
-                CommandDispatcher::run(new Command(unloadPayload(d.unloadPaths)));
+                CommandDispatcher::run(new Command(unloadPayloads(d.unloadPaths)));
                 d.unloadPaths.clear();
             }
             d.pending = 0;
         }
     });
+}
+
+void
+StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
+{
+    QTreeWidgetItem* item = d.tree->itemAt(event->pos());
+    QList<SdfPath> paths;
+    for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
+        QString p = selected->data(0, Qt::UserRole).toString();
+        if (!p.isEmpty())
+            paths.append(SdfPath(usd::QStringToString(p)));
+    }
+    if (paths.isEmpty())
+        return;
+
+    std::vector<SdfPath> filtered;
+    filtered.reserve(paths.size());
+    for (const SdfPath& p : paths) {
+        bool isChild = false;
+        for (const SdfPath& other : paths) {
+            if (p != other && p.HasPrefix(other)) {
+                isChild = true;
+                break;
+            }
+        }
+        if (!isChild)
+            filtered.push_back(p);
+    }
+    QList<SdfPath> payloadPaths;
+    std::function<void(const UsdPrim&)> collectPayloads = [&](const UsdPrim& prim) {
+        if (!prim)
+            return;
+        if (prim.HasPayload())
+            payloadPaths.append(prim.GetPath());
+        for (const UsdPrim& c : prim.GetAllChildren())
+            collectPayloads(c);
+    };
+
+    for (const SdfPath& rootPath : filtered) {
+        UsdPrim root = d.stage->GetPrimAtPath(rootPath);
+        if (root)
+            collectPayloads(root);
+    }
+    QMap<QString, QList<QString>> variantSets = findVariantSets(d.stage, paths, true);
+
+    QMenu menu(d.tree.data());
+    struct VariantSelection {
+        QString setName;
+        QString value;
+    };
+    QAction* loadSelected = nullptr;
+    QAction* unloadSelected = nullptr;
+    QMap<QAction*, VariantSelection> variantActions;
+
+    if (!payloadPaths.isEmpty()) {
+        if (!variantSets.isEmpty()) {
+            QMenu* loadMenu = menu.addMenu("Load");
+            QMenu* unloadMenu = menu.addMenu("Unload");
+
+            loadSelected = loadMenu->addAction("Selected");
+            unloadSelected = unloadMenu->addAction("Selected");
+            loadMenu->addSeparator();
+
+            for (auto it = variantSets.begin(); it != variantSets.end(); ++it) {
+                QString setName = it.key();
+                const QList<QString>& values = it.value();
+
+                QMenu* variantMenu = loadMenu->addMenu(QString("%1").arg(setName));
+
+                for (const QString& value : values) {
+                    QAction* action = variantMenu->addAction(value);
+                    variantActions[action] = { setName, value };
+                }
+            }
+        }
+        else {
+            loadSelected = menu.addAction("Load");
+            unloadSelected = menu.addAction("Unload");
+        }
+    }
+    menu.addSeparator();
+
+    QMenu* menuShow = menu.addMenu("Show");
+    QAction* showSelected = menuShow->addAction("Selected");
+    QAction* showRecursive = menuShow->addAction("Recursively");
+
+    QMenu* menuHide = menu.addMenu("Hide");
+    QAction* hideSelected = menuHide->addAction("Selected");
+    QAction* hideRecursive = menuHide->addAction("Recursively");
+    menu.addSeparator();
+
+    QAction* isolateSelected = menu.addAction("Isolate");
+    QAction* isolateClear = menu.addAction("Clear");
+
+    QAction* chosen = menu.exec(d.tree->mapToGlobal(event->pos()));
+    if (!chosen)
+        return;
+
+    if (chosen == loadSelected) {
+        CommandDispatcher::run(new Command(usd::loadPayloads(payloadPaths)));
+        return;
+    }
+
+    if (chosen == unloadSelected) {
+        CommandDispatcher::run(new Command(usd::unloadPayloads(payloadPaths)));
+        return;
+    }
+
+    if (variantActions.contains(chosen)) {
+        VariantSelection sel = variantActions[chosen];
+        CommandDispatcher::run(new Command(usd::loadPayloads(payloadPaths, sel.setName, sel.value)));
+        return;
+    }
+
+    if (chosen == showSelected)
+        CommandDispatcher::run(new Command(usd::show(paths, false)));
+    else if (chosen == showRecursive)
+        CommandDispatcher::run(new Command(usd::show(paths, true)));
+
+    else if (chosen == hideSelected)
+        CommandDispatcher::run(new Command(usd::hide(paths, false)));
+    else if (chosen == hideRecursive)
+        CommandDispatcher::run(new Command(usd::hide(paths, true)));
+    else if (chosen == isolateSelected)
+        CommandDispatcher::run(new Command(usd::isolate(paths)));
+    else if (chosen == isolateClear)
+        CommandDispatcher::run(new Command(usd::isolate(QList<SdfPath>())));
+}
+
+void
+StageTreePrivate::updateStage(UsdStageRefPtr stage)
+{
+    close();
+    d.stage = stage;
+    UsdPrim prim = stage->GetPseudoRoot();
+    PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
+    itemCheckState(rootItem, false, true);
+    addChildren(rootItem, prim.GetPath());
+    initTree();
+    if (d.payloadEnabled)
+        itemCheckState(rootItem, true, true);
+}
+
+void
+StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
+{
+    QSignalBlocker blocker(d.tree);
+    std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* item) {
+        QString itemPath = item->data(0, Qt::UserRole).toString();
+        if (!itemPath.isEmpty()) {
+            for (const SdfPath& changed : paths) {
+                if (itemPath == StringToQString(changed.GetString())) {
+                    UsdPrim prim = d.stage->GetPrimAtPath(changed);
+                    if (prim && prim.HasPayload()) {
+                        Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
+
+                        if (item->checkState(0) != want)
+                            item->setCheckState(0, want);
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < item->childCount(); ++i)
+            updateItem(item->child(i));
+    };
+    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
+        updateItem(d.tree->topLevelItem(i));
+    d.tree->update();
+}
+
+void
+StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
+{
+    QSignalBlocker blocker(d.tree);
+    std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
+        QString pathString = item->data(0, Qt::UserRole).toString();
+        if (!pathString.isEmpty()) {
+            SdfPath path(pathString.toStdString());
+            item->setSelected(paths.contains(path));
+        }
+        for (int i = 0; i < item->childCount(); ++i)
+            selectItems(item->child(i));
+    };
+    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
+        selectItems(d.tree->topLevelItem(i));
+    d.tree->update();
 }
 
 StageTree::StageTree(QWidget* parent)
@@ -500,135 +629,7 @@ StageTree::updateSelection(const QList<SdfPath>& paths)
 void
 StageTree::contextMenuEvent(QContextMenuEvent* event)
 {
-    /*QTreeWidgetItem* item = itemAt(event->pos());
-    if (!item)
-        return;
-
-    QList<SdfPath> paths;
-    for (QTreeWidgetItem* selected : selectedItems()) {
-        QString pathString = selected->data(0, Qt::UserRole).toString();
-        if (!pathString.isEmpty())
-            paths.append(SdfPath(pathString.toStdString()));
-    }
-
-    if (paths.isEmpty())
-        return;
-
-    std::vector<SdfPath> filtered;
-    for (const SdfPath& p : paths) {
-        bool isChild = false;
-        for (const SdfPath& other : paths) {
-            if (p == other)
-                continue;
-            if (p.HasPrefix(other)) {
-                isChild = true;
-                break;
-            }
-        }
-        if (!isChild)
-            filtered.push_back(p);
-    }
-
-    QList<SdfPath> payloadPaths;
-    UsdStageRefPtr stage = p->d.stageModel->stage();
-
-    std::function<void(const UsdPrim&)> collectPayloads = [&](const UsdPrim& prim) {
-        if (!prim)
-            return;
-
-        if (prim.HasPayload())
-            payloadPaths.append(prim.GetPath());
-
-        for (const UsdPrim& child : prim.GetAllChildren())
-            collectPayloads(child);
-    };
-
-    for (const SdfPath& rootPath : filtered) {
-        UsdPrim root = stage->GetPrimAtPath(rootPath);
-        if (root)
-            collectPayloads(root);
-    }
-    auto variantSets = p->d.stageModel->variantSets(paths, true);
-    QMenu menu(this);
-
-    QMenu* loadMenu = menu.addMenu("Load");
-
-    QAction* loadSelected = loadMenu->addAction("Selected");
-    QAction* loadRecursive = loadMenu->addAction("Recursive");
-
-    loadMenu->addSeparator();
-
-    struct VariantSelection {
-        std::string setName;
-        std::string value;
-    };
-    QMap<QAction*, VariantSelection> variantActions;
-
-    for (const auto& it : variantSets) {
-        const std::string& setName = it.first;
-        const auto& values = it.second;
-
-        QString submenuName = QString("Recursive (%1)").arg(QString::fromStdString(setName));
-        QMenu* variantMenu = loadMenu->addMenu(submenuName);
-
-        for (const std::string& value : values) {
-            QAction* action = variantMenu->addAction(QString::fromStdString(value));
-            variantActions[action] = { setName, value };
-        }
-    }
-
-    menu.addSeparator();
-
-    QMenu* showMenu = menu.addMenu("Show");
-    QAction* showSelected = showMenu->addAction("Selected");
-    QAction* showRecursive = showMenu->addAction("Recursively");
-
-    QMenu* hideMenu = menu.addMenu("Hide");
-    QAction* hideSelected = hideMenu->addAction("Selected");
-    QAction* hideRecursive = hideMenu->addAction("Recursively");
-
-    menu.addSeparator();
-    QAction* isolate = menu.addAction("Isolate Selection");
-    QAction* clearIsolation = menu.addAction("Clear Isolation");
-
-    QAction* chosen = menu.exec(mapToGlobal(event->pos()));
-    if (!chosen)
-        return;
-
-    if (chosen == loadSelected) {
-        p->d.stageModel->loadPayloads(payloadPaths);
-        return;
-    }
-
-    if (chosen == loadRecursive) {
-        p->d.stageModel->loadPayloads(payloadPaths, "", "");
-        return;
-    }
-
-    if (variantActions.contains(chosen)) {
-        auto sel = variantActions[chosen];
-        p->d.stageModel->loadPayloads(payloadPaths, sel.setName, sel.value);
-        return;
-    }
-
-    if (chosen == showSelected) {
-        p->d.stageModel->setVisible(paths, true);
-    }
-    else if (chosen == showRecursive) {
-        p->d.stageModel->setVisible(paths, true, true);
-    }
-    else if (chosen == hideSelected) {
-        p->d.stageModel->setVisible(paths, false);
-    }
-    else if (chosen == hideRecursive) {
-        p->d.stageModel->setVisible(paths, false, true);
-    }
-    else if (chosen == isolate) {
-        p->d.stageModel->setMask(paths);
-    }
-    else if (chosen == clearIsolation) {
-        p->d.stageModel->setMask(QList<SdfPath>());
-    }*/
+    p->contextMenuEvent(event);
 }
 
 void
@@ -638,9 +639,7 @@ StageTree::keyPressEvent(QKeyEvent* event)
         for (int i = 0; i < topLevelItemCount(); ++i)
             topLevelItem(i)->setSelected(true);
     }
-    else {
-        QTreeWidget::keyPressEvent(event);
-    }
+    QTreeWidget::keyPressEvent(event);
 }
 
 void
@@ -650,7 +649,7 @@ StageTree::mousePressEvent(QMouseEvent* event)
     int column = columnAt(event->pos().x());
     if (!item) {
         clearSelection();
-        itemSelectionChanged();
+        Q_EMIT itemSelectionChanged();
         return;
     }
     if (column == PrimItem::Visible) {

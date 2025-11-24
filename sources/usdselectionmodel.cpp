@@ -3,7 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdselectionmodel.h"
-#include "usdutils.h"
+#include "usdqtutils.h"
 #include <QList>
 
 namespace usd {

@@ -585,6 +585,8 @@
     </widget>
     <addaction name="menuTheme"/>
     <addaction name="separator"/>
+    <addaction name="viewStatistics"/>
+    <addaction name="separator"/>
     <addaction name="viewOutliner"/>
     <addaction name="viewPayload"/>
    </widget>
@@ -1034,6 +1036,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+Z</string>
+   </property>
+  </action>
+  <action name="viewStatistics">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Statistics</string>
    </property>
   </action>
  </widget>

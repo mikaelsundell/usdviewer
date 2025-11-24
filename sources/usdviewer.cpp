@@ -11,6 +11,7 @@
 #include "stylesheet.h"
 #include "usdoutlinerview.h"
 #include "usdpayloadview.h"
+#include "usdqtutils.h"
 #include "usdrenderview.h"
 #include "usdstagemodel.h"
 #include <QActionGroup>
@@ -89,13 +90,16 @@ public Q_SLOTS:
     void openGithubIssues();
 
 public Q_SLOTS:
+    void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
+    void stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status);
 
 public:
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
     struct Data {
         StageModel::load_policy loadPolicy;
+        bool stageInit;
         QStringList arguments;
         QStringList extensions;
         QStringList recentFiles;
@@ -113,6 +117,7 @@ public:
 ViewerPrivate::ViewerPrivate()
 {
     d.loadPolicy = StageModel::load_policy::load_all;
+    d.stageInit = false;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
 
@@ -238,14 +243,19 @@ ViewerPrivate::init()
         }
     }
     // models
-    connect(d.stageModel.data(), &StageModel::stageChanged, this, [=]() { enable(true); });
+    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &ViewerPrivate::selectionChanged);
+    connect(d.stageModel.data(), &StageModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
+    connect(d.stageModel.data(), &StageModel::stageChanged, this, &ViewerPrivate::stageChanged);
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
-    connect(d.ui->viewOutliner, &QAction::toggled, this,
-            [=](bool checked) { d.ui->outlinerDock->setVisible(checked); });
     connect(d.ui->payloadDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewPayload->setChecked(visible); });
+    // views
+    connect(d.ui->viewStatistics, &QAction::toggled, this,
+            [=](bool checked) { renderView()->setStatisticsEnabled(checked); });
+    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->viewPayload, &QAction::toggled, this, [=](bool checked) { d.ui->payloadDock->setVisible(checked); });
     // settings
     initSettings();
@@ -307,6 +317,13 @@ ViewerPrivate::initSettings()
         d.loadPolicy = StageModel::load_payload;
         d.ui->policyPayload->setChecked(true);
     }
+    bool statistics = settingsValue("statistics", false).toBool();
+    if (statistics) {
+        d.ui->viewStatistics->setChecked(true);
+    }
+    else {
+        d.ui->viewStatistics->setChecked(false);
+    }
     QString theme = settingsValue("theme", "dark").toString();
     if (theme == "dark") {
         dark();
@@ -326,7 +343,6 @@ ViewerPrivate::loadFile(const QString& filename)
         updateStatus(QString("unsupported file format: %1").arg(fileInfo.suffix()), true);
         return false;
     }
-
     QElapsedTimer timer;
     timer.start();
 
@@ -373,6 +389,17 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
     if (event->type() == QEvent::ScreenChangeInternal) {
         profile();
         stylesheet();
+    }
+    else if (event->type() == QEvent::WindowStateChange) {
+        Qt::WindowStates state = d.viewer->windowState();
+        if (!(state & Qt::WindowMinimized)) {
+            QTimer::singleShot(0, d.viewer, [this]() {
+                if (d.ui->viewOutliner->isChecked() && !d.ui->outlinerDock->isVisible())
+                    d.ui->outlinerDock->show();
+                if (d.ui->viewPayload->isChecked() && !d.ui->payloadDock->isVisible())
+                    d.ui->payloadDock->show();
+            });
+        }
     }
     return QObject::eventFilter(object, event);
 }
@@ -437,6 +464,7 @@ void
 ViewerPrivate::saveSettings()
 {
     setSettingsValue("recentFiles", d.recentFiles);
+    setSettingsValue("statistics", d.ui->viewStatistics->isChecked());
 }
 
 void
@@ -833,6 +861,15 @@ ViewerPrivate::openGithubIssues()
 }
 
 void
+ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
+{
+    if (!d.stageInit && !bbox.GetRange().IsEmpty()) {
+        frameAll();
+        d.stageInit = true;
+    }
+}
+
+void
 ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 {
     if (paths.size()) {
@@ -842,6 +879,15 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
     else {
         d.ui->displayExpand->setEnabled(false);
         d.ui->displayIsolate->setEnabled(false);
+    }
+}
+
+void
+ViewerPrivate::stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status)
+{
+    d.stageInit = false;
+    if (status == StageModel::stage_loaded) {
+        enable(true);
     }
 }
 

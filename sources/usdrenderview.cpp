@@ -238,6 +238,18 @@ RenderView::setSceneMaterialsEnabled(bool enabled)
     p->imageGLWidget()->setSceneMaterialsEnabled(enabled);
 }
 
+bool
+RenderView::statisticsEnabled() const
+{
+    return p->imageGLWidget()->statisticsEnabled();
+}
+
+void
+RenderView::setStatisticsEnabled(bool enabled)
+{
+    p->imageGLWidget()->setStatisticsEnabled(enabled);
+}
+
 StageModel*
 RenderView::stageModel() const
 {

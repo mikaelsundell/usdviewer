@@ -37,9 +37,12 @@ private:
 };
 
 Command
-loadPayload(const QList<SdfPath>& paths);
+loadPayloads(const QList<SdfPath>& paths, const QString& variantSet = QString(),
+             const QString& variantValue = QString());
 Command
-unloadPayload(const QList<SdfPath>& paths);
+unloadPayloads(const QList<SdfPath>& paths);
+Command
+isolate(const QList<SdfPath>& paths);
 Command
 select(const QList<SdfPath>& paths);
 Command

@@ -30,5 +30,4 @@ PropertyItem::PropertyItem(QTreeWidgetItem* parent)
 {}
 
 PropertyItem::~PropertyItem() {}
-
 }  // namespace usd

@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdprimitem.h"
+#include "usdqtutils.h"
 #include <QPointer>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/imageable.h>
@@ -62,12 +63,12 @@ PrimItem::data(int column, int role) const
         switch (column) {
         case Name:
             if (prim)
-                return QString::fromStdString(prim.GetName().GetString());
+                return StringToQString(prim.GetName().GetString());
             else
-                return QString::fromStdString(p->d.path.GetName());
+                return StringToQString(p->d.path.GetName());
         case Type:
             if (prim)
-                return QString::fromStdString(prim.GetTypeName().GetString());
+                return StringToQString(prim.GetTypeName().GetString());
             else
                 return QString();
         case Visible: {
@@ -85,7 +86,7 @@ PrimItem::data(int column, int role) const
         }
     }
     else if (role == Qt::UserRole) {
-        return QString::fromStdString(p->d.path.GetString());
+        return StringToQString(p->d.path.GetString());
     }
     return QTreeWidgetItem::data(column, role);
 }

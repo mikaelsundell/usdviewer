@@ -49,6 +49,9 @@ public:
     bool sceneMaterialsEnabled() const;
     void setSceneMaterialsEnabled(bool enabled);
 
+    bool statisticsEnabled() const;
+    void setStatisticsEnabled(bool enabled);
+
     QList<QString> rendererAovs() const;
     void setRendererAov(const QString& aov);
 

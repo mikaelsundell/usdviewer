@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdpayloadview.h"
+#include "usdqtutils.h"
 #include <QDir>
 #include <QFileInfo>
 #include <QPointer>
@@ -20,7 +21,7 @@ public:
     void initSelection();
     QTreeWidget* payloadTree();
     bool eventFilter(QObject* obj, QEvent* event);
-    
+
 public Q_SLOTS:
     void cancel();
     void clear();
@@ -102,7 +103,7 @@ PayloadViewPrivate::cancel()
 void
 PayloadViewPrivate::clear()
 {
-    d.ui->payloadTree->clear();
+    payloadTree()->clear();
 }
 
 void
@@ -117,16 +118,17 @@ PayloadViewPrivate::payloadsRequested(const QList<SdfPath>& paths, StageModel::p
     d.ui->status->setText(updateStatus());
     for (const SdfPath& path : paths) {
         auto* item = new QTreeWidgetItem(d.ui->payloadTree);
-        item->setText(0, QString::fromStdString(path.GetName()));
-        item->setData(0, Qt::UserRole, QString::fromStdString(path.GetString()));
+        item->setText(0, StringToQString(path.GetName()));
+        item->setData(0, Qt::UserRole, StringToQString(path.GetString()));
         item->setText(1, "Queued");
     }
+    clear();
 }
 
 void
 PayloadViewPrivate::payloadChanged(const SdfPath& path, StageModel::payload_mode mode)
 {
-    QVariant target = QString::fromStdString(path.GetString());
+    QVariant target = StringToQString(path.GetString());
     QTreeWidget* tree = d.ui->payloadTree;
     const int role = Qt::UserRole;
     const int column = 0;
@@ -152,12 +154,12 @@ PayloadViewPrivate::payloadChanged(const SdfPath& path, StageModel::payload_mode
                 if (resolved.empty()) {
                     SdfLayerHandle introducingLayer = arc.GetIntroducingLayer();
                     if (introducingLayer && !introducingLayer->GetRealPath().empty()) {
-                        QFileInfo baseInfo(QString::fromStdString(introducingLayer->GetRealPath()));
-                        QString composed = QDir(baseInfo.absolutePath()).filePath(QString::fromStdString(assetPath));
+                        QFileInfo baseInfo(StringToQString(introducingLayer->GetRealPath()));
+                        QString composed = QDir(baseInfo.absolutePath()).filePath(StringToQString(assetPath));
                         resolved = composed.toStdString();
                     }
                 }
-                QString displayPath = QString::fromStdString(resolved.empty() ? assetPath : resolved);
+                QString displayPath = StringToQString(resolved.empty() ? assetPath : resolved);
                 QFileInfo info(displayPath);
                 if (info.exists()) {
                     d.totalsize += info.size();
@@ -189,8 +191,7 @@ PayloadViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 QString
 PayloadViewPrivate::updateStatus()
 {
-    QString sizeStr = QLocale().formattedDataSize(d.totalsize, 1,
-                                                  QLocale::DataSizeTraditionalFormat);
+    QString sizeStr = QLocale().formattedDataSize(d.totalsize, 1, QLocale::DataSizeTraditionalFormat);
     return QString("Time: 00:00:00 (Files: %1/%2, %3 %4)")
         .arg(d.completed)
         .arg(d.total)

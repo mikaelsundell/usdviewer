@@ -40,7 +40,7 @@ main(int argc, char* argv[])
 #if defined(_DEBUG)
     platform::console("plugins");
     for (const auto& plugin : plugins) {
-        platform::console(QString::fromStdString(plugin->GetPath()));
+        platform::console(StringToQString(plugin->GetPath()));
     }
     if (0) {
         test();

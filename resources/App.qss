@@ -109,6 +109,55 @@ QLineEdit
     padding-right: 5px;
 }
 
+QMenu {
+    background-color: $base;
+    border: 1px solid $borderalt;
+    padding: 4px;
+}
+
+QMenu::item {
+    color: $text;
+    background-color: transparent;
+    padding: 4px 20px 4px 20px;
+    font-size: $defaultsize;
+}
+
+QMenu::item:selected {
+    background-color: $highlight;
+    color: $text;
+}
+
+QMenu::separator {
+    height: 1px;
+    margin: 4px 4px;
+    background-color: $borderalt;
+}
+
+QMenu::indicator {
+    width: 12px;
+    height: 12px;
+}
+
+QMenu::indicator:checked {
+    image: url(":/icons/resources/Cross.png");
+}
+
+QMenu::indicator:unchecked {
+    image: none;
+}
+
+QMenu::right-arrow {
+    image: url(":/icons/resources/Left.png");
+    width: 10px;
+    height: 10px;
+}
+
+QMenu::left-arrow {
+    image: url(":/icons/resources/Right.png");
+    width: 10px;
+    height: 10px;
+}
+
 QProgressBar {
     min-height: 10px;
     max-height: 10px; 

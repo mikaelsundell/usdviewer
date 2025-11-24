@@ -4,61 +4,27 @@
 
 #include "command.h"
 #include "commandstack.h"
+#include "usdstageutils.h"
 #include <QPointer>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
 
 namespace usd {
-namespace {
-    void visibility(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false)
-    {
-        QList<SdfPath> affected;
-        for (const SdfPath& path : paths) {
-            UsdPrim prim = stage->GetPrimAtPath(path);
-            if (!prim)
-                continue;
-            UsdGeomImageable imageable(prim);
-            if (imageable) {
-                if (visible)
-                    imageable.MakeVisible();
-                else
-                    imageable.MakeInvisible();
-                affected.append(path);
-            }
-            if (recursive) {
-                for (const UsdPrim& child : prim.GetAllDescendants()) {
-                    UsdGeomImageable childImageable(child);
-                    if (!childImageable)
-                        continue;
-                    TfToken currentVis;
-                    childImageable.GetVisibilityAttr().Get(&currentVis);
-                    TfToken desiredVis = visible ? UsdGeomTokens->inherited : UsdGeomTokens->invisible;
-                    if (currentVis != desiredVis) {
-                        if (visible)
-                            childImageable.MakeVisible();
-                        else
-                            childImageable.MakeInvisible();
-                        affected.append(child.GetPath());
-                    }
-                }
-            }
-        }
-    }
-}  // namespace
-
 Command
-loadPayload(const QList<SdfPath>& paths)
+loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
 {
     return Command(
         // redo
-        [paths](StageModel* sm, SelectionModel*) { sm->loadPayloads(paths); },
+        [paths, variantSet, variantValue](StageModel* sm, SelectionModel*) {
+            sm->loadPayloads(paths, variantSet, variantValue);
+        },
         // undo
         [paths](StageModel* sm, SelectionModel*) { sm->unloadPayloads(paths); });
 }
 
 Command
-unloadPayload(const QList<SdfPath>& paths)
+unloadPayloads(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
@@ -66,6 +32,17 @@ unloadPayload(const QList<SdfPath>& paths)
         // undo
         [paths](StageModel* sm, SelectionModel*) { sm->loadPayloads(paths); });
 }
+
+Command
+isolate(const QList<SdfPath>& paths)
+{
+    return Command(
+        // redo
+        [paths](StageModel* sm, SelectionModel*) { sm->setMask(paths); },
+        // undo
+        [paths](StageModel* sm, SelectionModel*) { sm->setMask(QList<SdfPath>()); });
+}
+
 Command
 select(const QList<SdfPath>& paths)
 {
@@ -81,9 +58,9 @@ show(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
         // redo
-        [paths, recursive](StageModel* sm, SelectionModel*) { visibility(sm->stage(), paths, true, recursive); },
+        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, true, recursive); },
         // undo
-        [paths, recursive](StageModel* sm, SelectionModel*) { visibility(sm->stage(), paths, false, recursive); });
+        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, false, recursive); });
 }
 
 Command
@@ -91,8 +68,8 @@ hide(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
         // redo
-        [paths, recursive](StageModel* sm, SelectionModel*) { visibility(sm->stage(), paths, false, recursive); },
+        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, false, recursive); },
         // undo
-        [paths, recursive](StageModel* sm, SelectionModel*) { visibility(sm->stage(), paths, true, recursive); });
+        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, true, recursive); });
 }
 }  // namespace usd

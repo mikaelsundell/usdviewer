@@ -3,13 +3,15 @@
     <file>../resources/Checked.png</file>
     <file>../resources/Clear.png</file>
     <file>../resources/ClearDisabled.png</file>
+    <file>../resources/Closed.png</file>
     <file>../resources/Collapse.png</file>
     <file>../resources/CollapseDisabled.png</file>
     <file>../resources/Expand.png</file>
     <file>../resources/ExpandDisabled.png</file>
+    <file>../resources/Left.png</file>
     <file>../resources/Open.png</file>
     <file>../resources/Open.png</file>
     <file>../resources/PartiallyChecked.png</file>
-    <file>../resources/Closed.png</file>
+    <file>../resources/Right.png</file>
   </qresource>
 </RCC>

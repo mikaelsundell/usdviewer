@@ -20,15 +20,20 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+namespace usd {
 GfVec4f
-QColor_GfVec4f(const QColor& color);
-TfToken
-QString_TfToken(const QString& str);
-
+QColorToGfVec4f(const QColor& color);
+std::string
+QStringToString(const QString& str);
 QString
-TfToken_QString(const TfToken& token);
+StringToQString(const std::string& str);
+TfToken
+QStringToTfToken(const QString& str);
+QString
+TfTokenToQString(const TfToken& token);
 QList<QString>
-TfTokenVector_QList(const TfTokenVector& tokens);
+TfTokenVectorToQList(const TfTokenVector& tokens);
+}  // namespace usd
 
 void
 CheckOpenGLError(const char* function, const char* file, int line);
@@ -63,6 +68,8 @@ QDebug
 operator<<(QDebug debug, const GfMatrix4d& matrix);
 QDebug
 operator<<(QDebug debug, const GfQuaternion& quat);
+QDebug
+operator<<(QDebug debug, const GfRange3d& range);
 QDebug
 operator<<(QDebug debug, const GfCamera& camera);
 QDebug

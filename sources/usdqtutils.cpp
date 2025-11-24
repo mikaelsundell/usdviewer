@@ -2,41 +2,55 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdutils.h"
+#include "usdqtutils.h"
 #include <QColor>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
 
+namespace usd {
 GfVec4f
-QColor_GfVec4f(const QColor& color)
+QColorToGfVec4f(const QColor& color)
 {
     return GfVec4f(color.redF(), color.greenF(), color.blueF(), color.alphaF());
 }
 
+std::string
+QStringToString(const QString& str)
+{
+    return str.toUtf8().constData();
+}
+
+QString
+StringToQString(const std::string& str)
+{
+    return QString::fromUtf8(str.c_str());
+}
+
 TfToken
-QString_TfToken(const QString& str)
+QStringToTfToken(const QString& str)
 {
     return TfToken(str.toStdString());
 }
 
 QString
-TfToken_QString(const TfToken& token)
+TfTokenToQString(const TfToken& token)
 {
-    return QString::fromStdString(token.GetString());
+    return StringToQString(token.GetString());
 }
 
 QList<QString>
-TfTokenVector_QList(const TfTokenVector& tokens)
+TfTokenVectorToQList(const TfTokenVector& tokens)
 {
     QList<QString> list;
     list.reserve(tokens.size());
     for (const auto& token : tokens) {
-        list.append(QString::fromStdString(token.GetString()));
+        list.append(StringToQString(token.GetString()));
     }
     return list;
 }
+}  // namespace usd
 
 void
 CheckOpenGLError(const char* function, const char* file, int line)
@@ -198,6 +212,17 @@ operator<<(QDebug debug, const GfQuaternion& quat)
 }
 
 QDebug
+operator<<(QDebug debug, const GfRange3d& range)
+{
+    QDebugStateSaver saver(debug);
+    debug.nospace() << "GfRange3d(\n"
+                    << "  min=(" << range.GetMin()[0] << ", " << range.GetMin()[1] << ", " << range.GetMin()[2]
+                    << "),\n"
+                    << "  max=(" << range.GetMax()[0] << ", " << range.GetMax()[1] << ", " << range.GetMax()[2] << "))";
+    return debug;
+}
+
+QDebug
 operator<<(QDebug debug, const GfCamera& camera)
 {
     QDebugStateSaver saver(debug);
@@ -257,7 +282,7 @@ QDebug
 operator<<(QDebug debug, const SdfPath& path)
 {
     QDebugStateSaver saver(debug);
-    debug.nospace() << "SdfPath(\"" << QString::fromStdString(path.GetString()) << "\")";
+    debug.nospace() << "SdfPath(\"" << usd::StringToQString(path.GetString()) << "\")";
     return debug;
 }
 
@@ -309,7 +334,7 @@ operator<<(QDebug debug, const VtValue& value)
         debug << value.UncheckedGet<double>();
     }
     else if (value.IsHolding<std::string>()) {
-        debug << "\"" << QString::fromStdString(value.UncheckedGet<std::string>()) << "\"";
+        debug << "\"" << usd::StringToQString(value.UncheckedGet<std::string>()) << "\"";
     }
     else if (value.IsHolding<VtDictionary>()) {
         debug << value.UncheckedGet<VtDictionary>();
@@ -355,16 +380,16 @@ operator<<(QDebug debug, const VtValue& value)
                 if (!first)
                     debug << ", ";
                 first = false;
-                debug << "\"" << QString::fromStdString(item) << "\"";
+                debug << "\"" << usd::StringToQString(item) << "\"";
             }
         }
         else {
-            debug << "<unsupported array type: " << QString::fromStdString(array.GetTypeName()) << ">";
+            debug << "<unsupported array type: " << usd::StringToQString(array.GetTypeName()) << ">";
         }
         debug << "]";
     }
     else {
-        debug << "<unsupported type: " << QString::fromStdString(value.GetTypeName()) << ">";
+        debug << "<unsupported type: " << usd::StringToQString(value.GetTypeName()) << ">";
     }
     return debug;
 }
@@ -381,7 +406,7 @@ operator<<(QDebug debug, const VtDictionary& dict)
         first = false;
         const std::string& key = pair.first;
         const VtValue& value = pair.second;
-        debug << "\"" << QString::fromStdString(key) << "\": ";
+        debug << "\"" << usd::StringToQString(key) << "\": ";
         debug << value;
     }
 

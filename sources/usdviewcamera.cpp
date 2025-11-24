@@ -3,7 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdviewcamera.h"
-#include "usdutils.h"
+#include "usdqtutils.h"
 #include <pxr/base/gf/frustum.h>
 #include <pxr/base/gf/range1d.h>
 #include <pxr/base/gf/rotation.h>
@@ -79,6 +79,8 @@ ViewCameraPrivate::frameAll()
     if (d.distance < d.nearClipping + maxsize * 0.5) {
         d.distance = d.nearClipping + length;
     }
+    d.center = d.range.GetMidpoint();
+    d.focusPoint = d.center;
     d.valid = false;
 }
 

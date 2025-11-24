@@ -6,7 +6,7 @@
 #include "command.h"
 #include "commanddispatcher.h"
 #include "platform.h"
-#include "usdutils.h"
+#include "usdqtutils.h"
 #include "usdviewcamera.h"
 #include <QColor>
 #include <QColorSpace>
@@ -26,6 +26,7 @@
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/metrics.h>
+#include <pxr/usd/usdGeom/xform.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
@@ -59,7 +60,17 @@ public:
     double widgetAspectRatio() const;
     GfVec2i widgetSize() const;
     GfVec4d widgetViewport() const;
-    void cleanUp();
+    void updateStatistics();
+    struct Statistics {
+        size_t prims = 0;
+        size_t meshes = 0;
+        size_t xforms = 0;
+        size_t payloads = 0;
+        size_t instances = 0;
+        size_t vertices = 0;
+        size_t normals = 0;
+        size_t faces = 0;
+    };
     struct Data {
         size_t count;
         qint64 frame;
@@ -71,6 +82,7 @@ public:
         bool defaultCameraLightEnabled;
         bool sceneLightsEnabled;
         bool sceneMaterialsEnabled;
+        bool statisticsEnabled;
         bool drag;
         bool sweep;
         QPoint start;
@@ -86,6 +98,7 @@ public:
         QList<SdfPath> selection;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<ImagingGLWidget> glwidget;
+        Statistics stats;
     };
     Data d;
 };
@@ -182,7 +195,7 @@ ImagingGLWidgetPrivate::paintGL()
                 glDisable(GL_FRAMEBUFFER_SRGB);
             }
             Q_ASSERT("aov is not set and is required" && d.aov.size());
-            TfToken aovtoken(QString_TfToken(d.aov));
+            TfToken aovtoken(QStringToTfToken(d.aov));
             d.glEngine->SetRendererAov(aovtoken);
             GfVec4d viewport = widgetViewport();
             d.glEngine->SetRenderBufferSize(widgetSize());
@@ -203,7 +216,7 @@ ImagingGLWidgetPrivate::paintGL()
             GfMatrix4d viewModel = frustum.ComputeViewMatrix();
             GfMatrix4d projectionMatrix = frustum.ComputeProjectionMatrix();
             d.glEngine->SetCameraState(viewModel, projectionMatrix);
-            d.params.clearColor = QColor_GfVec4f(d.clearColor);
+            d.params.clearColor = QColorToGfVec4f(d.clearColor);
             // drawmode
             {
                 UsdImagingGLDrawMode mode;
@@ -291,6 +304,38 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
         painter.setPen(QPen(QColor(0, 150, 255, 200), 1));
         painter.setBrush(QColor(0, 150, 255, 50));
         painter.drawRect(rect);
+    }
+    if (d.statisticsEnabled) {
+        QPainter painter(d.glwidget);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+
+        QFont font("Monospace");
+        font.setStyleHint(QFont::Monospace);
+        font.setPointSize(10);
+        painter.setFont(font);
+        QLocale locale = QLocale::system();
+        auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
+
+        QStringList lines;
+        lines << "Statistics"
+              << QString("Prims:      %1").arg(fmt(d.stats.prims))
+              << QString("Meshes:     %1").arg(fmt(d.stats.meshes))
+              << QString("Xforms:     %1").arg(fmt(d.stats.xforms))
+              << QString("Payloads:   %1").arg(fmt(d.stats.payloads))
+              << QString("Instances:  %1").arg(fmt(d.stats.instances))
+              << QString("Vertices:   %1").arg(fmt(d.stats.vertices))
+              << QString("Normals:    %1").arg(fmt(d.stats.normals))
+              << QString("Faces:      %1").arg(fmt(d.stats.faces));
+
+        QString overlay = lines.join("\n");
+        QFontMetrics fm(font);
+        QRect textRect = fm.boundingRect(QRect(0, 0, 500, 500), Qt::AlignLeft | Qt::AlignTop, overlay);
+        textRect.translate(10, 10);
+        painter.setBrush(QColor(0, 0, 0, 140));
+        painter.setPen(Qt::NoPen);
+        painter.drawRect(textRect);
+        painter.setPen(Qt::white);
+        painter.drawText(textRect, Qt::AlignLeft | Qt::AlignTop, overlay);
     }
 }
 
@@ -513,6 +558,9 @@ ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
     initCamera();
     d.glEngine.reset();
     initGL();
+    if (d.statisticsEnabled) {
+        updateStatistics();
+    }
 }
 
 void
@@ -531,6 +579,9 @@ ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
 void
 ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths)
 {
+    if (d.statisticsEnabled) {
+        updateStatistics();
+    }
     d.glwidget->update();
 }
 
@@ -580,6 +631,47 @@ ImagingGLWidgetPrivate::widgetViewport() const
 {
     GfVec2i size = widgetSize();
     return GfVec4d(0, 0, size[0], size[1]);
+}
+
+void
+ImagingGLWidgetPrivate::updateStatistics()
+{
+    d.stats = Statistics();
+    if (!d.stage)
+        return;
+
+    for (const UsdPrim& prim : d.stage->Traverse()) {
+        if (!prim.IsActive() || !prim.IsLoaded())
+            continue;
+
+        d.stats.prims++;
+
+        if (prim.IsA<UsdGeomXform>())
+            d.stats.xforms++;
+
+        if (prim.IsA<UsdGeomMesh>()) {
+            d.stats.meshes++;
+
+            UsdGeomMesh mesh(prim);
+
+            VtArray<GfVec3f> points;
+            mesh.GetPointsAttr().Get(&points);
+            d.stats.vertices += points.size();
+
+            VtArray<int> faceCounts;
+            mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
+            d.stats.faces += faceCounts.size();
+
+            VtArray<GfVec3f> normals;
+            mesh.GetNormalsAttr().Get(&normals);
+            d.stats.normals += normals.size();
+        }
+        if (prim.HasPayload())
+            d.stats.payloads++;
+
+        if (prim.IsInstanceable())
+            d.stats.instances++;
+    }
 }
 
 // todo: not yet in use
@@ -688,11 +780,27 @@ ImagingGLWidget::setSceneMaterialsEnabled(bool enabled)
     }
 }
 
+bool
+ImagingGLWidget::statisticsEnabled() const
+{
+    return p->d.statisticsEnabled;
+}
+
+void
+ImagingGLWidget::setStatisticsEnabled(bool enabled)
+{
+    if (enabled != p->d.statisticsEnabled) {
+        p->d.statisticsEnabled = enabled;
+        p->updateStatistics();
+        update();
+    }
+}
+
 QList<QString>
 ImagingGLWidget::rendererAovs() const
 {
     Q_ASSERT("gl engine is not inititialized" && p->d.glEngine);
-    return TfTokenVector_QList(p->d.glEngine->GetRendererAovs());
+    return TfTokenVectorToQList(p->d.glEngine->GetRendererAovs());
 }
 
 void

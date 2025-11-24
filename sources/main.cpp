@@ -4,8 +4,8 @@
 
 #include "platform.h"
 #include "test.h"
-#include "usdviewer.h"
 #include "usdqtutils.h"
+#include "usdviewer.h"
 #include <QApplication>
 #include <QDir>
 #include <pxr/base/plug/plugin.h>

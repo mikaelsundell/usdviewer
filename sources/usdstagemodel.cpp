@@ -227,16 +227,17 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
             }
         }
 
-        if (!loaded.isEmpty()) {
-            QMetaObject::invokeMethod(
-                d.stageModel,
-                [this, loaded]() {
+        QMetaObject::invokeMethod(
+            d.stageModel,
+            [this, loaded]() {
+                {
+                    QWriteLocker locker(&d.stageLock);
                     d.bboxCache.reset();
-                    d.bbox = boundingBox();
-                    updatePrims(loaded);
-                },
-                Qt::QueuedConnection);
-        }
+                }
+                d.bbox = boundingBox();
+                updatePrims(loaded);
+            },
+            Qt::QueuedConnection);
     });
     return true;
 }
@@ -362,9 +363,9 @@ StageModelPrivate::reload()
         if (d.stage) {
             d.stage->Reload();
             d.bboxCache.reset();
-            d.bbox = boundingBox();
         }
     }
+    d.bbox = boundingBox();
     QMetaObject::invokeMethod(
         d.stageModel, [this]() { updateStage(); }, Qt::QueuedConnection);
 
@@ -380,7 +381,10 @@ StageModelPrivate::isLoaded() const
 void
 StageModelPrivate::setMask(const QList<SdfPath>& paths)
 {
-    d.mask = paths;
+    {
+        QWriteLocker locker(&d.stageLock);
+        d.mask = paths;
+    }
     Q_EMIT d.stageModel->maskChanged(paths);
 }
 
@@ -388,14 +392,14 @@ GfBBox3d
 StageModelPrivate::boundingBox()
 {
     QReadLocker locker(&d.stageLock);
-    if (d.mask.isEmpty()) {
-        Q_ASSERT("stage is not loaded" && isLoaded());
-        if (!d.bboxCache) {
-            d.bboxCache.reset(
-                new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
+        if (d.mask.isEmpty()) {
+            Q_ASSERT("stage is not loaded" && isLoaded());
+            if (!d.bboxCache) {
+                d.bboxCache.reset(
+                    new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
+            }
+            return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
         }
-        return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
-    }
     else {
         return boundingBox(d.mask);
     }
@@ -425,7 +429,7 @@ StageModelPrivate::updatePrims(const QList<SdfPath> paths)
     Q_EMIT d.stageModel->boundingBoxChanged(d.bbox);
     if (!d.mask.isEmpty()) {
         QList<SdfPath> newMask;
-        bool changed = false;
+        bool updated = false;
         {
             QReadLocker locker(&d.stageLock);
             for (const SdfPath& path : d.mask) {
@@ -434,12 +438,15 @@ StageModelPrivate::updatePrims(const QList<SdfPath> paths)
                     newMask.append(path);
                 }
                 else {
-                    changed = true;
+                    updated = true;
                 }
             }
         }
-        if (changed) {
-            d.mask = newMask;
+        if (updated) {
+            {
+                QWriteLocker locker(&d.stageLock);
+                d.mask = newMask;
+            }
             Q_EMIT d.stageModel->maskChanged(newMask);
         }
     }
@@ -505,6 +512,8 @@ bool
 StageModel::exportToFile(const QString& filename)
 {
     QReadLocker locker(&p->d.stageLock);
+    if (!p->d.stage)
+        return false;
     return p->d.stage->Export(filename.toStdString());
 }
 
@@ -565,7 +574,6 @@ StageModel::filename() const
 UsdStageRefPtr
 StageModel::stage() const
 {
-    QReadLocker locker(&p->d.stageLock);
     Q_ASSERT("stage is not loaded" && isLoaded());
     return p->d.stage;
 }

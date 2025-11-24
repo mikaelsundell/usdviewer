@@ -269,20 +269,23 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.showProxy = true;
             d.params.showRender = true;
             TfErrorMark mark;
-            Hgi* hgi = d.glEngine->GetHgi();
-            hgi->StartFrame();
-            UsdPrim root = d.stage->GetPseudoRoot();
-            if (!d.mask.isEmpty()) {
-                SdfPathVector paths;
-                for (const SdfPath& path : d.mask)
-                    paths.push_back(path);
-                d.glEngine->PrepareBatch(root, d.params);
-                d.glEngine->RenderBatch(paths, d.params);
+            {
+                QReadLocker locker(CommandDispatcher::stageLock());
+                Hgi* hgi = d.glEngine->GetHgi();
+                hgi->StartFrame();
+                UsdPrim root = d.stage->GetPseudoRoot();
+                if (!d.mask.isEmpty()) {
+                    SdfPathVector paths;
+                    for (const SdfPath& path : d.mask)
+                        paths.push_back(path);
+                    d.glEngine->PrepareBatch(root, d.params);
+                    d.glEngine->RenderBatch(paths, d.params);
+                }
+                else {
+                    d.glEngine->Render(root, d.params);
+                }
+                hgi->EndFrame();
             }
-            else {
-                d.glEngine->Render(root, d.params);
-            }
-            hgi->EndFrame();
             if (!mark.IsClean()) {
                 qWarning() << "gl engine errors occured during rendering";
             }
@@ -318,8 +321,7 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
         auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
 
         QStringList lines;
-        lines << "Statistics"
-              << QString("Prims:      %1").arg(fmt(d.stats.prims))
+        lines << "Statistics" << QString("Prims:      %1").arg(fmt(d.stats.prims))
               << QString("Meshes:     %1").arg(fmt(d.stats.meshes))
               << QString("Xforms:     %1").arg(fmt(d.stats.xforms))
               << QString("Payloads:   %1").arg(fmt(d.stats.payloads))
@@ -637,43 +639,45 @@ ImagingGLWidgetPrivate::widgetViewport() const
 void
 ImagingGLWidgetPrivate::updateStatistics()
 {
-    /*
     d.stats = Statistics();
     if (!d.stage)
         return;
-
-    for (const UsdPrim& prim : d.stage->Traverse()) {
-        if (!prim.IsActive() || !prim.IsLoaded())
-            continue;
-
-        d.stats.prims++;
-
-        if (prim.IsA<UsdGeomXform>())
-            d.stats.xforms++;
-
-        if (prim.IsA<UsdGeomMesh>()) {
-            d.stats.meshes++;
-
-            UsdGeomMesh mesh(prim);
-
-            VtArray<GfVec3f> points;
-            mesh.GetPointsAttr().Get(&points);
-            d.stats.vertices += points.size();
-
-            VtArray<int> faceCounts;
-            mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
-            d.stats.faces += faceCounts.size();
-
-            VtArray<GfVec3f> normals;
-            mesh.GetNormalsAttr().Get(&normals);
-            d.stats.normals += normals.size();
+    
+    {
+        QReadLocker locker(CommandDispatcher::stageLock());
+        for (const UsdPrim& prim : d.stage->Traverse()) {
+            if (!prim.IsActive() || !prim.IsLoaded())
+                continue;
+            
+            d.stats.prims++;
+            
+            if (prim.IsA<UsdGeomXform>())
+                d.stats.xforms++;
+            
+            if (prim.IsA<UsdGeomMesh>()) {
+                d.stats.meshes++;
+                
+                UsdGeomMesh mesh(prim);
+                
+                VtArray<GfVec3f> points;
+                mesh.GetPointsAttr().Get(&points);
+                d.stats.vertices += points.size();
+                
+                VtArray<int> faceCounts;
+                mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
+                d.stats.faces += faceCounts.size();
+                
+                VtArray<GfVec3f> normals;
+                mesh.GetNormalsAttr().Get(&normals);
+                d.stats.normals += normals.size();
+            }
+            if (prim.HasPayload())
+                d.stats.payloads++;
+            
+            if (prim.IsInstanceable())
+                d.stats.instances++;
         }
-        if (prim.HasPayload())
-            d.stats.payloads++;
-
-        if (prim.IsInstanceable())
-            d.stats.instances++;
-    }*/
+    }
 }
 
 // todo: not yet in use

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "commandstack.h"
+#include <QReadWriteLock>
 
 namespace usd {
 class CommandDispatcher {
@@ -13,7 +14,7 @@ public:
     static void setCommandStack(CommandStack* commandStack);
     static void run(Command* command);
     template<typename T, typename... Args> static void run(Args&&... args);
-    static void requestAccess(std::function<void()> fn, bool write = false);
+    static QReadWriteLock* stageLock();
 
 private:
     struct Data {

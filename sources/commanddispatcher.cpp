@@ -25,17 +25,9 @@ CommandDispatcher::run(Command* cmd)
     d.stack->execute(cmd);
 }
 
-void
-CommandDispatcher::requestAccess(std::function<void()> fn, bool write)
+QReadWriteLock*
+CommandDispatcher::stageLock()
 {
-    auto* model = d.stack->stageModel();
-    if (write) {
-        QWriteLocker locker(&model->p->stageLock);
-        fn();
-    }
-    else {
-        QReadLocker locker(&model->p->stageLock);
-        fn();
-    }
+    return d.stack->stageModel()->stageLock();
 }
 }  // namespace usd

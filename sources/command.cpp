@@ -58,9 +58,15 @@ show(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
         // redo
-        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, true, recursive); },
+        [paths, recursive](StageModel* sm, SelectionModel*) {
+            QWriteLocker locker(sm->stageLock());
+            setVisibility(sm->stage(), paths, true, recursive);
+        },
         // undo
-        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, false, recursive); });
+        [paths, recursive](StageModel* sm, SelectionModel*) {
+            QWriteLocker locker(sm->stageLock());
+            setVisibility(sm->stage(), paths, false, recursive);
+        });
 }
 
 Command
@@ -68,8 +74,14 @@ hide(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
         // redo
-        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, false, recursive); },
+        [paths, recursive](StageModel* sm, SelectionModel*) {
+            QWriteLocker locker(sm->stageLock());
+            setVisibility(sm->stage(), paths, false, recursive);
+        },
         // undo
-        [paths, recursive](StageModel* sm, SelectionModel*) { setVisibility(sm->stage(), paths, true, recursive); });
+        [paths, recursive](StageModel* sm, SelectionModel*) {
+            QWriteLocker locker(sm->stageLock());
+            setVisibility(sm->stage(), paths, true, recursive);
+        });
 }
 }  // namespace usd

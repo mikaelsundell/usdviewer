@@ -89,6 +89,7 @@ public:
         QPoint start;
         QPoint end;
         QPoint mousepos;
+        QImage overlay;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
         ImagingGLWidget::draw_mode drawMode;
@@ -186,6 +187,8 @@ ImagingGLWidgetPrivate::paintGL()
 
     // paintGL() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
+
+    qDebug() << "paintGL: called";
 
     if (d.stage) {
         if (d.glEngine) {
@@ -300,45 +303,20 @@ ImagingGLWidgetPrivate::paintGL()
 void
 ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
 {
+    QPainter painter(d.glwidget);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     if (d.sweep) {
-        QPainter painter(d.glwidget);
+        painter.save();
         painter.setRenderHint(QPainter::Antialiasing, false);
         QRect rect(d.start, d.end);
         rect = rect.normalized();
         painter.setPen(QPen(QColor(0, 150, 255, 200), 1));
         painter.setBrush(QColor(0, 150, 255, 50));
         painter.drawRect(rect);
+        painter.restore();
     }
     if (d.statisticsEnabled) {
-        QPainter painter(d.glwidget);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-
-        QFont font("Monospace");
-        font.setStyleHint(QFont::Monospace);
-        font.setPointSize(10);
-        painter.setFont(font);
-        QLocale locale = QLocale::system();
-        auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
-
-        QStringList lines;
-        lines << "Statistics" << QString("Prims:      %1").arg(fmt(d.stats.prims))
-              << QString("Meshes:     %1").arg(fmt(d.stats.meshes))
-              << QString("Xforms:     %1").arg(fmt(d.stats.xforms))
-              << QString("Payloads:   %1").arg(fmt(d.stats.payloads))
-              << QString("Instances:  %1").arg(fmt(d.stats.instances))
-              << QString("Vertices:   %1").arg(fmt(d.stats.vertices))
-              << QString("Normals:    %1").arg(fmt(d.stats.normals))
-              << QString("Faces:      %1").arg(fmt(d.stats.faces));
-
-        QString overlay = lines.join("\n");
-        QFontMetrics fm(font);
-        QRect textRect = fm.boundingRect(QRect(0, 0, 500, 500), Qt::AlignLeft | Qt::AlignTop, overlay);
-        textRect.translate(10, 10);
-        painter.setBrush(QColor(0, 0, 0, 140));
-        painter.setPen(Qt::NoPen);
-        painter.drawRect(textRect);
-        painter.setPen(Qt::white);
-        painter.drawText(textRect, Qt::AlignLeft | Qt::AlignTop, overlay);
+        painter.drawImage(QPoint(0, 0), d.overlay);
     }
 }
 
@@ -642,40 +620,76 @@ ImagingGLWidgetPrivate::updateStatistics()
     d.stats = Statistics();
     if (!d.stage)
         return;
-    
+
     {
         QReadLocker locker(CommandDispatcher::stageLock());
         for (const UsdPrim& prim : d.stage->Traverse()) {
             if (!prim.IsActive() || !prim.IsLoaded())
                 continue;
-            
+
             d.stats.prims++;
-            
+
             if (prim.IsA<UsdGeomXform>())
                 d.stats.xforms++;
-            
+
             if (prim.IsA<UsdGeomMesh>()) {
                 d.stats.meshes++;
-                
+
                 UsdGeomMesh mesh(prim);
-                
+
                 VtArray<GfVec3f> points;
                 mesh.GetPointsAttr().Get(&points);
                 d.stats.vertices += points.size();
-                
+
                 VtArray<int> faceCounts;
                 mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
                 d.stats.faces += faceCounts.size();
-                
+
                 VtArray<GfVec3f> normals;
                 mesh.GetNormalsAttr().Get(&normals);
                 d.stats.normals += normals.size();
             }
             if (prim.HasPayload())
                 d.stats.payloads++;
-            
+
             if (prim.IsInstanceable())
                 d.stats.instances++;
+        }
+        d.overlay = QImage(300, 200, QImage::Format_ARGB32_Premultiplied);
+        d.overlay.fill(Qt::transparent);
+        {
+            QPainter p(&d.overlay);
+            p.setRenderHint(QPainter::Antialiasing, true);
+
+            QFont font("Monospace");
+            font.setStyleHint(QFont::Monospace);
+            font.setPointSize(10);
+            p.setFont(font);
+
+            QLocale locale = QLocale::system();
+            auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
+
+            QStringList lines;
+            lines << "Statistics" << QString("Prims:      %1").arg(fmt(d.stats.prims))
+                  << QString("Meshes:     %1").arg(fmt(d.stats.meshes))
+                  << QString("Xforms:     %1").arg(fmt(d.stats.xforms))
+                  << QString("Payloads:   %1").arg(fmt(d.stats.payloads))
+                  << QString("Instances:  %1").arg(fmt(d.stats.instances))
+                  << QString("Vertices:   %1").arg(fmt(d.stats.vertices))
+                  << QString("Normals:    %1").arg(fmt(d.stats.normals))
+                  << QString("Faces:      %1").arg(fmt(d.stats.faces));
+
+            QString overlay = lines.join("\n");
+
+            QFontMetrics fm(font);
+            QRect textRect = fm.boundingRect(QRect(0, 0, 300, 200), Qt::AlignLeft | Qt::AlignTop, overlay);
+            textRect.translate(10, 10);
+
+            p.setBrush(QColor(0, 0, 0, 140));
+            p.setPen(Qt::NoPen);
+            p.drawRect(textRect);
+            p.setPen(Qt::white);
+            p.drawText(textRect, overlay);
         }
     }
 }

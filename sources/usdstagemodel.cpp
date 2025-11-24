@@ -174,6 +174,9 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
         {
             QWriteLocker locker(&d.stageLock);
             for (const SdfPath& path : paths) {
+                qDebug() << "loadPayloads: loading path: " << path;
+
+
                 if (d.cancelRequested)
                     break;
 
@@ -392,14 +395,14 @@ GfBBox3d
 StageModelPrivate::boundingBox()
 {
     QReadLocker locker(&d.stageLock);
-        if (d.mask.isEmpty()) {
-            Q_ASSERT("stage is not loaded" && isLoaded());
-            if (!d.bboxCache) {
-                d.bboxCache.reset(
-                    new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
-            }
-            return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
+    if (d.mask.isEmpty()) {
+        Q_ASSERT("stage is not loaded" && isLoaded());
+        if (!d.bboxCache) {
+            d.bboxCache.reset(
+                new UsdGeomBBoxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true));
         }
+        return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
+    }
     else {
         return boundingBox(d.mask);
     }

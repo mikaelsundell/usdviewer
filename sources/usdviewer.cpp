@@ -407,11 +407,11 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 void
 ViewerPrivate::enable(bool enable)
 {
-    QList<QAction*> actions = { d.ui->fileReload,       d.ui->fileClose,       d.ui->fileSave,
-                                d.ui->fileSaveCopy,     d.ui->fileExportAll,   d.ui->fileExportSelected,
-                                d.ui->fileExportImage,  d.ui->editCopyImage,   d.ui->editDelete,
-                                d.ui->displayIsolate,   d.ui->displayFrameAll, d.ui->displayFrameSelected,
-                                d.ui->displayResetView, d.ui->displayExpand,   d.ui->displayCollapse };
+    QList<QAction*> actions
+        = { d.ui->fileReload,           d.ui->fileClose,        d.ui->fileSave,           d.ui->fileSaveAs,
+            d.ui->fileSaveCopy,         d.ui->fileExportAll,    d.ui->fileExportSelected, d.ui->fileExportImage,
+            d.ui->editCopyImage,        d.ui->editDelete,       d.ui->displayIsolate,     d.ui->displayFrameAll,
+            d.ui->displayFrameSelected, d.ui->displayResetView, d.ui->displayExpand,      d.ui->displayCollapse };
     for (QAction* action : actions) {
         if (action)
             action->setEnabled(enable);

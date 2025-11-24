@@ -122,6 +122,11 @@ QMenu::item {
     font-size: $defaultsize;
 }
 
+QMenu::item:disabled {
+    color: $textdisabled;
+    background-color: transparent;
+}
+
 QMenu::item:selected {
     background-color: $highlight;
     color: $text;

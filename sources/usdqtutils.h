@@ -35,7 +35,6 @@ QList<QString>
 TfTokenVectorToQList(const TfTokenVector& tokens);
 }  // namespace usd
 
-
 PXR_NAMESPACE_OPEN_SCOPE
 inline uint
 qHash(const SdfPath& path, uint seed = 0)

@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdprimitem.h"
+#include "commanddispatcher.h"
 #include "usdqtutils.h"
 #include <QPointer>
 #include <pxr/usd/usd/prim.h>
@@ -73,12 +74,15 @@ PrimItem::data(int column, int role) const
                 return QString();
         case Visible: {
             if (prim && prim.IsActive()) {
-                UsdGeomImageable imageable(prim);
-                if (imageable) {
-                    TfToken vis;
-                    imageable.GetVisibilityAttr().Get(&vis);
-                    return (vis == UsdGeomTokens->invisible) ? "H" : "V";
-                    return "V";
+                {
+                    QReadLocker locker(CommandDispatcher::stageLock());
+                    UsdGeomImageable imageable(prim);
+                    if (imageable) {
+                        TfToken vis;
+                        imageable.GetVisibilityAttr().Get(&vis);
+                        return (vis == UsdGeomTokens->invisible) ? "H" : "V";
+                        return "V";
+                    }
                 }
             }
         }

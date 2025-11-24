@@ -22,8 +22,6 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-
-
 namespace usd {
 class StageTreePrivate : public QObject {
 public:
@@ -73,9 +71,7 @@ public:
             const QStyle* style = w ? w->style() : QApplication::style();
             QRect checkRect = style->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &opt, w);
 
-            if (event->type() == QEvent::MouseButtonRelease ||
-                event->type() == QEvent::MouseButtonDblClick)
-            {
+            if (event->type() == QEvent::MouseButtonRelease || event->type() == QEvent::MouseButtonDblClick) {
                 auto* mouseEvent = dynamic_cast<QMouseEvent*>(event);
                 if (mouseEvent) {
                     if (mouseEvent->button() != Qt::LeftButton)
@@ -84,7 +80,11 @@ public:
                         return QStyledItemDelegate::editorEvent(event, model, option, index);
                 }
                 Qt::CheckState s = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-                s = (s == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+                switch (s) {
+                case Qt::Unchecked: s = Qt::Checked; break;
+                case Qt::Checked: s = Qt::Unchecked; break;
+                case Qt::PartiallyChecked: s = Qt::Unchecked; break;
+                }
                 model->setData(index, s, Qt::CheckStateRole);
             }
             return true;
@@ -533,13 +533,6 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
     for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
         updateItem(d.tree->topLevelItem(i));
     d.tree->update();
-}
-
-
-inline uint
-qHash(const SdfPath& path, uint seed = 0)
-{
-    return qHash(QString::fromStdString(path.GetString()), seed);
 }
 
 void

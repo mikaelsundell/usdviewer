@@ -13,8 +13,8 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class StageModelPrivate;
-class StageModel : public QObject {
+class DataModelPrivate;
+class DataModel : public QObject {
     Q_OBJECT
 public:
     enum load_policy { load_all, load_payload };
@@ -22,10 +22,10 @@ public:
     enum stage_status { stage_loaded, stage_failed, stage_closed };
 
 public:
-    StageModel();
-    StageModel(const QString& filename, load_policy policy = load_all);
-    StageModel(const StageModel& other);
-    ~StageModel();
+    DataModel();
+    DataModel(const QString& filename, load_policy policy = load_all);
+    DataModel(const DataModel& other);
+    ~DataModel();
     bool loadFromFile(const QString& filename, load_policy policy = load_all);
     bool loadPayloads(const QList<SdfPath>& paths, const QString& variantSet = QString(),
                       const QString& variantValue = QString());
@@ -54,6 +54,6 @@ Q_SIGNALS:
     void stageChanged(UsdStageRefPtr stage, load_policy policy, stage_status status);
 
 private:
-    QExplicitlySharedDataPointer<StageModelPrivate> p;
+    QExplicitlySharedDataPointer<DataModelPrivate> p;
 };
 }  // namespace usd

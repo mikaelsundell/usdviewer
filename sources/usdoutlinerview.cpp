@@ -15,22 +15,25 @@ class OutlinerViewPrivate : public QObject {
 public:
     OutlinerViewPrivate();
     void init();
-    void initStageModel();
+    void initDataModel();
     void initSelection();
     PropertyTree* propertyTree();
     StageTree* stageTree();
+    void updateFilter();
+    bool eventFilter(QObject* obj, QEvent* event);
 
 public Q_SLOTS:
     void collapse();
     void expand();
+    void filterChanged(const QString& filter);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status);
+    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
 
 public:
     struct Data {
         QScopedPointer<Ui_UsdOutlinerView> ui;
-        QPointer<StageModel> stageModel;
+        QPointer<DataModel> dataModel;
         QPointer<SelectionModel> selectionModel;
         QPointer<OutlinerView> view;
     };
@@ -44,18 +47,23 @@ OutlinerViewPrivate::init()
 {
     d.ui.reset(new Ui_UsdOutlinerView());
     d.ui->setupUi(d.view.data());
-    d.ui->stageTree->setHeaderLabels(QStringList() << "Name"
-                                                   << "Type"
-                                                   << "Vis");
-    d.ui->propertyTree->setHeaderLabels(QStringList() << "Name"
-                                                      << "Value");
+    stageTree()->setHeaderLabels(QStringList() << "Name"
+                                               << "Type"
+                                               << "Vis");
+    propertyTree()->setHeaderLabels(QStringList() << "Name"
+                                                  << "Value");
+    // event filter
+    stageTree()->installEventFilter(this);
+    propertyTree()->installEventFilter(this);
+    // connect
+    connect(d.ui->filter, &QLineEdit::textChanged, this, &OutlinerViewPrivate::filterChanged);
 }
 
 void
-OutlinerViewPrivate::initStageModel()
+OutlinerViewPrivate::initDataModel()
 {
-    connect(d.stageModel.data(), &StageModel::stageChanged, this, &OutlinerViewPrivate::stageChanged);
-    connect(d.stageModel.data(), &StageModel::primsChanged, this, &OutlinerViewPrivate::primsChanged);
+    connect(d.dataModel.data(), &DataModel::stageChanged, this, &OutlinerViewPrivate::stageChanged);
+    connect(d.dataModel.data(), &DataModel::primsChanged, this, &OutlinerViewPrivate::primsChanged);
 }
 
 void
@@ -76,6 +84,25 @@ OutlinerViewPrivate::stageTree()
     return d.ui->stageTree;
 }
 
+bool
+OutlinerViewPrivate::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::Show) {
+        if (auto* tree = qobject_cast<QTreeWidget*>(obj)) {
+            if (tree == stageTree()) {
+                tree->setColumnWidth(0, 180);
+                tree->setColumnWidth(1, 80);
+                tree->header()->setSectionResizeMode(2, QHeaderView::Stretch);
+            }
+            else if (tree == propertyTree()) {
+                tree->setColumnWidth(0, 180);
+                tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+            }
+        }
+    }
+    return QObject::eventFilter(obj, event);
+}
+
 void
 OutlinerViewPrivate::collapse()
 {
@@ -89,6 +116,13 @@ OutlinerViewPrivate::expand()
 {
     d.ui->stageTree->expand();
 }
+
+void
+OutlinerViewPrivate::filterChanged(const QString& filter)
+{
+    stageTree()->setFilter(filter);
+}
+
 
 void
 OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths)
@@ -105,10 +139,10 @@ OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 }
 
 void
-OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status)
+OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
 {
-    if (status == StageModel::stage_loaded) {
-        if (policy == StageModel::load_payload) {
+    if (status == DataModel::stage_loaded) {
+        if (policy == DataModel::load_payload) {
             stageTree()->setPayloadEnabled(true);
         }
         else {
@@ -160,18 +194,18 @@ OutlinerView::setSelectionModel(SelectionModel* selectionModel)
     }
 }
 
-StageModel*
-OutlinerView::stageModel() const
+DataModel*
+OutlinerView::dataModel() const
 {
-    return p->d.stageModel;
+    return p->d.dataModel;
 }
 
 void
-OutlinerView::setStageModel(StageModel* stageModel)
+OutlinerView::setDataModel(DataModel* dataModel)
 {
-    if (p->d.stageModel != stageModel) {
-        p->d.stageModel = stageModel;
-        p->initStageModel();
+    if (p->d.dataModel != dataModel) {
+        p->d.dataModel = dataModel;
+        p->initDataModel();
         update();
     }
 }

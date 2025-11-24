@@ -12,7 +12,7 @@ namespace usd {
 class RenderViewPrivate : public QObject {
 public:
     void init();
-    void initStageModel();
+    void initDataModel();
     void initSelection();
     ImagingGLWidget* imageGLWidget();
     ViewCamera camera();
@@ -25,13 +25,13 @@ public Q_SLOTS:
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status);
+    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
 
 public:
     struct Data {
         UsdStageRefPtr stage;
         QScopedPointer<Ui_UsdRenderView> ui;
-        QPointer<StageModel> stageModel;
+        QPointer<DataModel> dataModel;
         QPointer<SelectionModel> selectionModel;
         QPointer<RenderView> view;
     };
@@ -47,11 +47,12 @@ RenderViewPrivate::init()
 }
 
 void
-RenderViewPrivate::initStageModel()
+RenderViewPrivate::initDataModel()
 {
-    connect(d.stageModel.data(), &StageModel::stageChanged, this, &RenderViewPrivate::stageChanged);
-    connect(d.stageModel.data(), &StageModel::maskChanged, this, &RenderViewPrivate::maskChanged);
-    connect(d.stageModel.data(), &StageModel::primsChanged, this, &RenderViewPrivate::primsChanged);
+    connect(d.dataModel.data(), &DataModel::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
+    connect(d.dataModel.data(), &DataModel::maskChanged, this, &RenderViewPrivate::maskChanged);
+    connect(d.dataModel.data(), &DataModel::primsChanged, this, &RenderViewPrivate::primsChanged);
+    connect(d.dataModel.data(), &DataModel::stageChanged, this, &RenderViewPrivate::stageChanged);
 }
 
 void
@@ -75,10 +76,8 @@ RenderViewPrivate::camera()
 void
 RenderViewPrivate::frameAll()
 {
-    if (d.stageModel->isLoaded()) {
-        camera().setBoundingBox(d.stageModel->boundingBox());
-        camera().frameAll();
-        imageGLWidget()->update();
+    if (d.dataModel->isLoaded()) {
+        imageGLWidget()->frame(d.dataModel->boundingBox());
     }
 }
 
@@ -86,17 +85,16 @@ void
 RenderViewPrivate::frameSelected()
 {
     if (d.selectionModel->paths().size()) {
-        camera().setBoundingBox(d.stageModel->boundingBox(d.selectionModel->paths()));
-        camera().frameAll();
-        imageGLWidget()->update();
+        imageGLWidget()->frame(d.dataModel->boundingBox(d.selectionModel->paths()));
     }
 }
 
 void
 RenderViewPrivate::resetView()
 {
-    camera().resetView();
-    imageGLWidget()->update();
+    if (d.dataModel->isLoaded()) {
+        imageGLWidget()->resetView();
+    }
 }
 
 void
@@ -124,9 +122,9 @@ RenderViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 }
 
 void
-RenderViewPrivate::stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status)
+RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
 {
-    if (status == StageModel::stage_loaded) {
+    if (status == DataModel::stage_loaded) {
         imageGLWidget()->updateStage(stage);
     }
     else {
@@ -250,18 +248,18 @@ RenderView::setStatisticsEnabled(bool enabled)
     p->imageGLWidget()->setStatisticsEnabled(enabled);
 }
 
-StageModel*
-RenderView::stageModel() const
+DataModel*
+RenderView::dataModel() const
 {
-    return p->d.stageModel;
+    return p->d.dataModel;
 }
 
 void
-RenderView::setStageModel(StageModel* stageModel)
+RenderView::setDataModel(DataModel* dataModel)
 {
-    if (p->d.stageModel != stageModel) {
-        p->d.stageModel = stageModel;
-        p->initStageModel();
+    if (p->d.dataModel != dataModel) {
+        p->d.dataModel = dataModel;
+        p->initDataModel();
         update();
     }
 }

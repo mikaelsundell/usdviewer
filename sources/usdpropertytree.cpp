@@ -3,9 +3,9 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdpropertytree.h"
+#include "selectionmodel.h"
 #include "usdpropertyitem.h"
 #include "usdqtutils.h"
-#include "usdselectionmodel.h"
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -32,7 +32,6 @@ namespace usd {
 class PropertyTreePrivate : public QObject {
 public:
     void init();
-    bool eventFilter(QObject* obj, QEvent* event);
     void close();
     void updateStage(UsdStageRefPtr stage);
     void updatePrims(const QList<SdfPath>& paths);
@@ -50,24 +49,7 @@ public:
 
 void
 PropertyTreePrivate::init()
-{
-    d.tree->installEventFilter(this);
-}
-
-bool
-PropertyTreePrivate::eventFilter(QObject* obj, QEvent* event)
-{
-    if (event->type() == QEvent::Show) {
-        static bool init = false;
-        if (!init) {
-            init = true;
-            d.tree->setColumnWidth(PropertyItem::Name, 200);
-            d.tree->setColumnWidth(PropertyItem::Value, 80);
-            d.tree->header()->setSectionResizeMode(PropertyItem::Value, QHeaderView::Stretch);
-        }
-    }
-    return QObject::eventFilter(obj, event);
-}
+{}
 
 void
 PropertyTreePrivate::close()

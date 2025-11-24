@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "usdselectionmodel.h"
-#include "usdstagemodel.h"
+#include "datamodel.h"
+#include "selectionmodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 

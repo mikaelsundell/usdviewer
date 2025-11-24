@@ -7,7 +7,10 @@
 #include "commanddispatcher.h"
 #include "platform.h"
 #include "usdqtutils.h"
+#include "usdstageutils.h"
 #include "usdviewcamera.h"
+#include <QApplication>
+#include <QFontDatabase>
 #include <QColor>
 #include <QColorSpace>
 #include <QLocale>
@@ -40,6 +43,8 @@ public:
     void initGL();
     void initCamera();
     void close();
+    void frame(const GfBBox3d& bbox);
+    void resetView();
     void paintGL();
     void paintEvent(QPaintEvent* event);
     void focusEvent(QMouseEvent* event);
@@ -62,16 +67,6 @@ public:
     GfVec2i widgetSize() const;
     GfVec4d widgetViewport() const;
     void updateStatistics();
-    struct Statistics {
-        size_t prims = 0;
-        size_t meshes = 0;
-        size_t xforms = 0;
-        size_t payloads = 0;
-        size_t instances = 0;
-        size_t vertices = 0;
-        size_t normals = 0;
-        size_t faces = 0;
-    };
     struct Data {
         size_t count;
         qint64 frame;
@@ -89,7 +84,7 @@ public:
         QPoint start;
         QPoint end;
         QPoint mousepos;
-        QImage overlay;
+        QImage overlayStats;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
         ImagingGLWidget::draw_mode drawMode;
@@ -100,7 +95,6 @@ public:
         QList<SdfPath> selection;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<ImagingGLWidget> glwidget;
-        Statistics stats;
     };
     Data d;
 };
@@ -177,6 +171,21 @@ ImagingGLWidgetPrivate::close()
     d.glwidget->update();
     d.stage = nullptr;
     d.selection = QList<SdfPath>();
+}
+
+void
+ImagingGLWidgetPrivate::frame(const GfBBox3d& bbox)
+{
+    d.viewCamera.setBoundingBox(bbox);
+    d.viewCamera.frameAll();
+    d.glwidget->update();
+}
+
+void
+ImagingGLWidgetPrivate::resetView()
+{
+    initCamera();
+    d.glwidget->update();
 }
 
 void
@@ -316,7 +325,7 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
         painter.restore();
     }
     if (d.statisticsEnabled) {
-        painter.drawImage(QPoint(0, 0), d.overlay);
+        painter.drawImage(QPoint(0, 0), d.overlayStats);
     }
 }
 
@@ -617,48 +626,68 @@ ImagingGLWidgetPrivate::widgetViewport() const
 void
 ImagingGLWidgetPrivate::updateStatistics()
 {
-    d.stats = Statistics();
     if (!d.stage)
         return;
-
     {
         QReadLocker locker(CommandDispatcher::stageLock());
+        size_t prims = 0;
+        size_t meshes = 0;
+        size_t xforms = 0;
+        size_t payloads = 0;
+        size_t instances = 0;
+        size_t vertices = 0;
+        size_t normals = 0;
+        size_t faces = 0;
+    
         for (const UsdPrim& prim : d.stage->Traverse()) {
             if (!prim.IsActive() || !prim.IsLoaded())
                 continue;
 
-            d.stats.prims++;
-
+            prims++;
             if (prim.IsA<UsdGeomXform>())
-                d.stats.xforms++;
+                xforms++;
 
             if (prim.IsA<UsdGeomMesh>()) {
-                d.stats.meshes++;
-
+                meshes++;
                 UsdGeomMesh mesh(prim);
 
                 VtArray<GfVec3f> points;
                 mesh.GetPointsAttr().Get(&points);
-                d.stats.vertices += points.size();
+                vertices += points.size();
 
                 VtArray<int> faceCounts;
                 mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
-                d.stats.faces += faceCounts.size();
+                faces += faceCounts.size();
 
-                VtArray<GfVec3f> normals;
-                mesh.GetNormalsAttr().Get(&normals);
-                d.stats.normals += normals.size();
+                VtArray<GfVec3f> meshNormals;
+                UsdGeomPrimvarsAPI pvAPI(prim);
+                UsdGeomPrimvar normalsPv = pvAPI.GetPrimvar(TfToken("normals"));
+
+                bool hasNormals = false;
+                if (normalsPv && normalsPv.HasValue()) {
+                    normalsPv.Get(&meshNormals);
+                    hasNormals = true;
+                }
+                if (!hasNormals) {
+                    mesh.GetNormalsAttr().Get(&meshNormals);
+                }
+
             }
             if (prim.HasPayload())
-                d.stats.payloads++;
+                payloads++;
 
             if (prim.IsInstanceable())
-                d.stats.instances++;
+                instances++;
         }
-        d.overlay = QImage(300, 200, QImage::Format_ARGB32_Premultiplied);
-        d.overlay.fill(Qt::transparent);
+        
+        double dpr = 2.0;
+        int w = 300 * dpr;
+        int h = 200 * dpr;
+
+        d.overlayStats = QImage(300, 200, QImage::Format_ARGB32_Premultiplied);
+        d.overlayStats.fill(Qt::transparent);
         {
-            QPainter p(&d.overlay);
+            QPainter p(&d.overlayStats);
             p.setRenderHint(QPainter::Antialiasing, true);
 
             QFont font("Monospace");
@@ -670,21 +699,19 @@ ImagingGLWidgetPrivate::updateStatistics()
             auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
 
             QStringList lines;
-            lines << "Statistics" << QString("Prims:      %1").arg(fmt(d.stats.prims))
-                  << QString("Meshes:     %1").arg(fmt(d.stats.meshes))
-                  << QString("Xforms:     %1").arg(fmt(d.stats.xforms))
-                  << QString("Payloads:   %1").arg(fmt(d.stats.payloads))
-                  << QString("Instances:  %1").arg(fmt(d.stats.instances))
-                  << QString("Vertices:   %1").arg(fmt(d.stats.vertices))
-                  << QString("Normals:    %1").arg(fmt(d.stats.normals))
-                  << QString("Faces:      %1").arg(fmt(d.stats.faces));
+            lines << "Statistics" << QString("Prims:      %1").arg(fmt(prims))
+                  << QString("Meshes:     %1").arg(fmt(meshes))
+                  << QString("Xforms:     %1").arg(fmt(xforms))
+                  << QString("Payloads:   %1").arg(fmt(payloads))
+                  << QString("Instances:  %1").arg(fmt(instances))
+                  << QString("Vertices:   %1").arg(fmt(vertices))
+                  << QString("Normals:    %1").arg(fmt(normals))
+                  << QString("Faces:      %1").arg(fmt(faces));
 
             QString overlay = lines.join("\n");
-
             QFontMetrics fm(font);
             QRect textRect = fm.boundingRect(QRect(0, 0, 300, 200), Qt::AlignLeft | Qt::AlignTop, overlay);
             textRect.translate(10, 10);
-
             p.setBrush(QColor(0, 0, 0, 140));
             p.setPen(Qt::NoPen);
             p.drawRect(textRect);
@@ -723,6 +750,18 @@ void
 ImagingGLWidget::close()
 {
     p->close();
+}
+
+void
+ImagingGLWidget::frame(const GfBBox3d& bbox)
+{
+    p->frame(bbox);
+}
+
+void
+ImagingGLWidget::resetView()
+{
+    p->resetView();
 }
 
 ImagingGLWidget::draw_mode

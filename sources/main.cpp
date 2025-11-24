@@ -32,7 +32,7 @@ main(int argc, char* argv[])
         pxr::TfSetenv("PXR_DISABLE_STANDARD_PLUG_SEARCH_PATH", "1");
         std::vector<std::string> pluginPaths;
         for (const QString& dir : plugindirs) {
-            pluginPaths.push_back(dir.toStdString());
+            pluginPaths.push_back(QStringToString(dir));
         }
         pxr::PlugRegistry& registry = PlugRegistry::GetInstance();
         registry.RegisterPlugins(pluginPaths);

@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "usdselectionmodel.h"
-#include "usdstagemodel.h"
+#include "datamodel.h"
+#include "selectionmodel.h"
 #include <pxr/usd/sdf/path.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -13,17 +13,17 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace usd {
 class Command {
 public:
-    using Func = std::function<void(StageModel*, SelectionModel*)>;
+    using Func = std::function<void(DataModel*, SelectionModel*)>;
     Command(Func redo, Func undo = Func())
         : m_redo(std::move(redo))
         , m_undo(std::move(undo))
     {}
-    void execute(StageModel* s, SelectionModel* sel)
+    void execute(DataModel* s, SelectionModel* sel)
     {
         if (m_redo)
             m_redo(s, sel);
     }
-    void undo(StageModel* s, SelectionModel* sel)
+    void undo(DataModel* s, SelectionModel* sel)
     {
         if (m_undo)
             m_undo(s, sel);

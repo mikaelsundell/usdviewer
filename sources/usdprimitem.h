@@ -13,7 +13,7 @@ namespace usd {
 class PrimItemPrivate;
 class PrimItem : public QTreeWidgetItem {
 public:
-    enum Column { Name = 0, Type = 1, Visible = 2 };
+    enum Column { Name = 0, Type = 1, Vis = 2 };
     PrimItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path);
     PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path);
     virtual ~PrimItem();

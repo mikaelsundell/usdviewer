@@ -336,7 +336,7 @@ QTreeView
     border: 1px solid $borderalt;
     background-color: $base;
     selection-background-color: $highlight;
-    alternate-background-color: $highlight;
+    alternate-background-color: $basealt;
 }
 
 QTreeView QHeaderView:section

@@ -1,14 +1,14 @@
-﻿// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdstagetree.h"
 #include "command.h"
 #include "commanddispatcher.h"
+#include "selectionmodel.h"
 #include "stylesheet.h"
 #include "usdprimitem.h"
 #include "usdqtutils.h"
-#include "usdselectionmodel.h"
 #include "usdstageutils.h"
 #include <QApplication>
 #include <QHeaderView>
@@ -27,7 +27,7 @@ class StageTreePrivate : public QObject {
 public:
     StageTreePrivate();
     void init();
-    void initStageModel();
+    void initDataModel();
     void initSelection();
     void initTree();
     void close();
@@ -39,7 +39,6 @@ public:
     void updateFilter();
     void itemCheckState(QTreeWidgetItem* item, bool checkable, bool recursive = false);
     void treeCheckState(QTreeWidgetItem* item);
-    bool eventFilter(QObject* obj, QEvent* event);
     void contextMenuEvent(QContextMenuEvent* event);
     void updateStage(UsdStageRefPtr stage);
     void updatePrims(const QList<SdfPath>& paths);
@@ -162,7 +161,6 @@ StageTreePrivate::init()
             checkStateChanged(primItem);
         }
     });
-    d.tree->installEventFilter(this);
 }
 
 void
@@ -193,21 +191,6 @@ void
 StageTreePrivate::treeCheckState(QTreeWidgetItem* item)
 {
     itemCheckState(item, true, true);
-}
-
-bool
-StageTreePrivate::eventFilter(QObject* obj, QEvent* event)
-{
-    if (event->type() == QEvent::Show) {
-        static bool inittree = false;
-        if (!inittree) {
-            inittree = true;
-            d.tree->setColumnWidth(PrimItem::Name, 200);
-            d.tree->setColumnWidth(PrimItem::Type, 80);
-            d.tree->header()->setSectionResizeMode(PrimItem::Visible, QHeaderView::Stretch);
-        }
-    }
-    return QObject::eventFilter(obj, event);
 }
 
 void
@@ -284,12 +267,12 @@ StageTreePrivate::toggleVisible(PrimItem* item)
     QList<SdfPath> paths;
     QString pathString = item->data(0, Qt::UserRole).toString();
     if (!pathString.isEmpty())
-        paths.append(SdfPath(pathString.toStdString()));
+        paths.append(SdfPath(QStringToString(pathString)));
     if (item->isVisible()) {
-        CommandDispatcher::run(new Command(show(paths, false)));
+        CommandDispatcher::run(new Command(hide(paths, false)));
     }
     else {
-        CommandDispatcher::run(new Command(hide(paths, false)));
+        CommandDispatcher::run(new Command(show(paths, false)));
     }
 }
 
@@ -325,7 +308,7 @@ StageTreePrivate::itemSelectionChanged()
     for (QTreeWidgetItem* item : d.tree->selectedItems()) {
         QString pathString = item->data(0, Qt::UserRole).toString();
         if (!pathString.isEmpty())
-            paths.append(SdfPath(pathString.toStdString()));
+            paths.append(SdfPath(QStringToString(pathString)));
     }
     CommandDispatcher::run(new Command(select(paths)));
 }
@@ -337,7 +320,7 @@ StageTreePrivate::checkStateChanged(PrimItem* item)
     if (pathString.isEmpty())
         return;
 
-    SdfPath path(pathString.toStdString());
+    SdfPath path(QStringToString(pathString));
     UsdPrim prim = d.stage->GetPrimAtPath(path);
     if (!prim || !prim.HasPayload())
         return;
@@ -466,33 +449,33 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         return;
 
     if (chosen == loadSelected) {
-        CommandDispatcher::run(new Command(usd::loadPayloads(payloadPaths)));
+        CommandDispatcher::run(new Command(loadPayloads(payloadPaths)));
         return;
     }
 
     if (chosen == unloadSelected) {
-        CommandDispatcher::run(new Command(usd::unloadPayloads(payloadPaths)));
+        CommandDispatcher::run(new Command(unloadPayloads(payloadPaths)));
         return;
     }
 
     if (variantActions.contains(chosen)) {
         VariantSelection sel = variantActions[chosen];
-        CommandDispatcher::run(new Command(usd::loadPayloads(payloadPaths, sel.setName, sel.value)));
+        CommandDispatcher::run(new Command(loadPayloads(payloadPaths, sel.setName, sel.value)));
         return;
     }
 
     if (chosen == showSelected)
-        CommandDispatcher::run(new Command(usd::show(paths, false)));
+        CommandDispatcher::run(new Command(show(paths, false)));
     else if (chosen == showRecursive)
-        CommandDispatcher::run(new Command(usd::show(paths, true)));
+        CommandDispatcher::run(new Command(show(paths, true)));
     else if (chosen == hideSelected)
-        CommandDispatcher::run(new Command(usd::hide(paths, false)));
+        CommandDispatcher::run(new Command(hide(paths, false)));
     else if (chosen == hideRecursive)
-        CommandDispatcher::run(new Command(usd::hide(paths, true)));
+        CommandDispatcher::run(new Command(hide(paths, true)));
     else if (chosen == isolateSelected)
-        CommandDispatcher::run(new Command(usd::isolate(paths)));
+        CommandDispatcher::run(new Command(isolate(paths)));
     else if (chosen == isolateClear)
-        CommandDispatcher::run(new Command(usd::isolate(QList<SdfPath>())));
+        CommandDispatcher::run(new Command(isolate(QList<SdfPath>())));
 }
 
 void
@@ -666,7 +649,7 @@ StageTree::mousePressEvent(QMouseEvent* event)
         Q_EMIT itemSelectionChanged();
         return;
     }
-    if (column == PrimItem::Visible) {
+    if (column == PrimItem::Vis) {
         p->toggleVisible(static_cast<PrimItem*>(item));
         event->accept();
         return;

@@ -5,8 +5,8 @@
 #pragma once
 
 #include "command.h"
-#include "usdselectionmodel.h"
-#include "usdstagemodel.h"
+#include "datamodel.h"
+#include "selectionmodel.h"
 
 namespace usd {
 class CommandStackPrivate;
@@ -19,8 +19,8 @@ public:
     bool canUndo() const;
     bool canRedo() const;
 
-    StageModel* stageModel() const;
-    void setStageModel(StageModel* stageModel);
+    DataModel* dataModel() const;
+    void setDataModel(DataModel* dataModel);
 
     SelectionModel* selectionModel();
     void setSelectionModel(SelectionModel* selectionModel);

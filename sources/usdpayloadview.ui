@@ -72,6 +72,9 @@
       </item>
       <item>
        <widget class="QTreeWidget" name="payloadTree">
+        <property name="alternatingRowColors">
+         <bool>true</bool>
+        </property>
         <column>
          <property name="text">
           <string notr="true">1</string>

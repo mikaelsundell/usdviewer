@@ -31,7 +31,7 @@ StringToQString(const std::string& str)
 TfToken
 QStringToTfToken(const QString& str)
 {
-    return TfToken(str.toStdString());
+    return TfToken(QStringToString(str));
 }
 
 QString

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdselectionmodel.h"
+#include "selectionmodel.h"
 #include "usdqtutils.h"
 #include <QList>
 

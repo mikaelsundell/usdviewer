@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "usdselectionmodel.h"
-#include "usdstagemodel.h"
+#include "datamodel.h"
+#include "selectionmodel.h"
 #include "usdviewcamera.h"
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
@@ -33,6 +33,8 @@ public:
     ViewCamera viewCamera() const;
     QImage captureImage();
     void close();
+    void frame(const GfBBox3d& bbox);
+    void resetView();
 
     draw_mode drawMode() const;
     void setDrawMode(draw_mode drawMode);

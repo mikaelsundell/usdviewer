@@ -16,11 +16,11 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
 {
     return Command(
         // redo
-        [paths, variantSet, variantValue](StageModel* sm, SelectionModel*) {
-            sm->loadPayloads(paths, variantSet, variantValue);
+        [paths, variantSet, variantValue](DataModel* dm, SelectionModel*) {
+            dm->loadPayloads(paths, variantSet, variantValue);
         },
         // undo
-        [paths](StageModel* sm, SelectionModel*) { sm->unloadPayloads(paths); });
+        [paths](DataModel* dm, SelectionModel*) { dm->unloadPayloads(paths); });
 }
 
 Command
@@ -28,9 +28,9 @@ unloadPayloads(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths](StageModel* sm, SelectionModel*) { sm->unloadPayloads(paths); },
+        [paths](DataModel* dm, SelectionModel*) { dm->unloadPayloads(paths); },
         // undo
-        [paths](StageModel* sm, SelectionModel*) { sm->loadPayloads(paths); });
+        [paths](DataModel* dm, SelectionModel*) { dm->loadPayloads(paths); });
 }
 
 Command
@@ -38,9 +38,9 @@ isolate(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths](StageModel* sm, SelectionModel*) { sm->setMask(paths); },
+        [paths](DataModel* dm, SelectionModel*) { dm->setMask(paths); },
         // undo
-        [paths](StageModel* sm, SelectionModel*) { sm->setMask(QList<SdfPath>()); });
+        [paths](DataModel* dm, SelectionModel*) { dm->setMask(QList<SdfPath>()); });
 }
 
 Command
@@ -48,9 +48,9 @@ select(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths](StageModel*, SelectionModel* sel) { sel->updatePaths(paths); },
+        [paths](DataModel*, SelectionModel* sel) { sel->updatePaths(paths); },
         // undo
-        [](StageModel*, SelectionModel* sel) { sel->clear(); });
+        [](DataModel*, SelectionModel* sel) { sel->clear(); });
 }
 
 Command
@@ -58,14 +58,14 @@ show(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
         // redo
-        [paths, recursive](StageModel* sm, SelectionModel*) {
-            QWriteLocker locker(sm->stageLock());
-            setVisibility(sm->stage(), paths, true, recursive);
+        [paths, recursive](DataModel* dm, SelectionModel*) {
+            QWriteLocker locker(dm->stageLock());
+            setVisibility(dm->stage(), paths, true, recursive);
         },
         // undo
-        [paths, recursive](StageModel* sm, SelectionModel*) {
-            QWriteLocker locker(sm->stageLock());
-            setVisibility(sm->stage(), paths, false, recursive);
+        [paths, recursive](DataModel* dm, SelectionModel*) {
+            QWriteLocker locker(dm->stageLock());
+            setVisibility(dm->stage(), paths, false, recursive);
         });
 }
 
@@ -74,14 +74,14 @@ hide(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
         // redo
-        [paths, recursive](StageModel* sm, SelectionModel*) {
-            QWriteLocker locker(sm->stageLock());
-            setVisibility(sm->stage(), paths, false, recursive);
+        [paths, recursive](DataModel* dm, SelectionModel*) {
+            QWriteLocker locker(dm->stageLock());
+            setVisibility(dm->stage(), paths, false, recursive);
         },
         // undo
-        [paths, recursive](StageModel* sm, SelectionModel*) {
-            QWriteLocker locker(sm->stageLock());
-            setVisibility(sm->stage(), paths, true, recursive);
+        [paths, recursive](DataModel* dm, SelectionModel*) {
+            QWriteLocker locker(dm->stageLock());
+            setVisibility(dm->stage(), paths, true, recursive);
         });
 }
 }  // namespace usd

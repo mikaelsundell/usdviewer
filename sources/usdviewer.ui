@@ -507,6 +507,9 @@
     <addaction name="separator"/>
     <addaction name="fileExportImage"/>
     <addaction name="separator"/>
+    <addaction name="fileSaveSettings"/>
+    <addaction name="separator"/>
+    <addaction name="fileExit"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -1044,6 +1047,16 @@
    </property>
    <property name="text">
     <string>Statistics</string>
+   </property>
+  </action>
+  <action name="fileSaveSettings">
+   <property name="text">
+    <string>Save settings</string>
+   </property>
+  </action>
+  <action name="fileExit">
+   <property name="text">
+    <string>Exit</string>
    </property>
   </action>
  </widget>

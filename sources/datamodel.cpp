@@ -2,7 +2,7 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdstagemodel.h"
+#include "datamodel.h"
 #include "usdqtutils.h"
 #include <QMap>
 #include <QThreadPool>
@@ -16,12 +16,12 @@
 #include <stack>
 
 namespace usd {
-class StageModelPrivate : public QSharedData {
+class DataModelPrivate : public QSharedData {
 public:
-    StageModelPrivate();
-    ~StageModelPrivate();
+    DataModelPrivate();
+    ~DataModelPrivate();
     void initStage();
-    bool loadFromFile(const QString& filename, StageModel::load_policy loadPolicy);
+    bool loadFromFile(const QString& filename, DataModel::load_policy loadPolicy);
     bool loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue);
     bool unloadPayloads(const QList<SdfPath>& paths);
     void cancelPayloads();
@@ -43,7 +43,7 @@ public:
 public:
     class StageWatcher : public TfWeakBase {
     public:
-        StageWatcher(StageModelPrivate* parent)
+        StageWatcher(DataModelPrivate* parent)
             : d { TfNotice::Key(), parent }
         {}
         void init()
@@ -61,11 +61,11 @@ public:
             if (updated.isEmpty())
                 return;
             QMetaObject::invokeMethod(
-                d.parent->d.stageModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::QueuedConnection);
+                d.parent->d.dataModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::QueuedConnection);
         }
         struct Data {
             TfNotice::Key key;
-            StageModelPrivate* parent;
+            DataModelPrivate* parent;
         };
         Data d;
     };
@@ -73,8 +73,8 @@ public:
 public:
     struct Data {
         UsdStageRefPtr stage;
-        StageModel::load_policy loadPolicy;
-        StageModel::stage_status stageStatus;
+        DataModel::load_policy loadPolicy;
+        DataModel::stage_status stageStatus;
         QString filename;
         GfBBox3d bbox;
         QFuture<void> payloadJob;
@@ -84,25 +84,25 @@ public:
         QReadWriteLock stageLock;
         QScopedPointer<UsdGeomBBoxCache> bboxCache;
         QScopedPointer<StageWatcher> stageWatcher;
-        QPointer<StageModel> stageModel;
+        QPointer<DataModel> dataModel;
     };
     Data d;
 };
 
-StageModelPrivate::StageModelPrivate()
+DataModelPrivate::DataModelPrivate()
 {
-    d.loadPolicy = StageModel::load_policy::load_all;
+    d.loadPolicy = DataModel::load_policy::load_all;
     d.pool.setMaxThreadCount(QThread::idealThreadCount());
     d.pool.setThreadPriority(QThread::HighPriority);
     d.stageWatcher.reset(new StageWatcher(this));
 }
 
-StageModelPrivate::~StageModelPrivate() {}
+DataModelPrivate::~DataModelPrivate() {}
 
 void
-StageModelPrivate::initStage()
+DataModelPrivate::initStage()
 {
-    d.stageStatus = StageModel::stage_status::stage_loaded;
+    d.stageStatus = DataModel::stage_status::stage_loaded;
     d.bboxCache.reset();
     d.bbox = boundingBox();
     d.stageWatcher->init();
@@ -111,15 +111,15 @@ StageModelPrivate::initStage()
 }
 
 bool
-StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_policy policy)
+DataModelPrivate::loadFromFile(const QString& filename, DataModel::load_policy policy)
 {
     {
         QWriteLocker locker(&d.stageLock);
-        if (policy == StageModel::load_all) {
-            d.stage = UsdStage::Open(filename.toStdString(), UsdStage::LoadAll);
+        if (policy == DataModel::load_all) {
+            d.stage = UsdStage::Open(QStringToString(filename), UsdStage::LoadAll);
         }
         else {
-            d.stage = UsdStage::Open(filename.toStdString(),
+            d.stage = UsdStage::Open(QStringToString(filename),
                                      UsdStage::LoadNone);  // load stage without loading payloads
         }
         d.loadPolicy = policy;
@@ -130,12 +130,12 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_policy
         d.filename = filename;
     }
     else {
-        d.stageStatus = StageModel::stage_status::stage_failed;
+        d.stageStatus = DataModel::stage_status::stage_failed;
         d.bboxCache.reset();
         return false;
     }
     QMetaObject::invokeMethod(
-        d.stageModel,
+        d.dataModel,
         [this]() {
             setMask(d.mask);
             updateStage();
@@ -145,7 +145,7 @@ StageModelPrivate::loadFromFile(const QString& filename, StageModel::load_policy
 }
 
 bool
-StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
+DataModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
 {
     // this function expects *prim paths that directly contain payloads.
     // it does NOT recursively load payloads on child prims and it does NOT
@@ -153,7 +153,7 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
     // in the hierarchy.
 
     const bool useVariant = (!variantSet.isEmpty() && !variantValue.isEmpty());
-    Q_EMIT d.stageModel->payloadsRequested(paths, StageModel::payload_loaded);
+    Q_EMIT d.dataModel->payloadsRequested(paths, DataModel::payload_loaded);
 
     auto stage = d.stage;
     auto pool = &d.pool;
@@ -183,13 +183,13 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
                 UsdPrim prim = stage->GetPrimAtPath(path);
                 if (!prim) {
                     failed.append(path);
-                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
+                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
                     continue;
                 }
 
                 if (!prim.HasPayload()) {
                     failed.append(path);
-                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
+                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
                     continue;
                 }
 
@@ -201,13 +201,13 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
                         UsdVariantSet vs = prim.GetVariantSet(setNameStd);
                         if (!vs.IsValid()) {
                             failed.append(path);
-                            Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
+                            Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
                             continue;
                         }
                         auto variants = vs.GetVariantNames();
                         if (std::find(variants.begin(), variants.end(), setValueStd) == variants.end()) {
                             failed.append(path);
-                            Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
+                            Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
                             continue;
                         }
 
@@ -216,22 +216,22 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
 
                     if (prim.IsLoaded()) {
                         loaded.append(path);
-                        Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_loaded);
+                        Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_loaded);
                         continue;
                     }
 
                     prim.Load();
                     loaded.append(path);
-                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_loaded);
+                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_loaded);
                 } catch (const std::exception& e) {
                     failed.append(path);
-                    Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_failed);
+                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
                 }
             }
         }
 
         QMetaObject::invokeMethod(
-            d.stageModel,
+            d.dataModel,
             [this, loaded]() {
                 {
                     QWriteLocker locker(&d.stageLock);
@@ -246,12 +246,12 @@ StageModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& vari
 }
 
 bool
-StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
+DataModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
 {
     if (!isLoaded())
         return false;
 
-    Q_EMIT d.stageModel->payloadsRequested(paths, StageModel::payload_unloaded);
+    Q_EMIT d.dataModel->payloadsRequested(paths, DataModel::payload_unloaded);
 
     auto stage = d.stage;
     auto pool = &d.pool;
@@ -267,11 +267,11 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
                 prim.Unload();
                 unloaded.append(path);
 
-                Q_EMIT d.stageModel->payloadChanged(path, StageModel::payload_unloaded);
+                Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_unloaded);
             }
         }
         QMetaObject::invokeMethod(
-            d.stageModel,
+            d.dataModel,
             [this, unloaded]() {
                 if (!unloaded.isEmpty()) {
                     {
@@ -287,7 +287,7 @@ StageModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
 }
 
 void
-StageModelPrivate::cancelPayloads()
+DataModelPrivate::cancelPayloads()
 {
     if (!d.payloadJob.isRunning())
         return;
@@ -295,7 +295,7 @@ StageModelPrivate::cancelPayloads()
 }
 
 bool
-StageModelPrivate::saveToFile(const QString& filename)
+DataModelPrivate::saveToFile(const QString& filename)
 {
     if (!isLoaded())
         return false;
@@ -307,20 +307,20 @@ StageModelPrivate::saveToFile(const QString& filename)
             return false;
         }
         if (rootLayer->IsAnonymous()) {
-            return d.stage->Export(filename.toStdString());
+            return d.stage->Export(QStringToString(filename));
         }
         if (QFileInfo(d.filename).canonicalFilePath() == QFileInfo(filename).canonicalFilePath()) {
             d.stage->Save();
             return true;
         }
-        return d.stage->Export(filename.toStdString());
+        return d.stage->Export(QStringToString(filename));
     } catch (const std::exception& e) {
         return false;
     }
 }
 
 bool
-StageModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
+DataModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
 {
     QReadLocker locker(&d.stageLock);
     UsdStagePopulationMask mask;
@@ -342,11 +342,11 @@ StageModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString&
         return false;
 
     maskedStage->ExpandPopulationMask();
-    return maskedStage->Export(filename.toStdString());
+    return maskedStage->Export(QStringToString(filename));
 }
 
 bool
-StageModelPrivate::close()
+DataModelPrivate::close()
 {
     {
         QWriteLocker locker(&d.stageLock);
@@ -354,12 +354,12 @@ StageModelPrivate::close()
         d.bboxCache.reset();
     }
     QMetaObject::invokeMethod(
-        d.stageModel, [this]() { updateStage(); }, Qt::QueuedConnection);
+        d.dataModel, [this]() { updateStage(); }, Qt::QueuedConnection);
     return true;
 }
 
 bool
-StageModelPrivate::reload()
+DataModelPrivate::reload()
 {
     {
         QWriteLocker locker(&d.stageLock);
@@ -370,29 +370,29 @@ StageModelPrivate::reload()
     }
     d.bbox = boundingBox();
     QMetaObject::invokeMethod(
-        d.stageModel, [this]() { updateStage(); }, Qt::QueuedConnection);
+        d.dataModel, [this]() { updateStage(); }, Qt::QueuedConnection);
 
     return true;
 }
 
 bool
-StageModelPrivate::isLoaded() const
+DataModelPrivate::isLoaded() const
 {
     return d.stage != nullptr;
 }
 
 void
-StageModelPrivate::setMask(const QList<SdfPath>& paths)
+DataModelPrivate::setMask(const QList<SdfPath>& paths)
 {
     {
         QWriteLocker locker(&d.stageLock);
         d.mask = paths;
     }
-    Q_EMIT d.stageModel->maskChanged(paths);
+    Q_EMIT d.dataModel->maskChanged(paths);
 }
 
 GfBBox3d
-StageModelPrivate::boundingBox()
+DataModelPrivate::boundingBox()
 {
     QReadLocker locker(&d.stageLock);
     if (d.mask.isEmpty()) {
@@ -409,7 +409,7 @@ StageModelPrivate::boundingBox()
 }
 
 GfBBox3d
-StageModelPrivate::boundingBox(const QList<SdfPath>& paths)
+DataModelPrivate::boundingBox(const QList<SdfPath>& paths)
 {
     QReadLocker locker(&d.stageLock);
     Q_ASSERT("stage is not loaded" && isLoaded());
@@ -426,10 +426,10 @@ StageModelPrivate::boundingBox(const QList<SdfPath>& paths)
 }
 
 void
-StageModelPrivate::updatePrims(const QList<SdfPath> paths)
+DataModelPrivate::updatePrims(const QList<SdfPath> paths)
 {
-    Q_EMIT d.stageModel->primsChanged(paths);
-    Q_EMIT d.stageModel->boundingBoxChanged(d.bbox);
+    Q_EMIT d.dataModel->primsChanged(paths);
+    Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
     if (!d.mask.isEmpty()) {
         QList<SdfPath> newMask;
         bool updated = false;
@@ -450,139 +450,139 @@ StageModelPrivate::updatePrims(const QList<SdfPath> paths)
                 QWriteLocker locker(&d.stageLock);
                 d.mask = newMask;
             }
-            Q_EMIT d.stageModel->maskChanged(newMask);
+            Q_EMIT d.dataModel->maskChanged(newMask);
         }
     }
 }
 
 void
-StageModelPrivate::updateStage()
+DataModelPrivate::updateStage()
 {
-    Q_EMIT d.stageModel->stageChanged(d.stage, d.loadPolicy, d.stageStatus);
-    Q_EMIT d.stageModel->boundingBoxChanged(d.bbox);
+    Q_EMIT d.dataModel->stageChanged(d.stage, d.loadPolicy, d.stageStatus);
+    Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
 }
 
-StageModel::StageModel()
-    : p(new StageModelPrivate())
+DataModel::DataModel()
+    : p(new DataModelPrivate())
 {
-    p->d.stageModel = this;
+    p->d.dataModel = this;
 }
 
-StageModel::StageModel(const QString& filename, StageModel::load_policy loadPolicy)
-    : p(new StageModelPrivate())
+DataModel::DataModel(const QString& filename, DataModel::load_policy loadPolicy)
+    : p(new DataModelPrivate())
 {
-    p->d.stageModel = this;
+    p->d.dataModel = this;
     loadFromFile(filename, loadPolicy);
 }
 
-StageModel::StageModel(const StageModel& other)
+DataModel::DataModel(const DataModel& other)
     : p(other.p)
 {}
 
-StageModel::~StageModel() {}
+DataModel::~DataModel() {}
 
 bool
-StageModel::loadFromFile(const QString& filename, StageModel::load_policy loadPolicy)
+DataModel::loadFromFile(const QString& filename, DataModel::load_policy loadPolicy)
 {
     return p->loadFromFile(filename, loadPolicy);
 }
 
 bool
-StageModel::loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
+DataModel::loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
 {
     return p->loadPayloads(paths, variantSet, variantValue);
 }
 
 bool
-StageModel::unloadPayloads(const QList<SdfPath>& paths)
+DataModel::unloadPayloads(const QList<SdfPath>& paths)
 {
     return p->unloadPayloads(paths);
 }
 
 void
-StageModel::cancelPayloads()
+DataModel::cancelPayloads()
 {
     p->cancelPayloads();
 }
 
 bool
-StageModel::saveToFile(const QString& filename)
+DataModel::saveToFile(const QString& filename)
 {
     return p->saveToFile(filename);
 }
 
 bool
-StageModel::exportToFile(const QString& filename)
+DataModel::exportToFile(const QString& filename)
 {
     QReadLocker locker(&p->d.stageLock);
     if (!p->d.stage)
         return false;
-    return p->d.stage->Export(filename.toStdString());
+    return p->d.stage->Export(QStringToString(filename));
 }
 
 bool
-StageModel::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
+DataModel::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
 {
     return p->exportPathsToFile(paths, filename);
 }
 
 bool
-StageModel::reload()
+DataModel::reload()
 {
     return p->reload();
 }
 
 bool
-StageModel::close()
+DataModel::close()
 {
     return p->close();
 }
 
 bool
-StageModel::isLoaded() const
+DataModel::isLoaded() const
 {
     return p->isLoaded();
 }
 
 void
-StageModel::setMask(const QList<SdfPath>& paths)
+DataModel::setMask(const QList<SdfPath>& paths)
 {
     p->setMask(paths);
 }
 
 GfBBox3d
-StageModel::boundingBox()
+DataModel::boundingBox()
 {
     return p->boundingBox();
 }
 
-StageModel::load_policy
-StageModel::loadPolicy() const
+DataModel::load_policy
+DataModel::loadPolicy() const
 {
     return p->d.loadPolicy;
 }
 
 GfBBox3d
-StageModel::boundingBox(const QList<SdfPath>& paths)
+DataModel::boundingBox(const QList<SdfPath>& paths)
 {
     return p->boundingBox(paths);
 }
 
 QString
-StageModel::filename() const
+DataModel::filename() const
 {
     return p->d.filename;
 }
 
 UsdStageRefPtr
-StageModel::stage() const
+DataModel::stage() const
 {
     Q_ASSERT("stage is not loaded" && isLoaded());
     return p->d.stage;
 }
 
 QReadWriteLock*
-StageModel::stageLock() const
+DataModel::stageLock() const
 {
     return &p->d.stageLock;
 }

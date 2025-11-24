@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "usdselectionmodel.h"
-#include "usdstagemodel.h"
+#include "datamodel.h"
+#include "selectionmodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -47,8 +47,8 @@ public:
     render_mode renderMode() const;
     void setDrawMode(render_mode renderMode);
 
-    StageModel* stageModel() const;
-    void setStageModel(StageModel* stageModel);
+    DataModel* dataModel() const;
+    void setDataModel(DataModel* dataModel);
 
     SelectionModel* selectionModel();
     void setSelectionModel(SelectionModel* selectionModel);

@@ -17,7 +17,7 @@ public:
     struct Data {
         qsizetype index = -1;
         QVector<Command*> stack;
-        QPointer<StageModel> stageModel;
+        QPointer<DataModel> dataModel;
         QPointer<SelectionModel> selectionModel;
     };
     Data d;
@@ -47,7 +47,7 @@ CommandStack::execute(Command* command)
 {
     if (!command)
         return;
-    command->execute(p->d.stageModel, p->d.selectionModel);
+    command->execute(p->d.dataModel, p->d.selectionModel);
     p->push(command);
     Q_EMIT commandExecuted(command);
     Q_EMIT changed();
@@ -72,7 +72,7 @@ CommandStack::undo()
         return;
 
     Command* cmd = p->d.stack[p->d.index];
-    cmd->undo(p->d.stageModel, p->d.selectionModel);
+    cmd->undo(p->d.dataModel, p->d.selectionModel);
     p->d.index--;
 
     Q_EMIT changed();
@@ -86,22 +86,22 @@ CommandStack::redo()
 
     p->d.index++;
     Command* cmd = p->d.stack[p->d.index];
-    cmd->execute(p->d.stageModel, p->d.selectionModel);
+    cmd->execute(p->d.dataModel, p->d.selectionModel);
 
     Q_EMIT changed();
 }
 
-StageModel*
-CommandStack::stageModel() const
+DataModel*
+CommandStack::dataModel() const
 {
-    return p->d.stageModel;
+    return p->d.dataModel;
 }
 
 void
-CommandStack::setStageModel(StageModel* stageModel)
+CommandStack::setDataModel(DataModel* dataModel)
 {
-    if (p->d.stageModel != stageModel) {
-        p->d.stageModel = stageModel;
+    if (p->d.dataModel != dataModel) {
+        p->d.dataModel = dataModel;
     }
 }
 

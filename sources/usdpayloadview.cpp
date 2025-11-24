@@ -17,7 +17,7 @@ namespace usd {
 class PayloadViewPrivate : public QObject {
 public:
     void init();
-    void initStageModel();
+    void initDataModel();
     void initSelection();
     QTreeWidget* payloadTree();
     bool eventFilter(QObject* obj, QEvent* event);
@@ -26,20 +26,20 @@ public Q_SLOTS:
     void cancel();
     void clear();
     void selectionChanged(const QList<SdfPath>& paths);
-    void payloadsRequested(const QList<SdfPath>& paths, StageModel::payload_mode mode);
-    void payloadChanged(const SdfPath& path, StageModel::payload_mode mode);
-    void stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status);
+    void payloadsRequested(const QList<SdfPath>& paths, DataModel::payload_mode mode);
+    void payloadChanged(const SdfPath& path, DataModel::payload_mode mode);
+    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
 
 public:
     QString updateStatus();
     struct Data {
-        StageModel::payload_mode payloadMode;
+        DataModel::payload_mode payloadMode;
         UsdStageRefPtr stage;
         qsizetype total = 0;
         qsizetype completed = 0;
         qsizetype totalsize = 0;
         QScopedPointer<Ui_UsdPayloadView> ui;
-        QPointer<StageModel> stageModel;
+        QPointer<DataModel> dataModel;
         QPointer<SelectionModel> selectionModel;
         QPointer<PayloadView> view;
     };
@@ -61,11 +61,11 @@ PayloadViewPrivate::init()
 }
 
 void
-PayloadViewPrivate::initStageModel()
+PayloadViewPrivate::initDataModel()
 {
-    connect(d.stageModel.data(), &StageModel::payloadsRequested, this, &PayloadViewPrivate::payloadsRequested);
-    connect(d.stageModel.data(), &StageModel::payloadChanged, this, &PayloadViewPrivate::payloadChanged);
-    connect(d.stageModel.data(), &StageModel::stageChanged, this, &PayloadViewPrivate::stageChanged);
+    connect(d.dataModel.data(), &DataModel::payloadsRequested, this, &PayloadViewPrivate::payloadsRequested);
+    connect(d.dataModel.data(), &DataModel::payloadChanged, this, &PayloadViewPrivate::payloadChanged);
+    connect(d.dataModel.data(), &DataModel::stageChanged, this, &PayloadViewPrivate::stageChanged);
 }
 
 void
@@ -87,7 +87,7 @@ PayloadViewPrivate::eventFilter(QObject* obj, QEvent* event)
         static bool inittree = false;
         if (!inittree) {
             inittree = true;
-            payloadTree()->setColumnWidth(0, 200);
+            payloadTree()->setColumnWidth(0, 180);
             payloadTree()->header()->setSectionResizeMode(1, QHeaderView::Stretch);
         }
     }
@@ -97,7 +97,7 @@ PayloadViewPrivate::eventFilter(QObject* obj, QEvent* event)
 void
 PayloadViewPrivate::cancel()
 {
-    d.stageModel->cancelPayloads();
+    d.dataModel->cancelPayloads();
 }
 
 void
@@ -107,7 +107,7 @@ PayloadViewPrivate::clear()
 }
 
 void
-PayloadViewPrivate::payloadsRequested(const QList<SdfPath>& paths, StageModel::payload_mode mode)
+PayloadViewPrivate::payloadsRequested(const QList<SdfPath>& paths, DataModel::payload_mode mode)
 {
     d.payloadMode = mode;
     d.total = paths.size();
@@ -126,7 +126,7 @@ PayloadViewPrivate::payloadsRequested(const QList<SdfPath>& paths, StageModel::p
 }
 
 void
-PayloadViewPrivate::payloadChanged(const SdfPath& path, StageModel::payload_mode mode)
+PayloadViewPrivate::payloadChanged(const SdfPath& path, DataModel::payload_mode mode)
 {
     QVariant target = StringToQString(path.GetString());
     QTreeWidget* tree = d.ui->payloadTree;
@@ -156,7 +156,7 @@ PayloadViewPrivate::payloadChanged(const SdfPath& path, StageModel::payload_mode
                     if (introducingLayer && !introducingLayer->GetRealPath().empty()) {
                         QFileInfo baseInfo(StringToQString(introducingLayer->GetRealPath()));
                         QString composed = QDir(baseInfo.absolutePath()).filePath(StringToQString(assetPath));
-                        resolved = composed.toStdString();
+                        resolved = QStringToString(composed);
                     }
                 }
                 QString displayPath = StringToQString(resolved.empty() ? assetPath : resolved);
@@ -178,7 +178,7 @@ PayloadViewPrivate::payloadChanged(const SdfPath& path, StageModel::payload_mode
 }
 
 void
-PayloadViewPrivate::stageChanged(UsdStageRefPtr stage, StageModel::load_policy policy, StageModel::stage_status status)
+PayloadViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
 {
     d.ui->payloadTree->clear();
     d.stage = stage;
@@ -196,7 +196,7 @@ PayloadViewPrivate::updateStatus()
         .arg(d.completed)
         .arg(d.total)
         .arg(sizeStr)
-        .arg(d.payloadMode == StageModel::payload_loaded ? "loaded" : "unloaded");
+        .arg(d.payloadMode == DataModel::payload_loaded ? "loaded" : "unloaded");
 }
 
 PayloadView::PayloadView(QWidget* parent)
@@ -209,18 +209,18 @@ PayloadView::PayloadView(QWidget* parent)
 
 PayloadView::~PayloadView() {}
 
-StageModel*
-PayloadView::stageModel() const
+DataModel*
+PayloadView::dataModel() const
 {
-    return p->d.stageModel;
+    return p->d.dataModel;
 }
 
 void
-PayloadView::setStageModel(StageModel* stageModel)
+PayloadView::setDataModel(DataModel* dataModel)
 {
-    if (p->d.stageModel != stageModel) {
-        p->d.stageModel = stageModel;
-        p->initStageModel();
+    if (p->d.dataModel != dataModel) {
+        p->d.dataModel = dataModel;
+        p->initDataModel();
         update();
     }
 }

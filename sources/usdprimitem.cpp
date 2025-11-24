@@ -72,7 +72,7 @@ PrimItem::data(int column, int role) const
                 return StringToQString(prim.GetTypeName().GetString());
             else
                 return QString();
-        case Visible: {
+        case Vis: {
             if (prim && prim.IsActive()) {
                 {
                     QReadLocker locker(CommandDispatcher::stageLock());

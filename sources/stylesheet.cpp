@@ -141,7 +141,7 @@ Stylesheet::setTheme(Theme theme)
 
     if (theme == Dark) {
         map(Base, QColor::fromHsl(220, 6, 48));
-        map(BaseAlt, QColor::fromHsl(220, 6, 52));
+        map(BaseAlt, QColor::fromHsl(220, 6, 56));
         map(Dock, QColor::fromHsl(220, 6, 56));
         map(DockAlt, QColor::fromHsl(220, 6, 40));
         map(Accent, QColor::fromHsl(220, 6, 20));

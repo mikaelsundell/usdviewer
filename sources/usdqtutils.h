@@ -36,10 +36,10 @@ TfTokenVectorToQList(const TfTokenVector& tokens);
 }  // namespace usd
 
 PXR_NAMESPACE_OPEN_SCOPE
-inline uint
-qHash(const SdfPath& path, uint seed = 0)
+inline size_t
+qHash(const SdfPath& path, size_t seed = 0)
 {
-    return ::qHash(QString::fromStdString(path.GetString()), seed);
+    return ::qHash(usd::StringToQString(path.GetString()), seed);
 }
 PXR_NAMESPACE_CLOSE_SCOPE
 

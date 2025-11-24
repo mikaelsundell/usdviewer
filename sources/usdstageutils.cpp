@@ -5,6 +5,7 @@
 #include "usdstageutils.h"
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/variantSets.h>
+#include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <stack>

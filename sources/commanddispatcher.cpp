@@ -28,6 +28,6 @@ CommandDispatcher::run(Command* cmd)
 QReadWriteLock*
 CommandDispatcher::stageLock()
 {
-    return d.stack->stageModel()->stageLock();
+    return d.stack->dataModel()->stageLock();
 }
 }  // namespace usd

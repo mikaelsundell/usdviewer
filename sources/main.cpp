@@ -29,17 +29,17 @@ main(int argc, char* argv[])
         plugindirs << usddir;
     }
     if (!plugindirs.isEmpty()) {
-        pxr::TfSetenv("PXR_DISABLE_STANDARD_PLUG_SEARCH_PATH", "1");
+        TfSetenv("PXR_DISABLE_STANDARD_PLUG_SEARCH_PATH", "1");
         std::vector<std::string> pluginPaths;
         for (const QString& dir : plugindirs) {
-            pluginPaths.push_back(QStringToString(dir));
+            pluginPaths.push_back(usd::QStringToString(dir));
         }
-        pxr::PlugRegistry& registry = PlugRegistry::GetInstance();
+        PlugRegistry& registry = PlugRegistry::GetInstance();
         registry.RegisterPlugins(pluginPaths);
     }
 #endif
-    pxr::PlugRegistry& instance = pxr::PlugRegistry::GetInstance();
-    pxr::PlugPluginPtrVector plugins = instance.GetAllPlugins();
+    PlugRegistry& instance = PlugRegistry::GetInstance();
+    PlugPluginPtrVector plugins = instance.GetAllPlugins();
 #if defined(_DEBUG)
     platform::console("plugins");
     for (const auto& plugin : plugins) {

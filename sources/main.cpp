@@ -5,11 +5,14 @@
 #include "platform.h"
 #include "test.h"
 #include "usdviewer.h"
+#include "usdqtutils.h"
 #include <QApplication>
 #include <QDir>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/setenv.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 int
 main(int argc, char* argv[])
@@ -31,7 +34,7 @@ main(int argc, char* argv[])
         for (const QString& dir : plugindirs) {
             pluginPaths.push_back(dir.toStdString());
         }
-        pxr::PlugRegistry& registry = pxr::PlugRegistry::GetInstance();
+        pxr::PlugRegistry& registry = PlugRegistry::GetInstance();
         registry.RegisterPlugins(pluginPaths);
     }
 #endif
@@ -40,7 +43,7 @@ main(int argc, char* argv[])
 #if defined(_DEBUG)
     platform::console("plugins");
     for (const auto& plugin : plugins) {
-        platform::console(StringToQString(plugin->GetPath()));
+        platform::console(usd::StringToQString(plugin->GetPath()));
     }
     if (0) {
         test();

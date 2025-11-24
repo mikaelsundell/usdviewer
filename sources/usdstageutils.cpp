@@ -7,6 +7,7 @@
 #include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
+#include <stack>
 
 namespace usd {
 QMap<QString, QList<QString>>

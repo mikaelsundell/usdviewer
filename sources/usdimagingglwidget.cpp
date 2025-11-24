@@ -10,6 +10,7 @@
 #include "usdviewcamera.h"
 #include <QColor>
 #include <QColorSpace>
+#include <QLocale>
 #include <QMouseEvent>
 #include <QObject>
 #include <QPainter>
@@ -636,6 +637,7 @@ ImagingGLWidgetPrivate::widgetViewport() const
 void
 ImagingGLWidgetPrivate::updateStatistics()
 {
+    /*
     d.stats = Statistics();
     if (!d.stage)
         return;
@@ -671,7 +673,7 @@ ImagingGLWidgetPrivate::updateStatistics()
 
         if (prim.IsInstanceable())
             d.stats.instances++;
-    }
+    }*/
 }
 
 // todo: not yet in use

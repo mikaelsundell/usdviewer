@@ -134,12 +134,12 @@ QMenu::separator {
 }
 
 QMenu::indicator {
-    width: 12px;
-    height: 12px;
+    width: 16px;
+    height: 16px;
 }
 
 QMenu::indicator:checked {
-    image: url(":/icons/resources/Cross.png");
+    image: url(":/icons/resources/Checked.png");
 }
 
 QMenu::indicator:unchecked {

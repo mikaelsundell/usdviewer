@@ -35,6 +35,15 @@ QList<QString>
 TfTokenVectorToQList(const TfTokenVector& tokens);
 }  // namespace usd
 
+
+PXR_NAMESPACE_OPEN_SCOPE
+inline uint
+qHash(const SdfPath& path, uint seed = 0)
+{
+    return ::qHash(QString::fromStdString(path.GetString()), seed);
+}
+PXR_NAMESPACE_CLOSE_SCOPE
+
 void
 CheckOpenGLError(const char* function, const char* file, int line);
 #define CHECK_GL_ERROR() CheckOpenGLError(__FUNCTION__, __FILE__, __LINE__)

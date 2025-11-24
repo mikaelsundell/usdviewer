@@ -116,13 +116,13 @@ PayloadViewPrivate::payloadsRequested(const QList<SdfPath>& paths, StageModel::p
     d.ui->status->clear();
     d.ui->progress->setValue(0);
     d.ui->status->setText(updateStatus());
+    clear();
     for (const SdfPath& path : paths) {
         auto* item = new QTreeWidgetItem(d.ui->payloadTree);
         item->setText(0, StringToQString(path.GetName()));
         item->setData(0, Qt::UserRole, StringToQString(path.GetString()));
         item->setText(1, "Queued");
     }
-    clear();
 }
 
 void

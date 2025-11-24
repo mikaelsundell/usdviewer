@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+﻿// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
@@ -21,6 +21,8 @@
 #include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
+
+
 
 namespace usd {
 class StageTreePrivate : public QObject {
@@ -71,18 +73,20 @@ public:
             const QStyle* style = w ? w->style() : QApplication::style();
             QRect checkRect = style->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &opt, w);
 
-            if (auto* me = dynamic_cast<QMouseEvent*>(event)) {
-                if (!checkRect.contains(me->pos()))
-                    return QStyledItemDelegate::editorEvent(event, model, option, index);
+            if (event->type() == QEvent::MouseButtonRelease ||
+                event->type() == QEvent::MouseButtonDblClick)
+            {
+                auto* mouseEvent = dynamic_cast<QMouseEvent*>(event);
+                if (mouseEvent) {
+                    if (mouseEvent->button() != Qt::LeftButton)
+                        return false;
+                    if (!checkRect.contains(mouseEvent->pos()))
+                        return QStyledItemDelegate::editorEvent(event, model, option, index);
+                }
+                Qt::CheckState s = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
+                s = (s == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+                model->setData(index, s, Qt::CheckStateRole);
             }
-            Qt::CheckState s = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-            switch (s) {
-            case Qt::Unchecked: s = Qt::Checked; break;
-            case Qt::Checked: s = Qt::Unchecked; break;
-            case Qt::PartiallyChecked: s = Qt::Unchecked; break;
-            }
-
-            model->setData(index, s, Qt::CheckStateRole);
             return true;
         }
         QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
@@ -481,7 +485,6 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         CommandDispatcher::run(new Command(usd::show(paths, false)));
     else if (chosen == showRecursive)
         CommandDispatcher::run(new Command(usd::show(paths, true)));
-
     else if (chosen == hideSelected)
         CommandDispatcher::run(new Command(usd::hide(paths, false)));
     else if (chosen == hideRecursive)
@@ -518,7 +521,6 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
                     UsdPrim prim = d.stage->GetPrimAtPath(changed);
                     if (prim && prim.HasPayload()) {
                         Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
-
                         if (item->checkState(0) != want)
                             item->setCheckState(0, want);
                     }
@@ -533,15 +535,34 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
     d.tree->update();
 }
 
+
+inline uint
+qHash(const SdfPath& path, uint seed = 0)
+{
+    return qHash(QString::fromStdString(path.GetString()), seed);
+}
+
 void
 StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
     QSignalBlocker blocker(d.tree);
+    QSet<SdfPath> selectedSet = QSet<SdfPath>(paths.begin(), paths.end());
     std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
-        QString pathString = item->data(0, Qt::UserRole).toString();
-        if (!pathString.isEmpty()) {
-            SdfPath path(pathString.toStdString());
-            item->setSelected(paths.contains(path));
+        QString itemData = item->data(0, Qt::UserRole).toString();
+        if (!itemData.isEmpty()) {
+            SdfPath itemPath(QStringToString(itemData));
+            bool isSelected = false;
+            if (selectedSet.contains(itemPath))
+                isSelected = true;
+            else if (d.payloadEnabled && !item->childCount()) {
+                for (const SdfPath& path : selectedSet) {
+                    if (path.HasPrefix(itemPath) && path != itemPath) {
+                        isSelected = true;
+                        break;
+                    }
+                }
+            }
+            item->setSelected(isSelected);
         }
         for (int i = 0; i < item->childCount(); ++i)
             selectItems(item->child(i));

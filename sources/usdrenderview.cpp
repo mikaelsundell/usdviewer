@@ -131,6 +131,7 @@ RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy pol
     else {
         imageGLWidget()->close();
     }
+    d.stage = stage;
 }
 
 RenderView::RenderView(QWidget* parent)

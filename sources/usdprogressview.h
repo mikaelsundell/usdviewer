@@ -12,12 +12,12 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class PayloadViewPrivate;
-class PayloadView : public QWidget {
+class ProgressViewPrivate;
+class ProgressView : public QWidget {
     Q_OBJECT
 public:
-    PayloadView(QWidget* parent = nullptr);
-    virtual ~PayloadView();
+    ProgressView(QWidget* parent = nullptr);
+    virtual ~ProgressView();
 
     DataModel* dataModel() const;
     void setDataModel(DataModel* dataModel);
@@ -26,6 +26,6 @@ public:
     void setSelectionModel(SelectionModel* selectionModel);
 
 private:
-    QScopedPointer<PayloadViewPrivate> p;
+    QScopedPointer<ProgressViewPrivate> p;
 };
 }  // namespace usd

@@ -4,11 +4,13 @@
 
 #pragma once
 
-#include <QExplicitlySharedDataPointer>
-#include <QObject>
-#include <QReadWriteLock>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/usd/usd/stage.h>
+#include <QExplicitlySharedDataPointer>
+#include <QMap>
+#include <QObject>
+#include <QReadWriteLock>
+#include <QVariant>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -18,22 +20,32 @@ class DataModel : public QObject {
     Q_OBJECT
 public:
     enum load_policy { load_all, load_payload };
-    enum payload_mode { payload_loaded, payload_unloaded, payload_failed };
+    enum progress_mode { progress_idle, progress_running };
     enum stage_status { stage_loaded, stage_failed, stage_closed };
 
+public:
+    struct Notify {
+        QString message;
+        QList<SdfPath> paths;
+        QVariantMap details;
+        Notify() = default;
+        Notify(const QString& n, const QList<SdfPath>& p, const QVariantMap& d = {})
+            : message(n)
+            , paths(p)
+            , details(d)
+        {}
+    };
 public:
     DataModel();
     DataModel(const QString& filename, load_policy policy = load_all);
     DataModel(const DataModel& other);
     ~DataModel();
-    void beginChangeBlock(size_t count = 0);
-    void progressChangeBlock(size_t completed);
-    void endChangeBlock();
+    void beginProgressBlock(const QString& name, size_t count = 0);
+    void updateProgressNotify(const Notify& notify, size_t completed);
+    void cancelProgressBlock();
+    void endProgressBlock();
+    bool isProgressBlockCancelled() const;
     bool loadFromFile(const QString& filename, load_policy policy = load_all);
-    bool loadPayloads(const QList<SdfPath>& paths, const QString& variantSet = QString(),
-                      const QString& variantValue = QString());
-    bool unloadPayloads(const QList<SdfPath>& paths);
-    void cancelPayloads();
     bool saveToFile(const QString& filename);
     bool exportToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
@@ -48,13 +60,11 @@ public:
     QReadWriteLock* stageLock() const;
 
 Q_SIGNALS:
-    void changeBlockActive(bool active);
-    void changeBlockProgress(size_t completed, size_t total);
+    void progressBlockChanged(const QString& name, progress_mode mode);
+    void progressNotifyChanged(const Notify& notify, size_t completed, size_t expected);
     void boundingBoxChanged(const GfBBox3d& bbox);
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
-    void payloadsRequested(const QList<SdfPath>& paths, payload_mode mode);
-    void payloadChanged(const SdfPath& path, payload_mode mode);
     void stageChanged(UsdStageRefPtr stage, load_policy policy, stage_status status);
 
 private:

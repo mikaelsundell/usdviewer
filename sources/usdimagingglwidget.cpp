@@ -197,6 +197,8 @@ ImagingGLWidgetPrivate::paintGL()
     // paintGL() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
 
+    qDebug() << "paintGL(): begin()";
+
     if (d.stage) {
         if (d.glEngine) {
             if (!d.glEngine->IsColorCorrectionCapable()) {
@@ -305,6 +307,8 @@ ImagingGLWidgetPrivate::paintGL()
             qWarning() << "gl engine is not inititialized, render pass will be skipped";
         }
     }
+
+    qDebug() << "paintGL(): end()";
 }
 
 void
@@ -457,22 +461,31 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
 #endif
     QRect r = rect.normalized();
     QPoint tl = deviceRatio(r.topLeft());
-    QPoint br = deviceRatio(r.bottomRight() - QPoint(1,1));
+    QPoint br = deviceRatio(r.bottomRight() - QPoint(1, 1));
     r = QRect(tl, br);
-    
-    GfVec4d viewport = widgetViewport();
 
-    GfVec2d center(((r.left() + r.right()) * 0.5 - viewport[0]) / static_cast<double>(viewport[2]),
-                   ((r.top() + r.bottom()) * 0.5 - viewport[1]) / static_cast<double>(viewport[3]));
+    const int minSize = 10;
+    const bool isClick = (r.width() < 3 && r.height() < 3);
+
+    if (isClick) {
+        int cx = r.center().x();
+        int cy = r.center().y();
+
+        int halfW = minSize / 2;
+        int halfH = minSize / 2;
+
+        r = QRect(QPoint(cx - halfW, cy - halfH), QPoint(cx + halfW, cy + halfH));
+    }
+    GfVec4d viewport = widgetViewport();
+    GfVec2d center(((r.left() + r.right()) * 0.5 - viewport[0]) / viewport[2],
+                   ((r.top() + r.bottom()) * 0.5 - viewport[1]) / viewport[3]);
     center[0] = center[0] * 2.0 - 1.0;
     center[1] = -1.0 * (center[1] * 2.0 - 1.0);
 
-    GfVec2d size(static_cast<double>(r.width()) / viewport[2], static_cast<double>(r.height()) / viewport[3]);
-
-    const bool click = (r.width() < 3 && r.height() < 3);
+    GfVec2d size(double(r.width()) / viewport[2], double(r.height()) / viewport[3]);
 
     UsdImagingGLEngine::PickParams pickParams;
-    pickParams.resolveMode = click ? TfToken("resolveNearestToCenter") : TfToken("resolveDeep");
+    pickParams.resolveMode = isClick ? TfToken("resolveNearestToCenter") : TfToken("resolveDeep");
 
     GfCamera cam = d.viewCamera.camera();
     GfFrustum fr = cam.GetFrustum();
@@ -483,33 +496,26 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
                                                   pickFr.ComputeProjectionMatrix(), d.stage->GetPseudoRoot(), d.params,
                                                   &results);
 
-
     qDebug() << "results:" << results.size();
-    
+
     QList<SdfPath> selectedPaths;
     if (hit) {
-        for (const auto& rItem : results)
+        for (const auto& rItem : results) {
             if (!rItem.hitPrimPath.IsEmpty())
                 selectedPaths.append(rItem.hitPrimPath);
+        }
     }
 
     bool update = false;
-    
-    
-    
-    
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {
             for (const SdfPath& path : selectedPaths) {
-                qsizetype index = d.selection.indexOf(path);
-                if (index != -1) {
-                    d.selection.removeAt(index);
-                    update = true;
-                }
-                else {
+                qsizetype idx = d.selection.indexOf(path);
+                if (idx >= 0)
+                    d.selection.removeAt(idx);
+                else
                     d.selection.append(path);
-                    update = true;
-                }
+                update = true;
             }
         }
         else {
@@ -525,11 +531,14 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
             update = true;
         }
     }
+
     if (update) {
         CommandDispatcher::run(new Command(select(d.selection)));
     }
+
     d.glwidget->update();
 }
+
 
 void
 ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
@@ -579,11 +588,7 @@ void
 ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
-
-    qDebug() << "selected paths: " << paths.size();
-
     d.glEngine->SetSelected(QListToSdfPathVector(paths));
-
     d.glwidget->update();
     d.selection = paths;
 }

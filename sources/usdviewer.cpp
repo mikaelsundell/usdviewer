@@ -12,7 +12,7 @@
 #include "selectionmodel.h"
 #include "stylesheet.h"
 #include "usdoutlinerview.h"
-#include "usdpayloadview.h"
+#include "usdprogressview.h"
 #include "usdqtutils.h"
 #include "usdrenderview.h"
 #include <QActionGroup>
@@ -42,7 +42,7 @@ public:
     void initSettings();
     bool loadFile(const QString& filename);
     OutlinerView* outlinerView();
-    PayloadView* payloadView();
+    ProgressView* progressView();
     RenderView* renderView();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
@@ -88,7 +88,7 @@ public Q_SLOTS:
     void light();
     void dark();
     void toggleOutliner(bool checked);
-    void togglePayload(bool checked);
+    void toggleProgress(bool checked);
     void openGithubReadme();
     void openGithubIssues();
 
@@ -108,7 +108,7 @@ public:
         QStringList recentFiles;
         QColor backgroundColor;
         Qt::DockWidgetArea outlinerArea;
-        Qt::DockWidgetArea payloadArea;
+        Qt::DockWidgetArea progressArea;
         QScopedPointer<MouseEvent> backgroundColorFilter;
         QScopedPointer<DataModel> dataModel;
         QScopedPointer<SelectionModel> selectionModel;
@@ -158,10 +158,10 @@ ViewerPrivate::init()
     outlinerView()->setAttribute(Qt::WA_DeleteOnClose, false);
     outlinerView()->setDataModel(d.dataModel.data());
     outlinerView()->setSelectionModel(d.selectionModel.data());
-    d.payloadArea = d.viewer->dockWidgetArea(d.ui->payloadDock);
-    payloadView()->setAttribute(Qt::WA_DeleteOnClose, false);
-    payloadView()->setDataModel(d.dataModel.data());
-    payloadView()->setSelectionModel(d.selectionModel.data());
+    d.progressArea = d.viewer->dockWidgetArea(d.ui->progressDock);
+    progressView()->setAttribute(Qt::WA_DeleteOnClose, false);
+    progressView()->setDataModel(d.dataModel.data());
+    progressView()->setSelectionModel(d.selectionModel.data());
     renderView()->setBackgroundColor(d.backgroundColor);
     renderView()->setDataModel(d.dataModel.data());
     renderView()->setSelectionModel(d.selectionModel.data());
@@ -258,20 +258,17 @@ ViewerPrivate::init()
     // views
     connect(d.ui->viewStatistics, &QAction::toggled, this,
             [=](bool checked) { renderView()->setStatisticsEnabled(checked); });
-
-
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
-
-    connect(d.ui->payloadDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewPayload->setChecked(visible); });
+    connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
-    connect(d.ui->payloadDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewPayload->setChecked(visible); });
+    connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this, &ViewerPrivate::toggleOutliner);
-    connect(d.ui->viewPayload, &QAction::toggled, this, &ViewerPrivate::togglePayload);
+    connect(d.ui->viewProgress, &QAction::toggled, this, &ViewerPrivate::toggleProgress);
     // settings
     initSettings();
     enable(false);
@@ -393,10 +390,10 @@ ViewerPrivate::outlinerView()
     return d.ui->outlinerView;
 }
 
-PayloadView*
-ViewerPrivate::payloadView()
+ProgressView*
+ViewerPrivate::progressView()
 {
-    return d.ui->payloadView;
+    return d.ui->progressView;
 }
 
 bool
@@ -412,8 +409,8 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
             QTimer::singleShot(0, d.viewer, [this]() {
                 if (d.ui->viewOutliner->isChecked() && !d.ui->outlinerDock->isVisible())
                     d.ui->outlinerDock->show();
-                if (d.ui->viewPayload->isChecked() && !d.ui->payloadDock->isVisible())
-                    d.ui->payloadDock->show();
+                if (d.ui->viewProgress->isChecked() && !d.ui->progressDock->isVisible())
+                    d.ui->progressDock->show();
             });
         }
     }
@@ -881,19 +878,19 @@ ViewerPrivate::toggleOutliner(bool checked)
 }
 
 void
-ViewerPrivate::togglePayload(bool checked)
+ViewerPrivate::toggleProgress(bool checked)
 {
     if (checked) {
-        if (!d.ui->payloadDock->isVisible()) {
-            d.ui->payloadDock->setFloating(false);
-            if (!d.ui->payloadDock->parentWidget())
-                d.viewer->addDockWidget(d.payloadArea, d.ui->payloadDock);
-            d.ui->payloadDock->show();
+        if (!d.ui->progressDock->isVisible()) {
+            d.ui->progressDock->setFloating(false);
+            if (!d.ui->progressDock->parentWidget())
+                d.viewer->addDockWidget(d.progressArea, d.ui->progressDock);
+            d.ui->progressDock->show();
         }
     }
     else {
-        if (d.ui->payloadDock->isVisible())
-            d.ui->payloadDock->hide();
+        if (d.ui->progressDock->isVisible())
+            d.ui->progressDock->hide();
     }
 }
 

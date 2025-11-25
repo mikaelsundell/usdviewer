@@ -11,7 +11,6 @@
 #include <QtConcurrent>
 #include <pxr/base/tf/weakBase.h>
 #include <pxr/usd/usd/notice.h>
-#include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/metrics.h>
 #include <stack>
@@ -22,22 +21,19 @@ public:
     DataModelPrivate();
     ~DataModelPrivate();
     void initStage();
-    void beginChangeBlock(size_t count);
-    void progressChangeBlock(size_t completed);
-    void endChangeBlock();
+    void beginProgressBlock(const QString& name, size_t count);
+    void updateProgressNotify(const DataModel::Notify& notify, size_t completed);
+    void cancelProgressBlock();
+    void endProgressBlock();
+    bool isProgressBlockCancelled() const;
     bool loadFromFile(const QString& filename, DataModel::load_policy loadPolicy);
-    bool loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue);
-    bool unloadPayloads(const QList<SdfPath>& paths);
-    void cancelPayloads();
     bool saveToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool close();
     bool reload();
     bool isLoaded() const;
     void setMask(const QList<SdfPath>& paths);
-    void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive);
     GfBBox3d boundingBox();
-    std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive);
 
 public:
     void updatePrims(const QList<SdfPath> paths);
@@ -78,13 +74,14 @@ public:
         UsdStageRefPtr stage;
         DataModel::load_policy loadPolicy;
         DataModel::stage_status stageStatus;
+        QString changeName;
         size_t changeDepth;
         size_t expectedChanges;
         size_t completedChanges;
+        std::atomic<bool> changeCancelled { false };
         QString filename;
         GfBBox3d bbox;
         QFuture<void> payloadJob;
-        std::atomic<bool> cancelRequested { false };
         QList<SdfPath> pendingPaths;
         QList<SdfPath> mask;
         QThreadPool pool;
@@ -99,6 +96,7 @@ public:
 DataModelPrivate::DataModelPrivate()
 {
     d.loadPolicy = DataModel::load_policy::load_all;
+    d.changeDepth = 0;
     d.expectedChanges = 0;
     d.completedChanges = 0;
     d.pendingPaths.clear();
@@ -119,29 +117,36 @@ DataModelPrivate::initStage()
     d.stageWatcher->d.key = TfNotice::Register(TfWeakPtr<StageWatcher>(d.stageWatcher.data()),
                                                &StageWatcher::objectsChanged, d.stage);
     d.pendingPaths.clear();
-    d.changeDepth = 0;
 }
 
 void
-DataModelPrivate::beginChangeBlock(size_t count)
+DataModelPrivate::beginProgressBlock(const QString& name, size_t count)
 {
+    d.changeCancelled.store(false);
+    d.changeName = name;
     d.changeDepth++;
     if (d.changeDepth == 1) {
         d.expectedChanges = count;
         d.completedChanges = 0;
-        Q_EMIT d.dataModel->changeBlockActive(true);
+        Q_EMIT d.dataModel->progressBlockChanged(name, DataModel::progress_mode::progress_running);
     }
 }
 
 void
-DataModelPrivate::progressChangeBlock(size_t completed)
+DataModelPrivate::updateProgressNotify(const DataModel::Notify& notify, size_t completed)
 {
     d.completedChanges = completed;
-    Q_EMIT d.dataModel->changeBlockProgress(completed, d.expectedChanges);
+    Q_EMIT d.dataModel->progressNotifyChanged(notify, completed, d.expectedChanges);
 }
 
 void
-DataModelPrivate::endChangeBlock()
+DataModelPrivate::cancelProgressBlock()
+{
+    d.changeCancelled.store(true);
+}
+
+void
+DataModelPrivate::endProgressBlock()
 {
     if (d.changeDepth == 0)
         return;
@@ -150,7 +155,16 @@ DataModelPrivate::endChangeBlock()
     if (d.changeDepth > 0)
         return;
 
-    Q_EMIT d.dataModel->changeBlockActive(false);
+    bool cancelled = d.changeCancelled.load();
+    d.changeCancelled.store(false);
+
+    Q_EMIT d.dataModel->progressBlockChanged(d.changeName, DataModel::progress_mode::progress_idle);
+    d.changeName.clear();
+
+    if (cancelled) {
+        d.pendingPaths.clear();
+        return;
+    }
 
     if (d.pendingPaths.isEmpty())
         return;
@@ -171,6 +185,11 @@ DataModelPrivate::endChangeBlock()
     Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
 }
 
+bool
+DataModelPrivate::isProgressBlockCancelled() const
+{
+    return d.changeCancelled.load();
+}
 
 bool
 DataModelPrivate::loadFromFile(const QString& filename, DataModel::load_policy policy)
@@ -204,156 +223,6 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::load_policy p
         },
         Qt::QueuedConnection);
     return true;
-}
-
-bool
-DataModelPrivate::loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
-{
-    // this function expects *prim paths that directly contain payloads.
-    // it does NOT recursively load payloads on child prims and it does NOT
-    // accept higher-level ancestor prims that merely contain payloads deeper
-    // in the hierarchy.
-
-    const bool useVariant = (!variantSet.isEmpty() && !variantValue.isEmpty());
-    Q_EMIT d.dataModel->payloadsRequested(paths, DataModel::payload_loaded);
-
-    auto stage = d.stage;
-    auto pool = &d.pool;
-
-    d.cancelRequested = false;
-
-    d.payloadJob = QtConcurrent::run(pool, [this, stage, paths, variantSet, variantValue, useVariant]() {
-        QList<SdfPath> loaded;
-        QList<SdfPath> failed;
-
-        std::string setNameStd;
-        std::string setValueStd;
-
-        if (useVariant) {
-            setNameStd = QStringToString(variantSet);
-            setValueStd = QStringToString(variantValue);
-        }
-        {
-            QWriteLocker locker(&d.stageLock);
-            for (const SdfPath& path : paths) {
-                qDebug() << "loadPayloads: loading path: " << path;
-
-
-                if (d.cancelRequested)
-                    break;
-
-                UsdPrim prim = stage->GetPrimAtPath(path);
-                if (!prim) {
-                    failed.append(path);
-                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
-                    continue;
-                }
-
-                if (!prim.HasPayload()) {
-                    failed.append(path);
-                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
-                    continue;
-                }
-
-                try {
-                    if (useVariant) {
-                        if (prim.IsLoaded())
-                            prim.Unload();
-
-                        UsdVariantSet vs = prim.GetVariantSet(setNameStd);
-                        if (!vs.IsValid()) {
-                            failed.append(path);
-                            Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
-                            continue;
-                        }
-                        auto variants = vs.GetVariantNames();
-                        if (std::find(variants.begin(), variants.end(), setValueStd) == variants.end()) {
-                            failed.append(path);
-                            Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
-                            continue;
-                        }
-
-                        vs.SetVariantSelection(setValueStd);
-                    }
-
-                    if (prim.IsLoaded()) {
-                        loaded.append(path);
-                        Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_loaded);
-                        continue;
-                    }
-
-                    prim.Load();
-                    loaded.append(path);
-                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_loaded);
-                } catch (const std::exception& e) {
-                    failed.append(path);
-                    Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_failed);
-                }
-            }
-        }
-
-        QMetaObject::invokeMethod(
-            d.dataModel,
-            [this, loaded]() {
-                {
-                    QWriteLocker locker(&d.stageLock);
-                    d.bboxCache.reset();
-                }
-                d.bbox = boundingBox();
-                updatePrims(loaded);
-            },
-            Qt::QueuedConnection);
-    });
-    return true;
-}
-
-bool
-DataModelPrivate::unloadPayloads(const QList<SdfPath>& paths)
-{
-    if (!isLoaded())
-        return false;
-
-    Q_EMIT d.dataModel->payloadsRequested(paths, DataModel::payload_unloaded);
-
-    auto stage = d.stage;
-    auto pool = &d.pool;
-    QFuture<void> future = QtConcurrent::run(pool, [this, stage, paths]() {
-        QList<SdfPath> unloaded;
-        {
-            QWriteLocker locker(&d.stageLock);
-            for (const SdfPath& path : paths) {
-                UsdPrim prim = stage->GetPrimAtPath(path);
-                if (!prim)
-                    continue;
-
-                prim.Unload();
-                unloaded.append(path);
-
-                Q_EMIT d.dataModel->payloadChanged(path, DataModel::payload_unloaded);
-            }
-        }
-        QMetaObject::invokeMethod(
-            d.dataModel,
-            [this, unloaded]() {
-                if (!unloaded.isEmpty()) {
-                    {
-                        d.bboxCache.reset();
-                        d.bbox = boundingBox();
-                    }
-                    updatePrims(unloaded);
-                }
-            },
-            Qt::QueuedConnection);
-    });
-    return true;
-}
-
-void
-DataModelPrivate::cancelPayloads()
-{
-    if (!d.payloadJob.isRunning())
-        return;
-    d.cancelRequested = true;
 }
 
 bool
@@ -531,45 +400,39 @@ DataModel::DataModel(const DataModel& other)
 DataModel::~DataModel() {}
 
 void
-DataModel::beginChangeBlock(size_t count)
+DataModel::beginProgressBlock(const QString& name, size_t count)
 {
-    p->beginChangeBlock(count);
+    p->beginProgressBlock(name, count);
 }
 
 void
-DataModel::progressChangeBlock(size_t completed)
+DataModel::updateProgressNotify(const Notify& notify, size_t completed)
 {
-    p->progressChangeBlock(completed);
+    p->updateProgressNotify(notify, completed);
 }
 
 void
-DataModel::endChangeBlock()
+DataModel::cancelProgressBlock()
 {
-    p->endChangeBlock();
+    return p->cancelProgressBlock();
+}
+
+void
+DataModel::endProgressBlock()
+{
+    p->endProgressBlock();
+}
+
+bool
+DataModel::isProgressBlockCancelled() const
+{
+    return p->isProgressBlockCancelled();
 }
 
 bool
 DataModel::loadFromFile(const QString& filename, DataModel::load_policy loadPolicy)
 {
     return p->loadFromFile(filename, loadPolicy);
-}
-
-bool
-DataModel::loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
-{
-    return p->loadPayloads(paths, variantSet, variantValue);
-}
-
-bool
-DataModel::unloadPayloads(const QList<SdfPath>& paths)
-{
-    return p->unloadPayloads(paths);
-}
-
-void
-DataModel::cancelPayloads()
-{
-    p->cancelPayloads();
 }
 
 bool

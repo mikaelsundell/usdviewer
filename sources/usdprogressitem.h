@@ -7,15 +7,15 @@
 #include <QTreeWidgetItem>
 
 namespace usd {
-class PayloadItemPrivate;
-class PayloadItem : public QTreeWidgetItem {
+class ProgressItemPrivate;
+class ProgressItem : public QTreeWidgetItem {
 public:
     enum Column { Name = 0, Value };
-    PayloadItem(QTreeWidget* parent);
-    PayloadItem(QTreeWidgetItem* parent);
-    virtual ~PayloadItem();
+    ProgressItem(QTreeWidget* parent);
+    ProgressItem(QTreeWidgetItem* parent);
+    virtual ~ProgressItem();
 
 private:
-    QScopedPointer<PayloadItemPrivate> p;
+    QScopedPointer<ProgressItemPrivate> p;
 };
 }  // namespace usd

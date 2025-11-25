@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>UsdPayloadView</class>
- <widget class="QWidget" name="UsdPayloadView">
+ <class>UsdProgressView</class>
+ <widget class="QWidget" name="UsdProgressView">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -41,7 +41,7 @@
       <item>
        <widget class="QLabel" name="label">
         <property name="text">
-         <string>Payloads</string>
+         <string>Progress</string>
         </property>
        </widget>
       </item>
@@ -66,12 +66,12 @@
          </font>
         </property>
         <property name="text">
-         <string>Time: 00:00:00 (Files: 0 / 0, 0 MB loaded)</string>
+         <string></string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QTreeWidget" name="payloadTree">
+       <widget class="QTreeWidget" name="progressTree">
         <property name="alternatingRowColors">
          <bool>true</bool>
         </property>

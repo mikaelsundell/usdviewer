@@ -2,33 +2,33 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "usdpayloaditem.h"
+#include "usdprogressitem.h"
 #include <QPointer>
 
 namespace usd {
-class PayloadItemPrivate {
+class ProgressItemPrivate {
 public:
     void init();
     struct Data {
-        PayloadItem* item;
+        ProgressItem* item;
     };
     Data d;
 };
 
 void
-PayloadItemPrivate::init()
+ProgressItemPrivate::init()
 {}
 
-PayloadItem::PayloadItem(QTreeWidget* parent)
+ProgressItem::ProgressItem(QTreeWidget* parent)
     : QTreeWidgetItem(parent)
-    , p(new PayloadItemPrivate())
+    , p(new ProgressItemPrivate())
 {}
 
-PayloadItem::PayloadItem(QTreeWidgetItem* parent)
+ProgressItem::ProgressItem(QTreeWidgetItem* parent)
     : QTreeWidgetItem(parent)
-    , p(new PayloadItemPrivate())
+    , p(new ProgressItemPrivate())
 {}
 
-PayloadItem::~PayloadItem() {}
+ProgressItem::~ProgressItem() {}
 
 }  // namespace usd

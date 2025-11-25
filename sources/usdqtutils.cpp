@@ -10,12 +10,6 @@
 #include <pxr/usd/usdGeom/imageable.h>
 
 namespace usd {
-GfVec4f
-QColorToGfVec4f(const QColor& color)
-{
-    return GfVec4f(color.redF(), color.greenF(), color.blueF(), color.alphaF());
-}
-
 std::string
 QStringToString(const QString& str)
 {
@@ -49,6 +43,21 @@ TfTokenVectorToQList(const TfTokenVector& tokens)
         list.append(StringToQString(token.GetString()));
     }
     return list;
+}
+SdfPathVector
+QListToSdfPathVector(const QList<SdfPath>& paths)
+{
+    SdfPathVector vec;
+    vec.reserve(paths.size());
+    for (const SdfPath& p : paths) {
+        vec.push_back(p);
+    }
+    return vec;
+}
+GfVec4f
+QColorToGfVec4f(const QColor& color)
+{
+    return GfVec4f(color.redF(), color.greenF(), color.blueF(), color.alphaF());
 }
 }  // namespace usd
 

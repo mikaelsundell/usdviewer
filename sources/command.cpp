@@ -17,10 +17,16 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
     return Command(
         // redo
         [paths, variantSet, variantValue](DataModel* dm, SelectionModel*) {
+            dm->beginChangeBlock(paths.size());
             dm->loadPayloads(paths, variantSet, variantValue);
+            dm->endChangeBlock();
         },
         // undo
-        [paths](DataModel* dm, SelectionModel*) { dm->unloadPayloads(paths); });
+        [paths](DataModel* dm, SelectionModel*) {
+            dm->beginChangeBlock(paths.size());
+            dm->unloadPayloads(paths);
+            dm->endChangeBlock();
+        });
 }
 
 Command
@@ -28,9 +34,17 @@ unloadPayloads(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths](DataModel* dm, SelectionModel*) { dm->unloadPayloads(paths); },
+        [paths](DataModel* dm, SelectionModel*) {
+            dm->beginChangeBlock(paths.size());
+            dm->unloadPayloads(paths);
+            dm->endChangeBlock();
+        },
         // undo
-        [paths](DataModel* dm, SelectionModel*) { dm->loadPayloads(paths); });
+        [paths](DataModel* dm, SelectionModel*) {
+            dm->beginChangeBlock(paths.size());
+            dm->loadPayloads(paths);
+            dm->endChangeBlock();
+        });
 }
 
 Command
@@ -38,9 +52,17 @@ isolate(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths](DataModel* dm, SelectionModel*) { dm->setMask(paths); },
+        [paths](DataModel* dm, SelectionModel*) {
+            dm->beginChangeBlock(1);
+            dm->setMask(paths);
+            dm->endChangeBlock();
+        },
         // undo
-        [paths](DataModel* dm, SelectionModel*) { dm->setMask(QList<SdfPath>()); });
+        [paths](DataModel* dm, SelectionModel*) {
+            dm->beginChangeBlock(1);
+            dm->setMask({});
+            dm->endChangeBlock();
+        });
 }
 
 Command
@@ -49,6 +71,7 @@ select(const QList<SdfPath>& paths)
     return Command(
         // redo
         [paths](DataModel*, SelectionModel* sel) { sel->updatePaths(paths); },
+
         // undo
         [](DataModel*, SelectionModel* sel) { sel->clear(); });
 }
@@ -59,13 +82,30 @@ show(const QList<SdfPath>& paths, bool recursive)
     return Command(
         // redo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            QWriteLocker locker(dm->stageLock());
-            setVisibility(dm->stage(), paths, true, recursive);
+            dm->beginChangeBlock(paths.size());
+            size_t completed = 0;
+            {
+                QWriteLocker locker(dm->stageLock());
+                for (const SdfPath& p : paths) {
+                    setVisibility(dm->stage(), { p }, true, recursive);
+                    dm->progressChangeBlock(++completed);
+                }
+            }
+            dm->endChangeBlock();
         },
+
         // undo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            QWriteLocker locker(dm->stageLock());
-            setVisibility(dm->stage(), paths, false, recursive);
+            dm->beginChangeBlock(paths.size());
+            size_t completed = 0;
+            {
+                QWriteLocker locker(dm->stageLock());
+                for (const SdfPath& p : paths) {
+                    setVisibility(dm->stage(), { p }, false, recursive);
+                    dm->progressChangeBlock(++completed);
+                }
+            }
+            dm->endChangeBlock();
         });
 }
 
@@ -75,13 +115,30 @@ hide(const QList<SdfPath>& paths, bool recursive)
     return Command(
         // redo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            QWriteLocker locker(dm->stageLock());
-            setVisibility(dm->stage(), paths, false, recursive);
+            dm->beginChangeBlock(paths.size());
+            size_t completed = 0;
+            {
+                QWriteLocker locker(dm->stageLock());
+                for (const SdfPath& p : paths) {
+                    setVisibility(dm->stage(), { p }, false, recursive);
+                    dm->progressChangeBlock(++completed);
+                }
+            }
+            dm->endChangeBlock();
         },
         // undo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            QWriteLocker locker(dm->stageLock());
-            setVisibility(dm->stage(), paths, true, recursive);
+            dm->beginChangeBlock(paths.size());
+            size_t completed = 0;
+            {
+                QWriteLocker locker(dm->stageLock());
+                for (const SdfPath& p : paths) {
+                    setVisibility(dm->stage(), { p }, true, recursive);
+                    dm->progressChangeBlock(++completed);
+                }
+            }
+            dm->endChangeBlock();
         });
 }
+
 }  // namespace usd

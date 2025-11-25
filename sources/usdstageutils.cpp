@@ -81,6 +81,21 @@ findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursiv
     return result;
 }
 
+GfBBox3d
+boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+{
+    UsdGeomBBoxCache cache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true);
+    GfBBox3d bbox;
+    for (const SdfPath& path : paths) {
+        UsdPrim prim = stage->GetPrimAtPath(path);
+        if (!prim || !prim.IsA<UsdGeomImageable>())
+            continue;
+
+        bbox = GfBBox3d::Combine(bbox, cache.ComputeWorldBound(prim));
+    }
+    return bbox;
+}
+
 void
 setVisibility(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive)
 {

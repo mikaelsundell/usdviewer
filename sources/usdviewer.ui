@@ -813,6 +813,9 @@
    <property name="text">
     <string>Outliner</string>
    </property>
+   <property name="shortcut">
+    <string>O</string>
+   </property>
   </action>
   <action name="policyAll">
    <property name="checkable">
@@ -847,6 +850,9 @@
    </property>
    <property name="text">
     <string>Payload</string>
+   </property>
+   <property name="shortcut">
+    <string>P</string>
    </property>
   </action>
   <action name="editShowSelected">

@@ -4,6 +4,7 @@
 
 #include "datamodel.h"
 #include "usdqtutils.h"
+#include "usdstageutils.h"
 #include <QMap>
 #include <QThreadPool>
 #include <QVariant>
@@ -21,6 +22,9 @@ public:
     DataModelPrivate();
     ~DataModelPrivate();
     void initStage();
+    void beginChangeBlock(size_t count);
+    void progressChangeBlock(size_t completed);
+    void endChangeBlock();
     bool loadFromFile(const QString& filename, DataModel::load_policy loadPolicy);
     bool loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue);
     bool unloadPayloads(const QList<SdfPath>& paths);
@@ -33,7 +37,6 @@ public:
     void setMask(const QList<SdfPath>& paths);
     void setVisible(const QList<SdfPath>& paths, bool visible, bool recursive);
     GfBBox3d boundingBox();
-    GfBBox3d boundingBox(const QList<SdfPath>& paths);
     std::map<std::string, std::vector<std::string>> variantSets(const QList<SdfPath>& paths, bool recursive);
 
 public:
@@ -61,7 +64,7 @@ public:
             if (updated.isEmpty())
                 return;
             QMetaObject::invokeMethod(
-                d.parent->d.dataModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::QueuedConnection);
+                d.parent->d.dataModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::DirectConnection);
         }
         struct Data {
             TfNotice::Key key;
@@ -75,10 +78,14 @@ public:
         UsdStageRefPtr stage;
         DataModel::load_policy loadPolicy;
         DataModel::stage_status stageStatus;
+        size_t changeDepth;
+        size_t expectedChanges;
+        size_t completedChanges;
         QString filename;
         GfBBox3d bbox;
         QFuture<void> payloadJob;
         std::atomic<bool> cancelRequested { false };
+        QList<SdfPath> pendingPaths;
         QList<SdfPath> mask;
         QThreadPool pool;
         QReadWriteLock stageLock;
@@ -92,6 +99,9 @@ public:
 DataModelPrivate::DataModelPrivate()
 {
     d.loadPolicy = DataModel::load_policy::load_all;
+    d.expectedChanges = 0;
+    d.completedChanges = 0;
+    d.pendingPaths.clear();
     d.pool.setMaxThreadCount(QThread::idealThreadCount());
     d.pool.setThreadPriority(QThread::HighPriority);
     d.stageWatcher.reset(new StageWatcher(this));
@@ -108,7 +118,59 @@ DataModelPrivate::initStage()
     d.stageWatcher->init();
     d.stageWatcher->d.key = TfNotice::Register(TfWeakPtr<StageWatcher>(d.stageWatcher.data()),
                                                &StageWatcher::objectsChanged, d.stage);
+    d.pendingPaths.clear();
+    d.changeDepth = 0;
 }
+
+void
+DataModelPrivate::beginChangeBlock(size_t count)
+{
+    d.changeDepth++;
+    if (d.changeDepth == 1) {
+        d.expectedChanges = count;
+        d.completedChanges = 0;
+        Q_EMIT d.dataModel->changeBlockActive(true);
+    }
+}
+
+void
+DataModelPrivate::progressChangeBlock(size_t completed)
+{
+    d.completedChanges = completed;
+    Q_EMIT d.dataModel->changeBlockProgress(completed, d.expectedChanges);
+}
+
+void
+DataModelPrivate::endChangeBlock()
+{
+    if (d.changeDepth == 0)
+        return;
+
+    d.changeDepth--;
+    if (d.changeDepth > 0)
+        return;
+
+    Q_EMIT d.dataModel->changeBlockActive(false);
+
+    if (d.pendingPaths.isEmpty())
+        return;
+
+    QList<SdfPath> unique;
+    QSet<SdfPath> set;
+    for (const SdfPath& p : d.pendingPaths) {
+        if (!set.contains(p)) {
+            set.insert(p);
+            unique.append(p);
+        }
+    }
+    d.pendingPaths.clear();
+    d.bboxCache.reset();
+    d.bbox = boundingBox();
+
+    Q_EMIT d.dataModel->primsChanged(unique);
+    Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
+}
+
 
 bool
 DataModelPrivate::loadFromFile(const QString& filename, DataModel::load_policy policy)
@@ -352,6 +414,8 @@ DataModelPrivate::close()
         QWriteLocker locker(&d.stageLock);
         d.stage = nullptr;
         d.bboxCache.reset();
+        d.pendingPaths.clear();
+        d.changeDepth = 0;
     }
     QMetaObject::invokeMethod(
         d.dataModel, [this]() { updateStage(); }, Qt::QueuedConnection);
@@ -404,47 +468,32 @@ DataModelPrivate::boundingBox()
         return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
     }
     else {
-        return boundingBox(d.mask);
+        return usd::boundingBox(d.stage, d.mask);
     }
-}
-
-GfBBox3d
-DataModelPrivate::boundingBox(const QList<SdfPath>& paths)
-{
-    QReadLocker locker(&d.stageLock);
-    Q_ASSERT("stage is not loaded" && isLoaded());
-    UsdGeomBBoxCache cache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true);
-    GfBBox3d bbox;
-    for (const SdfPath& path : paths) {
-        UsdPrim prim = d.stage->GetPrimAtPath(path);
-        if (!prim || !prim.IsA<UsdGeomImageable>())
-            continue;
-
-        bbox = GfBBox3d::Combine(bbox, cache.ComputeWorldBound(prim));
-    }
-    return bbox;
 }
 
 void
 DataModelPrivate::updatePrims(const QList<SdfPath> paths)
 {
+    if (d.changeDepth > 0) {
+        d.pendingPaths.append(paths);
+        return;
+    }
     Q_EMIT d.dataModel->primsChanged(paths);
     Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
     if (!d.mask.isEmpty()) {
         QList<SdfPath> newMask;
         bool updated = false;
-        {
-            QReadLocker locker(&d.stageLock);
-            for (const SdfPath& path : d.mask) {
-                UsdPrim prim = d.stage->GetPrimAtPath(path);
-                if (prim && prim.IsValid() && prim.IsActive()) {
-                    newMask.append(path);
-                }
-                else {
-                    updated = true;
-                }
-            }
+
+        QReadLocker locker(&d.stageLock);
+        for (const SdfPath& path : d.mask) {
+            UsdPrim prim = d.stage->GetPrimAtPath(path);
+            if (prim && prim.IsValid() && prim.IsActive())
+                newMask.append(path);
+            else
+                updated = true;
         }
+
         if (updated) {
             {
                 QWriteLocker locker(&d.stageLock);
@@ -480,6 +529,24 @@ DataModel::DataModel(const DataModel& other)
 {}
 
 DataModel::~DataModel() {}
+
+void
+DataModel::beginChangeBlock(size_t count)
+{
+    p->beginChangeBlock(count);
+}
+
+void
+DataModel::progressChangeBlock(size_t completed)
+{
+    p->progressChangeBlock(completed);
+}
+
+void
+DataModel::endChangeBlock()
+{
+    p->endChangeBlock();
+}
 
 bool
 DataModel::loadFromFile(const QString& filename, DataModel::load_policy loadPolicy)
@@ -560,12 +627,6 @@ DataModel::load_policy
 DataModel::loadPolicy() const
 {
     return p->d.loadPolicy;
-}
-
-GfBBox3d
-DataModel::boundingBox(const QList<SdfPath>& paths)
-{
-    return p->boundingBox(paths);
 }
 
 QString

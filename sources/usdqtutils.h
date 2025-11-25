@@ -21,8 +21,6 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-GfVec4f
-QColorToGfVec4f(const QColor& color);
 std::string
 QStringToString(const QString& str);
 QString
@@ -33,6 +31,10 @@ QString
 TfTokenToQString(const TfToken& token);
 QList<QString>
 TfTokenVectorToQList(const TfTokenVector& tokens);
+SdfPathVector
+QListToSdfPathVector(const QList<SdfPath>& paths);
+GfVec4f
+QColorToGfVec4f(const QColor& color);
 }  // namespace usd
 
 PXR_NAMESPACE_OPEN_SCOPE

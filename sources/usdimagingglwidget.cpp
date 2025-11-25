@@ -10,9 +10,9 @@
 #include "usdstageutils.h"
 #include "usdviewcamera.h"
 #include <QApplication>
-#include <QFontDatabase>
 #include <QColor>
 #include <QColorSpace>
+#include <QFontDatabase>
 #include <QLocale>
 #include <QMouseEvent>
 #include <QObject>
@@ -196,8 +196,6 @@ ImagingGLWidgetPrivate::paintGL()
 
     // paintGL() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
-
-    qDebug() << "paintGL: called";
 
     if (d.stage) {
         if (d.glEngine) {
@@ -457,15 +455,11 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
 #ifdef WIN32
     glDepthMask(GL_TRUE);
 #endif
-    QPoint tl = deviceRatio(rect.topLeft());
-    QPoint br = deviceRatio(rect.bottomRight());
-
-    if (br.x() < tl.x())
-        std::swap(tl.rx(), br.rx());
-    if (br.y() < tl.y())
-        std::swap(tl.ry(), br.ry());
-    const QRect r(tl, br);
-
+    QRect r = rect.normalized();
+    QPoint tl = deviceRatio(r.topLeft());
+    QPoint br = deviceRatio(r.bottomRight() - QPoint(1,1));
+    r = QRect(tl, br);
+    
     GfVec4d viewport = widgetViewport();
 
     GfVec2d center(((r.left() + r.right()) * 0.5 - viewport[0]) / static_cast<double>(viewport[2]),
@@ -489,6 +483,9 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
                                                   pickFr.ComputeProjectionMatrix(), d.stage->GetPseudoRoot(), d.params,
                                                   &results);
 
+
+    qDebug() << "results:" << results.size();
+    
     QList<SdfPath> selectedPaths;
     if (hit) {
         for (const auto& rItem : results)
@@ -497,6 +494,10 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     }
 
     bool update = false;
+    
+    
+    
+    
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {
             for (const SdfPath& path : selectedPaths) {
@@ -540,7 +541,6 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
     d.glwidget->update();
 }
 
-
 void
 ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
 {
@@ -579,10 +579,11 @@ void
 ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 {
     Q_ASSERT("gl engine is not set" && d.glEngine);
-    d.glEngine->ClearSelected();
-    for (SdfPath path : paths) {
-        d.glEngine->AddSelected(path, UsdImagingDelegate::ALL_INSTANCES);
-    }
+
+    qDebug() << "selected paths: " << paths.size();
+
+    d.glEngine->SetSelected(QListToSdfPathVector(paths));
+
     d.glwidget->update();
     d.selection = paths;
 }
@@ -638,7 +639,7 @@ ImagingGLWidgetPrivate::updateStatistics()
         size_t vertices = 0;
         size_t normals = 0;
         size_t faces = 0;
-    
+
         for (const UsdPrim& prim : d.stage->Traverse()) {
             if (!prim.IsActive() || !prim.IsLoaded())
                 continue;
@@ -671,7 +672,6 @@ ImagingGLWidgetPrivate::updateStatistics()
                 if (!hasNormals) {
                     mesh.GetNormalsAttr().Get(&meshNormals);
                 }
-
             }
             if (prim.HasPayload())
                 payloads++;
@@ -679,7 +679,7 @@ ImagingGLWidgetPrivate::updateStatistics()
             if (prim.IsInstanceable())
                 instances++;
         }
-        
+
         double dpr = 2.0;
         int w = 300 * dpr;
         int h = 200 * dpr;
@@ -700,12 +700,9 @@ ImagingGLWidgetPrivate::updateStatistics()
 
             QStringList lines;
             lines << "Statistics" << QString("Prims:      %1").arg(fmt(prims))
-                  << QString("Meshes:     %1").arg(fmt(meshes))
-                  << QString("Xforms:     %1").arg(fmt(xforms))
-                  << QString("Payloads:   %1").arg(fmt(payloads))
-                  << QString("Instances:  %1").arg(fmt(instances))
-                  << QString("Vertices:   %1").arg(fmt(vertices))
-                  << QString("Normals:    %1").arg(fmt(normals))
+                  << QString("Meshes:     %1").arg(fmt(meshes)) << QString("Xforms:     %1").arg(fmt(xforms))
+                  << QString("Payloads:   %1").arg(fmt(payloads)) << QString("Instances:  %1").arg(fmt(instances))
+                  << QString("Vertices:   %1").arg(fmt(vertices)) << QString("Normals:    %1").arg(fmt(normals))
                   << QString("Faces:      %1").arg(fmt(faces));
 
             QString overlay = lines.join("\n");

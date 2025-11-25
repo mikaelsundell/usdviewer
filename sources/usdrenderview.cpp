@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "usdrenderview.h"
+#include "usdstageutils.h"
 #include <QPointer>
 
 // generated files
@@ -85,7 +86,7 @@ void
 RenderViewPrivate::frameSelected()
 {
     if (d.selectionModel->paths().size()) {
-        imageGLWidget()->frame(d.dataModel->boundingBox(d.selectionModel->paths()));
+        imageGLWidget()->frame(boundingBox(d.stage, d.selectionModel->paths()));
     }
 }
 

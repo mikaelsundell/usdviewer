@@ -6,6 +6,7 @@
 #include "usdpropertytree.h"
 #include "usdstagetree.h"
 #include <QPointer>
+#include <QTimer>
 
 // generated files
 #include "ui_usdoutlinerview.h"
@@ -52,6 +53,7 @@ OutlinerViewPrivate::init()
                                                << "Vis");
     propertyTree()->setHeaderLabels(QStringList() << "Name"
                                                   << "Value");
+    d.ui->filter->setFocusPolicy(Qt::NoFocus);
     // event filter
     stageTree()->installEventFilter(this);
     propertyTree()->installEventFilter(this);

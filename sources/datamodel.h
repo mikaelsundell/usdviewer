@@ -26,6 +26,9 @@ public:
     DataModel(const QString& filename, load_policy policy = load_all);
     DataModel(const DataModel& other);
     ~DataModel();
+    void beginChangeBlock(size_t count = 0);
+    void progressChangeBlock(size_t completed);
+    void endChangeBlock();
     bool loadFromFile(const QString& filename, load_policy policy = load_all);
     bool loadPayloads(const QList<SdfPath>& paths, const QString& variantSet = QString(),
                       const QString& variantValue = QString());
@@ -40,12 +43,13 @@ public:
     void setMask(const QList<SdfPath>& paths);
     load_policy loadPolicy() const;
     GfBBox3d boundingBox();
-    GfBBox3d boundingBox(const QList<SdfPath>& paths);
     QString filename() const;
     UsdStageRefPtr stage() const;
     QReadWriteLock* stageLock() const;
 
 Q_SIGNALS:
+    void changeBlockActive(bool active);
+    void changeBlockProgress(size_t completed, size_t total);
     void boundingBoxChanged(const GfBBox3d& bbox);
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);

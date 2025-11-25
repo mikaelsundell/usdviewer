@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <pxr/base/gf/bbox3d.h>
-#include <pxr/usd/usd/stage.h>
 #include <QExplicitlySharedDataPointer>
 #include <QMap>
 #include <QObject>
 #include <QReadWriteLock>
 #include <QVariant>
+#include <pxr/base/gf/bbox3d.h>
+#include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -35,6 +35,7 @@ public:
             , details(d)
         {}
     };
+
 public:
     DataModel();
     DataModel(const QString& filename, load_policy policy = load_all);
@@ -53,6 +54,7 @@ public:
     bool close();
     bool isLoaded() const;
     void setMask(const QList<SdfPath>& paths);
+    void setStatus(const QString& status);
     load_policy loadPolicy() const;
     GfBBox3d boundingBox();
     QString filename() const;
@@ -66,6 +68,7 @@ Q_SIGNALS:
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, load_policy policy, stage_status status);
+    void statusChanged(const QString& status);
 
 private:
     QExplicitlySharedDataPointer<DataModelPrivate> p;

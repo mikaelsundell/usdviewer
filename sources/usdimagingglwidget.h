@@ -64,7 +64,7 @@ public:
     void updateSelection(const QList<SdfPath>& paths);
 
 Q_SIGNALS:
-    void renderReady();
+    void renderReady(qint64 elapsed);
 
 protected:
     void initializeGL() override;

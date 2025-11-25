@@ -27,10 +27,10 @@ public Q_SLOTS:
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void renderReady(qint64 elapsed);
 
 public:
     struct Data {
-        UsdStageRefPtr stage;
         QScopedPointer<Ui_UsdRenderView> ui;
         QPointer<DataModel> dataModel;
         QPointer<SelectionModel> selectionModel;
@@ -44,7 +44,7 @@ RenderViewPrivate::init()
 {
     d.ui.reset(new Ui_UsdRenderView());
     d.ui->setupUi(d.view.data());
-    connect(imageGLWidget(), &ImagingGLWidget::renderReady, d.view.data(), &RenderView::renderReady);
+    connect(imageGLWidget(), &ImagingGLWidget::renderReady, this, &RenderViewPrivate::renderReady);
 }
 
 void
@@ -86,7 +86,7 @@ void
 RenderViewPrivate::frameSelected()
 {
     if (d.selectionModel->paths().size()) {
-        imageGLWidget()->frame(boundingBox(d.stage, d.selectionModel->paths()));
+        imageGLWidget()->frame(boundingBox(d.dataModel->stage(), d.selectionModel->paths()));
     }
 }
 
@@ -126,12 +126,23 @@ void
 RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
 {
     if (status == DataModel::stage_loaded) {
-        imageGLWidget()->updateStage(stage);
+        imageGLWidget()->updateStage(d.dataModel->stage());
     }
     else {
         imageGLWidget()->close();
     }
-    d.stage = stage;
+}
+
+void
+RenderViewPrivate::renderReady(qint64 elapsed)
+{
+    const qint64 thresholdMs = 500;
+    if (elapsed > thresholdMs) {
+        if (d.dataModel) {
+            QString msg = QStringLiteral("Warning: Render time %1 ms").arg(elapsed);
+            d.dataModel->setStatus(msg);
+        }
+    }
 }
 
 RenderView::RenderView(QWidget* parent)

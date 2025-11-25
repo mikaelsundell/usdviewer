@@ -7,11 +7,11 @@
 #include "usdqtutils.h"
 #include "usdstageutils.h"
 #include <QPointer>
+#include <QtConcurrent>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
-#include <QtConcurrent>
 
 namespace usd {
 Command
@@ -40,13 +40,14 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                         info["variantSet"] = variantSet;
                         info["variantValue"] = variantValue;
 
-                        QMetaObject::invokeMethod(
+                        // todo: we need to add notify ordering here
+                        /*QMetaObject::invokeMethod(
                             dm,
                             [dm, path, info, completed]() {
                                 dm->updateProgressNotify(DataModel::Notify("loading payload", { path }, info),
                                                          completed);
                             },
-                            Qt::QueuedConnection);
+                            Qt::QueuedConnection);*/
 
                         UsdPrim prim = stage->GetPrimAtPath(path);
                         if (!prim || !prim.HasPayload()) {
@@ -83,6 +84,9 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             QMetaObject::invokeMethod(
                                 dm,
                                 [dm, path, completed]() {
+
+                                    qDebug() << "sending payload loaded";
+
                                     dm->updateProgressNotify(DataModel::Notify("payload loaded", { path }),
                                                              completed + 1);
                                 },
@@ -104,11 +108,7 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     }
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm]() {
-                        dm->endProgressBlock();
-                    },
-                    Qt::QueuedConnection);
+                    dm, [dm]() { dm->endProgressBlock(); }, Qt::QueuedConnection);
             });
         },
         [paths](DataModel* dm, SelectionModel*) {
@@ -150,7 +150,6 @@ unloadPayloads(const QList<SdfPath>& paths)
                         completed++;
                     }
                 }
-
                 QMetaObject::invokeMethod(
                     safe_dm,
                     [safe_dm]() {
@@ -170,23 +169,39 @@ Command
 isolate(const QList<SdfPath>& paths)
 {
     return Command(
-        // redo
         [paths](DataModel* dm, SelectionModel*) {
             dm->beginProgressBlock("redo isolate", 1);
-            dm->setMask(paths);
-            DataModel::Notify notify("set mask", paths);
-            dm->updateProgressNotify(notify, 1);
-            dm->endProgressBlock();
+
+            QFuture<void> future = QtConcurrent::run([dm, paths]() {
+                {
+                    dm->setMask(paths);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, paths]() {
+                        dm->updateProgressNotify(DataModel::Notify("Isolate set", paths), 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         },
-        // undo
         [paths](DataModel* dm, SelectionModel*) {
             dm->beginProgressBlock("undo isolate", 1);
-            dm->setMask({});
-            DataModel::Notify notify("clear mask", {});
-            dm->updateProgressNotify(notify, 1);
-            dm->endProgressBlock();
+            QFuture<void> future = QtConcurrent::run([dm]() {
+                {
+                    dm->setMask({});
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm]() {
+                        dm->updateProgressNotify(DataModel::Notify("Isolate cleared", {}), 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         });
 }
+
 
 Command
 select(const QList<SdfPath>& paths)
@@ -202,41 +217,37 @@ Command
 show(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
-        // redo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("redo show", paths.size());
-            size_t completed = 0;
-
-            QWriteLocker locker(dm->stageLock());
-            for (const SdfPath& p : paths) {
-                if (dm->isProgressBlockCancelled())
-                    break;
-
-                setVisibility(dm->stage(), { p }, true, recursive);
-
-                DataModel::Notify notify("show prim", { p });
-                dm->updateProgressNotify(notify, ++completed);
-            }
-
-            dm->endProgressBlock();
+            dm->beginProgressBlock("redo show", 1);
+            QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
+                {
+                    QWriteLocker lock(dm->stageLock());
+                    setVisibility(dm->stage(), paths, true, recursive);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, paths]() {
+                        dm->updateProgressNotify(DataModel::Notify("Shown", paths), 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         },
-        // undo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("undo show", paths.size());
-            size_t completed = 0;
-
-            QWriteLocker locker(dm->stageLock());
-            for (const SdfPath& p : paths) {
-                if (dm->isProgressBlockCancelled())
-                    break;
-
-                setVisibility(dm->stage(), { p }, false, recursive);
-
-                DataModel::Notify notify("hide prim", { p });
-                dm->updateProgressNotify(notify, ++completed);
-            }
-
-            dm->endProgressBlock();
+            dm->beginProgressBlock("undo show", 1);
+            QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
+                {
+                    QWriteLocker lock(dm->stageLock());
+                    setVisibility(dm->stage(), paths, false, recursive);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, paths]() {
+                        dm->updateProgressNotify(DataModel::Notify("Hidden", paths), 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         });
 }
 
@@ -244,36 +255,37 @@ Command
 hide(const QList<SdfPath>& paths, bool recursive)
 {
     return Command(
-        // redo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("redo hide", paths.size());
-            size_t completed = 0;
-            QWriteLocker locker(dm->stageLock());
-            for (const SdfPath& p : paths) {
-                if (dm->isProgressBlockCancelled())
-                    break;
-
-                setVisibility(dm->stage(), { p }, false, recursive);
-
-                DataModel::Notify notify("hide prim", { p });
-                dm->updateProgressNotify(notify, ++completed);
-            }
-            dm->endProgressBlock();
+            dm->beginProgressBlock("redo hide", 1);
+            QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
+                {
+                    QWriteLocker lock(dm->stageLock());
+                    setVisibility(dm->stage(), paths, false, recursive);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, paths]() {
+                        dm->updateProgressNotify(DataModel::Notify("Hidden", paths), 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         },
-
-        // undo
         [paths, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("undo hide", paths.size());
-            size_t completed = 0;
-            QWriteLocker locker(dm->stageLock());
-            for (const SdfPath& p : paths) {
-                if (dm->isProgressBlockCancelled())
-                    break;
-                setVisibility(dm->stage(), { p }, true, recursive);
-                DataModel::Notify notify("show prim", { p });
-                dm->updateProgressNotify(notify, ++completed);
-            }
-            dm->endProgressBlock();
+            dm->beginProgressBlock("undo hide", 1);
+            QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
+                {
+                    QWriteLocker lock(dm->stageLock());
+                    setVisibility(dm->stage(), paths, true, recursive);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, paths]() {
+                        dm->updateProgressNotify(DataModel::Notify("Shown", paths), 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         });
 }
 }  // namespace usd

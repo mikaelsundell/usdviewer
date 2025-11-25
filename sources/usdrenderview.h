@@ -53,9 +53,6 @@ public:
     SelectionModel* selectionModel();
     void setSelectionModel(SelectionModel* selectionModel);
 
-Q_SIGNALS:
-    void renderReady();
-
 private:
     QScopedPointer<RenderViewPrivate> p;
 };

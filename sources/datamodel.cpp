@@ -480,6 +480,12 @@ DataModel::setMask(const QList<SdfPath>& paths)
     p->setMask(paths);
 }
 
+void
+DataModel::setStatus(const QString& status)
+{
+    Q_EMIT statusChanged(status);
+}
+
 GfBBox3d
 DataModel::boundingBox()
 {

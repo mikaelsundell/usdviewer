@@ -54,7 +54,7 @@ ProgressViewPrivate::init()
     progressTree()->installEventFilter(this);
     // payload tree
     progressTree()->setHeaderLabels(QStringList() << "Name"
-                                                     << "Paths");
+                                                  << "Paths");
     // connect
     connect(d.ui->clear, &QPushButton::clicked, this, &ProgressViewPrivate::clear);
 }
@@ -113,18 +113,15 @@ ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::progre
 
         clear();
         d.ui->progress->setValue(0);
-
-        d.d.timer.restart();
-        d.d.running = true;
-
+        d.timer.restart();
+        d.running = true;
         d.ui->status->setText(QString("Running: %1").arg(name));
     }
     else {
         qDebug() << "IDLE:" << name;
 
-        d.d.running = false;
-        qint64 ms = d.d.timer.elapsed();
-
+        d.running = false;
+        qint64 ms = d.timer.elapsed();
         QString timeStr = QTime(0, 0).addMSecs(ms).toString("hh:mm:ss");
         d.ui->status->setText(QString("Finished: %1 (Time: %2)").arg(name).arg(timeStr));
     }
@@ -134,8 +131,8 @@ void
 ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size_t completed, size_t expected)
 {
     QTreeWidget* tree = progressTree();
-    if (d.d.expectedCount == 0)
-        d.d.expectedCount = int(expected);
+    if (d.expectedCount == 0)
+        d.expectedCount = int(expected);
 
     int index = int(completed) - 1;
     if (index < 0)
@@ -143,13 +140,27 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
 
     while (tree->topLevelItemCount() <= index) {
         auto* newItem = new QTreeWidgetItem(tree);
-        newItem->setText(0, "Pending...");
+        newItem->setText(0, "Pending ...");
         newItem->setText(1, "");
     }
 
     QTreeWidgetItem* item = tree->topLevelItem(index);
     if (item) {
+
+        qDebug() << "notify.message: " << notify.message;
+
         item->setText(0, notify.message);
+        QString col1;
+        if (!notify.paths.isEmpty()) {
+            QString first = StringToQString(notify.paths.first().GetName());
+            int count = notify.paths.size();
+            col1 = QString("%1 (%2)").arg(first).arg(count);
+        }
+        else {
+            col1 = QString();
+        }
+        item->setText(1, col1);
+
         QString msg = notify.message.toLower();
         if (msg.contains("failed")) {
             item->setForeground(0, QBrush(Qt::red));
@@ -161,9 +172,10 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
             item->setForeground(0, QBrush(Qt::yellow));
         }
         else {
-            item->setForeground(0, QBrush(Qt:));
+            item->setForeground(0, QBrush(Qt::transparent));
         }
     }
+
     int pct = int((double(completed) / std::max<size_t>(1, expected)) * 100.0);
     d.ui->progress->setValue(pct);
 
@@ -185,10 +197,9 @@ ProgressViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 QString
 ProgressViewPrivate::updateStatus(size_t completed, size_t expected)
 {
-    qint64 ms = d.d.timer.elapsed();
+    qint64 ms = d.timer.elapsed();
     QString timeStr = QTime(0, 0).addMSecs(ms).toString("hh:mm:ss");
-
-    return QString("Time: %1 (%2 / %3)").arg(timeStr).arg(completed).arg(expected);
+    return QString("Time: %1 (%2/%3)").arg(timeStr).arg(completed).arg(expected);
 }
 
 ProgressView::ProgressView(QWidget* parent)

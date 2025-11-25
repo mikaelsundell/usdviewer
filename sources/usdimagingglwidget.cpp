@@ -139,7 +139,6 @@ ImagingGLWidgetPrivate::initGL()
             qWarning() << "could not initialize gl engine, no hydra driver found.";
             d.glEngine.reset();
         }
-        d.glwidget->renderReady();
     }
 }
 
@@ -197,10 +196,10 @@ ImagingGLWidgetPrivate::paintGL()
     // paintGL() may be invoked by Qt before the USD stage is fully initialized.
     // Ensure the stage exists and is successfully loaded before rendering.
 
-    qDebug() << "paintGL(): begin()";
-
     if (d.stage) {
         if (d.glEngine) {
+            QElapsedTimer timer;
+            timer.start();
             if (!d.glEngine->IsColorCorrectionCapable()) {
                 glEnable(GL_FRAMEBUFFER_SRGB);
             }
@@ -302,13 +301,12 @@ ImagingGLWidgetPrivate::paintGL()
                 qWarning() << "gl engine errors occured during rendering";
             }
             d.count++;
+            Q_EMIT d.glwidget->renderReady(timer.elapsed());
         }
         else {
             qWarning() << "gl engine is not inititialized, render pass will be skipped";
         }
     }
-
-    qDebug() << "paintGL(): end()";
 }
 
 void

@@ -58,7 +58,6 @@ public Q_SLOTS:
     void saveCopy();
     void reload();
     void close();
-    void ready();
     void copyImage();
     void backgroundColor();
     void exportAll();
@@ -96,6 +95,7 @@ public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
     void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void statusChanged(const QString& status);
 
 public:
     void updateRecentFiles(const QString& filename);
@@ -166,7 +166,6 @@ ViewerPrivate::init()
     renderView()->setDataModel(d.dataModel.data());
     renderView()->setSelectionModel(d.selectionModel.data());
     // connect
-    connect(renderView(), &RenderView::renderReady, this, &ViewerPrivate::ready);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
         d.loadPolicy = DataModel::load_all;
@@ -255,6 +254,7 @@ ViewerPrivate::init()
     connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &ViewerPrivate::selectionChanged);
     connect(d.dataModel.data(), &DataModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
     connect(d.dataModel.data(), &DataModel::stageChanged, this, &ViewerPrivate::stageChanged);
+    connect(d.dataModel.data(), &DataModel::statusChanged, this, &ViewerPrivate::statusChanged);
     // views
     connect(d.ui->viewStatistics, &QAction::toggled, this,
             [=](bool checked) { renderView()->setStatisticsEnabled(checked); });
@@ -576,12 +576,6 @@ ViewerPrivate::close()
         d.viewer->setWindowTitle(QString("%1").arg(PROJECT_NAME));
         enable(false);
     }
-}
-
-void
-ViewerPrivate::ready()
-{
-    frameAll();
 }
 
 void
@@ -935,6 +929,12 @@ ViewerPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy,
     if (status == DataModel::stage_loaded) {
         enable(true);
     }
+}
+
+void
+ViewerPrivate::statusChanged(const QString& status)
+{
+    updateStatus(status);
 }
 
 void

@@ -19,6 +19,7 @@ public:
     PropertyTree(QWidget* parent = nullptr);
     virtual ~PropertyTree();
     void close();
+
     void updateStage(UsdStageRefPtr stage);
     void updatePrims(const QList<SdfPath>& paths);
     void updateSelection(const QList<SdfPath>& paths);

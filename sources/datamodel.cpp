@@ -282,6 +282,7 @@ DataModelPrivate::close()
     {
         QWriteLocker locker(&d.stageLock);
         d.stage = nullptr;
+        d.stageStatus = DataModel::stage_status::stage_closed;
         d.bboxCache.reset();
         d.pendingPaths.clear();
         d.changeDepth = 0;

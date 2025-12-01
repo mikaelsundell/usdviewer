@@ -202,7 +202,6 @@ isolate(const QList<SdfPath>& paths)
         });
 }
 
-
 Command
 select(const QList<SdfPath>& paths)
 {

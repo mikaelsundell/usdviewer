@@ -154,8 +154,8 @@ OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy p
         propertyTree()->updateStage(stage);
     }
     else {
-        propertyTree()->clear();
-        stageTree()->clear();
+        propertyTree()->close();
+        stageTree()->close();
     }
 }
 

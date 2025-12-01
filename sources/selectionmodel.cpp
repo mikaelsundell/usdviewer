@@ -100,7 +100,7 @@ SelectionModel::clear()
     Q_EMIT selectionChanged(p->d.paths);
 }
 
-SelectionModel::~SelectionModel() {}
+SelectionModel::~SelectionModel() = default;
 
 bool
 SelectionModel::isEmpty() const

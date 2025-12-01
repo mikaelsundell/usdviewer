@@ -29,6 +29,6 @@ ProgressItem::ProgressItem(QTreeWidgetItem* parent)
     , p(new ProgressItemPrivate())
 {}
 
-ProgressItem::~ProgressItem() {}
+ProgressItem::~ProgressItem() = default;
 
 }  // namespace usd

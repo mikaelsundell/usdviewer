@@ -9,7 +9,7 @@ MouseEvent::MouseEvent(QObject* parent)
     : QObject(parent)
 {}
 
-MouseEvent::~MouseEvent() {}
+MouseEvent::~MouseEvent() = default;
 
 bool
 MouseEvent::eventFilter(QObject* obj, QEvent* event)

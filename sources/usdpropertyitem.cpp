@@ -29,5 +29,5 @@ PropertyItem::PropertyItem(QTreeWidgetItem* parent)
     , p(new PropertyItemPrivate())
 {}
 
-PropertyItem::~PropertyItem() {}
+PropertyItem::~PropertyItem() = default;
 }  // namespace usd

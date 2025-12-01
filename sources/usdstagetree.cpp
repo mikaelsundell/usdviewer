@@ -6,6 +6,7 @@
 #include "command.h"
 #include "commanddispatcher.h"
 #include "selectionmodel.h"
+#include "signalguard.h"
 #include "stylesheet.h"
 #include "usdprimitem.h"
 #include "usdqtutils.h"
@@ -23,12 +24,10 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class StageTreePrivate : public QObject {
+class StageTreePrivate : public QObject, public SignalGuard {
 public:
     StageTreePrivate();
     void init();
-    void initDataModel();
-    void initSelection();
     void initTree();
     void close();
     void collapse();
@@ -180,7 +179,6 @@ StageTreePrivate::itemCheckState(QTreeWidgetItem* item, bool checkable, bool rec
         item->setFlags(f);
         item->setData(0, Qt::CheckStateRole, QVariant());
     }
-
     if (recursive) {
         for (int i = 0; i < item->childCount(); ++i)
             itemCheckState(item->child(i), checkable, recursive);
@@ -209,6 +207,7 @@ StageTreePrivate::initTree()
 void
 StageTreePrivate::close()
 {
+    QSignalBlocker blocker(d.tree);
     d.stage = nullptr;
     d.tree->clear();
 }
@@ -481,71 +480,81 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 void
 StageTreePrivate::updateStage(UsdStageRefPtr stage)
 {
-    close();
-    d.stage = stage;
-    UsdPrim prim = stage->GetPseudoRoot();
-    PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
-    itemCheckState(rootItem, false, true);
-    addChildren(rootItem, prim.GetPath());
-    initTree();
-    if (d.payloadEnabled)
-        itemCheckState(rootItem, true, true);
+    beginGuard();
+    {
+        close();
+        d.stage = stage;
+        UsdPrim prim = stage->GetPseudoRoot();
+        PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
+        itemCheckState(rootItem, false, true);
+        addChildren(rootItem, prim.GetPath());
+        initTree();
+        if (d.payloadEnabled)
+            itemCheckState(rootItem, true, true);
+    }
+    endGuard();
 }
 
 void
 StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
 {
-    QSignalBlocker blocker(d.tree);
-    std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* item) {
-        QString itemPath = item->data(0, Qt::UserRole).toString();
-        if (!itemPath.isEmpty()) {
-            for (const SdfPath& changed : paths) {
-                if (itemPath == StringToQString(changed.GetString())) {
-                    UsdPrim prim = d.stage->GetPrimAtPath(changed);
-                    if (prim && prim.HasPayload()) {
-                        Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
-                        if (item->checkState(0) != want)
-                            item->setCheckState(0, want);
+    beginGuard();
+    {
+        std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* item) {
+            QString itemPath = item->data(0, Qt::UserRole).toString();
+            if (!itemPath.isEmpty()) {
+                for (const SdfPath& changed : paths) {
+                    if (itemPath == StringToQString(changed.GetString())) {
+                        UsdPrim prim = d.stage->GetPrimAtPath(changed);
+                        if (prim && prim.HasPayload()) {
+                            Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
+                            if (item->checkState(0) != want)
+                                item->setCheckState(0, want);
+                        }
                     }
                 }
             }
-        }
-        for (int i = 0; i < item->childCount(); ++i)
-            updateItem(item->child(i));
-    };
-    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
-        updateItem(d.tree->topLevelItem(i));
-    d.tree->update();
+            for (int i = 0; i < item->childCount(); ++i)
+                updateItem(item->child(i));
+        };
+        for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
+            updateItem(d.tree->topLevelItem(i));
+        d.tree->update();
+    }
+    endGuard();
 }
 
 void
 StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
-    QSignalBlocker blocker(d.tree);
-    QSet<SdfPath> selectedSet = QSet<SdfPath>(paths.begin(), paths.end());
-    std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
-        QString itemData = item->data(0, Qt::UserRole).toString();
-        if (!itemData.isEmpty()) {
-            SdfPath itemPath(QStringToString(itemData));
-            bool isSelected = false;
-            if (selectedSet.contains(itemPath))
-                isSelected = true;
-            else if (d.payloadEnabled && !item->childCount()) {
-                for (const SdfPath& path : selectedSet) {
-                    if (path.HasPrefix(itemPath) && path != itemPath) {
-                        isSelected = true;
-                        break;
+    beginGuard();
+    {
+        QSet<SdfPath> selectedSet = QSet<SdfPath>(paths.begin(), paths.end());
+        std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
+            QString itemData = item->data(0, Qt::UserRole).toString();
+            if (!itemData.isEmpty()) {
+                SdfPath itemPath(QStringToString(itemData));
+                bool isSelected = false;
+                if (selectedSet.contains(itemPath))
+                    isSelected = true;
+                else if (d.payloadEnabled && !item->childCount()) {
+                    for (const SdfPath& path : selectedSet) {
+                        if (path.HasPrefix(itemPath) && path != itemPath) {
+                            isSelected = true;
+                            break;
+                        }
                     }
                 }
+                item->setSelected(isSelected);
             }
-            item->setSelected(isSelected);
-        }
-        for (int i = 0; i < item->childCount(); ++i)
-            selectItems(item->child(i));
-    };
-    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
-        selectItems(d.tree->topLevelItem(i));
-    d.tree->update();
+            for (int i = 0; i < item->childCount(); ++i)
+                selectItems(item->child(i));
+        };
+        for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
+            selectItems(d.tree->topLevelItem(i));
+        d.tree->update();
+    }
+    endGuard();
 }
 
 StageTree::StageTree(QWidget* parent)

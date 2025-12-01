@@ -52,7 +52,7 @@ Stylesheet::Stylesheet()
     setTheme(Stylesheet::Light);
 }
 
-Stylesheet::~Stylesheet() {}
+Stylesheet::~Stylesheet() = default;
 
 void
 Stylesheet::applyQss(const QString& qss)

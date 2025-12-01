@@ -43,7 +43,7 @@ DockWidget::DockWidget(QWidget* parent)
     p->init();
 }
 
-DockWidget::~DockWidget() {}
+DockWidget::~DockWidget() = default;
 
 void
 DockWidget::mousePressEvent(QMouseEvent* event)

@@ -84,7 +84,6 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             QMetaObject::invokeMethod(
                                 dm,
                                 [dm, path, completed]() {
-
                                     qDebug() << "sending payload loaded";
 
                                     dm->updateProgressNotify(DataModel::Notify("payload loaded", { path }),

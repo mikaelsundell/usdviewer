@@ -51,7 +51,7 @@ PrimItem::PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const S
     setCheckState(0, Qt::Unchecked);
     p->init();
 }
-PrimItem::~PrimItem() {}
+PrimItem::~PrimItem() = default;
 
 QVariant
 PrimItem::data(int column, int role) const

@@ -969,7 +969,7 @@ Viewer::Viewer(QWidget* parent)
     p->init();
 }
 
-Viewer::~Viewer() {}
+Viewer::~Viewer() = default;
 
 void
 Viewer::setArguments(const QStringList& arguments)

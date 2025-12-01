@@ -146,7 +146,6 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
 
     QTreeWidgetItem* item = tree->topLevelItem(index);
     if (item) {
-
         qDebug() << "notify.message: " << notify.message;
 
         item->setText(0, notify.message);
@@ -210,7 +209,7 @@ ProgressView::ProgressView(QWidget* parent)
     p->init();
 }
 
-ProgressView::~ProgressView() {}
+ProgressView::~ProgressView() = default;
 
 DataModel*
 ProgressView::dataModel() const

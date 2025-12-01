@@ -105,7 +105,7 @@ DataModelPrivate::DataModelPrivate()
     d.stageWatcher.reset(new StageWatcher(this));
 }
 
-DataModelPrivate::~DataModelPrivate() {}
+DataModelPrivate::~DataModelPrivate() = default;
 
 void
 DataModelPrivate::initStage()
@@ -398,7 +398,7 @@ DataModel::DataModel(const DataModel& other)
     : p(other.p)
 {}
 
-DataModel::~DataModel() {}
+DataModel::~DataModel() = default;
 
 void
 DataModel::beginProgressBlock(const QString& name, size_t count)

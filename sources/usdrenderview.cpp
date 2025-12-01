@@ -153,7 +153,7 @@ RenderView::RenderView(QWidget* parent)
     p->init();
 }
 
-RenderView::~RenderView() {}
+RenderView::~RenderView() = default;
 
 QImage
 RenderView::captureImage()

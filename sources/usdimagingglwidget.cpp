@@ -6,6 +6,7 @@
 #include "command.h"
 #include "commanddispatcher.h"
 #include "platform.h"
+#include "signalguard.h"
 #include "usdqtutils.h"
 #include "usdstageutils.h"
 #include "usdviewcamera.h"
@@ -37,7 +38,7 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class ImagingGLWidgetPrivate : public QObject {
+class ImagingGLWidgetPrivate : public QObject, public SignalGuard {
 public:
     void init();
     void initGL();
@@ -170,6 +171,9 @@ ImagingGLWidgetPrivate::close()
     d.glwidget->update();
     d.stage = nullptr;
     d.selection = QList<SdfPath>();
+    if (d.statisticsEnabled) {
+        updateStatistics();
+    }
 }
 
 void
@@ -494,8 +498,6 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
                                                   pickFr.ComputeProjectionMatrix(), d.stage->GetPseudoRoot(), d.params,
                                                   &results);
 
-    qDebug() << "results:" << results.size();
-
     QList<SdfPath> selectedPaths;
     if (hit) {
         for (const auto& rItem : results) {
@@ -551,44 +553,64 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
 void
 ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
 {
-    d.stage = stage;
-    initCamera();
-    d.glEngine.reset();
-    initGL();
-    if (d.statisticsEnabled) {
-        updateStatistics();
+    beginGuard();
+    {
+        d.stage = stage;
+        initCamera();
+        d.glEngine.reset();
+        initGL();
+        if (d.statisticsEnabled) {
+            updateStatistics();
+        }
     }
+    endGuard();
 }
 
 void
 ImagingGLWidgetPrivate::updateBoundingBox(const GfBBox3d& bbox)
 {
-    d.bbox = bbox;
-}
+    beginGuard();
+    {
+        d.bbox = bbox;
+        d.glwidget->update();
+    }
+    endGuard();}
 
 void
 ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
 {
-    d.mask = paths;
-    d.glwidget->update();
+    beginGuard();
+    {
+        d.mask = paths;
+        d.glwidget->update();
+    }
+    endGuard();
 }
 
 void
 ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths)
 {
-    if (d.statisticsEnabled) {
-        updateStatistics();
+    beginGuard();
+    {
+        if (d.statisticsEnabled) {
+            updateStatistics();
+        }
+        d.glwidget->update();
     }
-    d.glwidget->update();
+    endGuard();
 }
 
 void
 ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 {
-    Q_ASSERT("gl engine is not set" && d.glEngine);
-    d.glEngine->SetSelected(QListToSdfPathVector(paths));
-    d.glwidget->update();
-    d.selection = paths;
+    beginGuard();
+    {
+        Q_ASSERT("gl engine is not set" && d.glEngine);
+        d.glEngine->SetSelected(QListToSdfPathVector(paths));
+        d.glwidget->update();
+        d.selection = paths;
+    }
+    endGuard();
 }
 
 QPoint
@@ -630,43 +652,41 @@ ImagingGLWidgetPrivate::widgetViewport() const
 void
 ImagingGLWidgetPrivate::updateStatistics()
 {
-    if (!d.stage)
-        return;
+    size_t prims = 0;
+    size_t meshes = 0;
+    size_t xforms = 0;
+    size_t payloads = 0;
+    size_t instances = 0;
+    size_t vertices = 0;
+    size_t normals = 0;
+    size_t faces = 0;
+    if (d.stage)
     {
         QReadLocker locker(CommandDispatcher::stageLock());
-        size_t prims = 0;
-        size_t meshes = 0;
-        size_t xforms = 0;
-        size_t payloads = 0;
-        size_t instances = 0;
-        size_t vertices = 0;
-        size_t normals = 0;
-        size_t faces = 0;
-
         for (const UsdPrim& prim : d.stage->Traverse()) {
             if (!prim.IsActive() || !prim.IsLoaded())
                 continue;
-
+            
             prims++;
             if (prim.IsA<UsdGeomXform>())
                 xforms++;
-
+            
             if (prim.IsA<UsdGeomMesh>()) {
                 meshes++;
                 UsdGeomMesh mesh(prim);
-
+                
                 VtArray<GfVec3f> points;
                 mesh.GetPointsAttr().Get(&points);
                 vertices += points.size();
-
+                
                 VtArray<int> faceCounts;
                 mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
                 faces += faceCounts.size();
-
+                
                 VtArray<GfVec3f> meshNormals;
                 UsdGeomPrimvarsAPI pvAPI(prim);
                 UsdGeomPrimvar normalsPv = pvAPI.GetPrimvar(TfToken("normals"));
-
+                
                 bool hasNormals = false;
                 if (normalsPv && normalsPv.HasValue()) {
                     normalsPv.Get(&meshNormals);
@@ -678,46 +698,44 @@ ImagingGLWidgetPrivate::updateStatistics()
             }
             if (prim.HasPayload())
                 payloads++;
-
+            
             if (prim.IsInstanceable())
                 instances++;
         }
+    }
+    double dpr = 2.0;
+    int w = 300 * dpr;
+    int h = 200 * dpr;
+    d.overlayStats = QImage(300, 200, QImage::Format_ARGB32_Premultiplied);
+    d.overlayStats.fill(Qt::transparent);
+    {
+        QPainter p(&d.overlayStats);
+        p.setRenderHint(QPainter::Antialiasing, true);
 
-        double dpr = 2.0;
-        int w = 300 * dpr;
-        int h = 200 * dpr;
+        QFont font("Monospace");
+        font.setStyleHint(QFont::Monospace);
+        font.setPointSize(10);
+        p.setFont(font);
 
-        d.overlayStats = QImage(300, 200, QImage::Format_ARGB32_Premultiplied);
-        d.overlayStats.fill(Qt::transparent);
-        {
-            QPainter p(&d.overlayStats);
-            p.setRenderHint(QPainter::Antialiasing, true);
+        QLocale locale = QLocale::system();
+        auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
 
-            QFont font("Monospace");
-            font.setStyleHint(QFont::Monospace);
-            font.setPointSize(10);
-            p.setFont(font);
+        QStringList lines;
+        lines << "Statistics" << QString("Prims:      %1").arg(fmt(prims))
+              << QString("Meshes:     %1").arg(fmt(meshes)) << QString("Xforms:     %1").arg(fmt(xforms))
+              << QString("Payloads:   %1").arg(fmt(payloads)) << QString("Instances:  %1").arg(fmt(instances))
+              << QString("Vertices:   %1").arg(fmt(vertices)) << QString("Normals:    %1").arg(fmt(normals))
+              << QString("Faces:      %1").arg(fmt(faces));
 
-            QLocale locale = QLocale::system();
-            auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
-
-            QStringList lines;
-            lines << "Statistics" << QString("Prims:      %1").arg(fmt(prims))
-                  << QString("Meshes:     %1").arg(fmt(meshes)) << QString("Xforms:     %1").arg(fmt(xforms))
-                  << QString("Payloads:   %1").arg(fmt(payloads)) << QString("Instances:  %1").arg(fmt(instances))
-                  << QString("Vertices:   %1").arg(fmt(vertices)) << QString("Normals:    %1").arg(fmt(normals))
-                  << QString("Faces:      %1").arg(fmt(faces));
-
-            QString overlay = lines.join("\n");
-            QFontMetrics fm(font);
-            QRect textRect = fm.boundingRect(QRect(0, 0, 300, 200), Qt::AlignLeft | Qt::AlignTop, overlay);
-            textRect.translate(10, 10);
-            p.setBrush(QColor(0, 0, 0, 140));
-            p.setPen(Qt::NoPen);
-            p.drawRect(textRect);
-            p.setPen(Qt::white);
-            p.drawText(textRect, overlay);
-        }
+        QString overlay = lines.join("\n");
+        QFontMetrics fm(font);
+        QRect textRect = fm.boundingRect(QRect(0, 0, 300, 200), Qt::AlignLeft | Qt::AlignTop, overlay);
+        textRect.translate(10, 10);
+        p.setBrush(QColor(0, 0, 0, 140));
+        p.setPen(Qt::NoPen);
+        p.drawRect(textRect);
+        p.setPen(Qt::white);
+        p.drawText(textRect, overlay);
     }
 }
 
@@ -732,7 +750,7 @@ ImagingGLWidget::ImagingGLWidget(QWidget* parent)
     p->init();
 }
 
-ImagingGLWidget::~ImagingGLWidget() {}
+ImagingGLWidget::~ImagingGLWidget() = default;
 
 ViewCamera
 ImagingGLWidget::viewCamera() const

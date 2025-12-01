@@ -187,7 +187,7 @@ ViewCamera::ViewCamera(const ViewCamera& other)
     : p(other.p)
 {}
 
-ViewCamera::~ViewCamera() {}
+ViewCamera::~ViewCamera() = default;
 
 void
 ViewCamera::frameAll() const

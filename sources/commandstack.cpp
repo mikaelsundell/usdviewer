@@ -40,7 +40,7 @@ CommandStack::CommandStack(QObject* parent)
     , p(new CommandStackPrivate)
 {}
 
-CommandStack::~CommandStack() {}
+CommandStack::~CommandStack() = default;
 
 void
 CommandStack::execute(Command* command)

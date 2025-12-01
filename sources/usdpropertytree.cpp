@@ -4,6 +4,7 @@
 
 #include "usdpropertytree.h"
 #include "selectionmodel.h"
+#include "signalguard.h"
 #include "usdpropertyitem.h"
 #include "usdqtutils.h"
 #include <QFileInfo>
@@ -29,7 +30,7 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usd {
-class PropertyTreePrivate : public QObject {
+class PropertyTreePrivate : public QObject, public SignalGuard {
 public:
     void init();
     void close();
@@ -62,103 +63,115 @@ PropertyTreePrivate::close()
 void
 PropertyTreePrivate::updateStage(UsdStageRefPtr stage)
 {
-    close();
-    d.stage = stage;
-    PropertyItem* stageItem = new PropertyItem(d.tree.data());
-    stageItem->setText(PropertyItem::Name, "Stage");
-    d.tree->addTopLevelItem(stageItem);
-    stageItem->setExpanded(true);
-    auto addChild = [&](const QString& name, const QString& value) {
-        PropertyItem* item = new PropertyItem(stageItem);
-        item->setText(PropertyItem::Name, name);
-        item->setText(PropertyItem::Value, value);
-        item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-    };
-    addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stage)));
-    addChild("upAxis", StringToQString(UsdGeomGetStageUpAxis(stage).GetString()));
-    addChild("timeCodesPerSecond", QString::number(stage->GetTimeCodesPerSecond()));
-    addChild("startTimeCode", QString::number(stage->GetStartTimeCode()));
-    addChild("endTimeCode", QString::number(stage->GetEndTimeCode()));
-    std::string comment = stage->GetRootLayer()->GetComment();
-    if (!comment.empty())
-        addChild("comment", StringToQString(comment));
-    std::string filePath = stage->GetRootLayer()->GetRealPath();
-    addChild("filePath", QFileInfo(StringToQString(filePath)).fileName());
+    beginGuard();
+    {
+        close();
+        d.stage = stage;
+        PropertyItem* stageItem = new PropertyItem(d.tree.data());
+        stageItem->setText(PropertyItem::Name, "Stage");
+        d.tree->addTopLevelItem(stageItem);
+        stageItem->setExpanded(true);
+        auto addChild = [&](const QString& name, const QString& value) {
+            PropertyItem* item = new PropertyItem(stageItem);
+            item->setText(PropertyItem::Name, name);
+            item->setText(PropertyItem::Value, value);
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        };
+        addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stage)));
+        addChild("upAxis", StringToQString(UsdGeomGetStageUpAxis(stage).GetString()));
+        addChild("timeCodesPerSecond", QString::number(stage->GetTimeCodesPerSecond()));
+        addChild("startTimeCode", QString::number(stage->GetStartTimeCode()));
+        addChild("endTimeCode", QString::number(stage->GetEndTimeCode()));
+        std::string comment = stage->GetRootLayer()->GetComment();
+        if (!comment.empty())
+            addChild("comment", StringToQString(comment));
+        std::string filePath = stage->GetRootLayer()->GetRealPath();
+        addChild("filePath", QFileInfo(StringToQString(filePath)).fileName());
+    }
+    endGuard();
 }
 
 void
 PropertyTreePrivate::updatePrims(const QList<SdfPath>& paths)
 {
-    if (paths.contains(d.path)) {
-        updateSelection({ d.path });
+    beginGuard();
+    {
+        if (paths.contains(d.path)) {
+            updateSelection({ d.path });
+        }
     }
+    endGuard();
 }
 
 void
 PropertyTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
-    d.tree->clear();
-    if (paths.size()) {
-        if (paths.size() > 1) {
-            PropertyItem* multiItem = new PropertyItem(d.tree.data());
-            multiItem->setText(PropertyItem::Name, "[Multiple selection]");
-            d.tree->addTopLevelItem(multiItem);
-            multiItem->setExpanded(true);
-            return;
-        }
-        SdfPath path = paths.first();
-        UsdPrim prim = d.stage->GetPrimAtPath(path);
-        if (!prim)
-            return;
-
-        PropertyItem* primItem = new PropertyItem(d.tree.data());
-        primItem->setText(PropertyItem::Name, StringToQString(path.GetString()));
-        primItem->setExpanded(true);
-        d.tree->addTopLevelItem(primItem);
-
-        auto addChild = [&](const QString& name, const QString& value) {
-            PropertyItem* item = new PropertyItem(primItem);
-            item->setText(PropertyItem::Name, name);
-            item->setText(PropertyItem::Value, value);
-            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-        };
-
-
-        /*
-         addChild("Type", StringToQString(prim.GetTypeName().GetString()));
-         addChild("Active", prim.IsActive() ? "true" : "false");
-         addChild("Visibility",
-         StringToQString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
-         
-         addChild("Kind", StringToQString(UsdModelAPI(prim).GetKind()));
-         
-         if (prim.IsA<UsdGeomXformable>()) {
-         GfMatrix4d worldXf;
-         UsdGeomXformable(prim).GetLocalTransformation(&worldXf);
-         addChild("LocalToWorldXform", StringToQString(GfMatrixToString(worldXf)));
-         }
-         
-         if (UsdGeomImageable imageable = UsdGeomImageable(prim)) {
-         GfBBox3d bbox = imageable.ComputeWorldBound(UsdTimeCode::Default());
-         GfRange3d range = bbox.ComputeAlignedRange();
-         QString bboxString = QString("[%1, %2]").arg(range.GetMin().GetString().c_str(), range.GetMax().GetString().c_str());
-         addChild("WorldBoundingBox", bboxString);
-         }
-         */
-
-        for (const UsdAttribute& attr : prim.GetAttributes()) {
-            std::string name = attr.GetName().GetString();
-            VtValue value;
-            if (attr.Get(&value)) {
-                addChild(StringToQString(name), StringToQString(value.GetTypeName()));
+    beginGuard();
+    {
+        d.tree->clear();
+        if (paths.size()) {
+            if (paths.size() > 1) {
+                PropertyItem* multiItem = new PropertyItem(d.tree.data());
+                multiItem->setText(PropertyItem::Name, "[Multiple selection]");
+                d.tree->addTopLevelItem(multiItem);
+                multiItem->setExpanded(true);
+                return;
             }
+            SdfPath path = paths.first();
+            UsdPrim prim = d.stage->GetPrimAtPath(path);
+            if (!prim)
+                return;
+            
+            PropertyItem* primItem = new PropertyItem(d.tree.data());
+            primItem->setText(PropertyItem::Name, StringToQString(path.GetString()));
+            primItem->setExpanded(true);
+            d.tree->addTopLevelItem(primItem);
+            
+            auto addChild = [&](const QString& name, const QString& value) {
+                PropertyItem* item = new PropertyItem(primItem);
+                item->setText(PropertyItem::Name, name);
+                item->setText(PropertyItem::Value, value);
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            };
+            
+            
+            /*
+             addChild("Type", StringToQString(prim.GetTypeName().GetString()));
+             addChild("Active", prim.IsActive() ? "true" : "false");
+             addChild("Visibility",
+             StringToQString(UsdGeomImageable(prim).ComputeVisibility(UsdTimeCode::Default()).GetString()));
+             
+             addChild("Kind", StringToQString(UsdModelAPI(prim).GetKind()));
+             
+             if (prim.IsA<UsdGeomXformable>()) {
+             GfMatrix4d worldXf;
+             UsdGeomXformable(prim).GetLocalTransformation(&worldXf);
+             addChild("LocalToWorldXform", StringToQString(GfMatrixToString(worldXf)));
+             }
+             
+             if (UsdGeomImageable imageable = UsdGeomImageable(prim)) {
+             GfBBox3d bbox = imageable.ComputeWorldBound(UsdTimeCode::Default());
+             GfRange3d range = bbox.ComputeAlignedRange();
+             QString bboxString = QString("[%1, %2]").arg(range.GetMin().GetString().c_str(), range.GetMax().GetString().c_str());
+             addChild("WorldBoundingBox", bboxString);
+             }
+             */
+            
+            for (const UsdAttribute& attr : prim.GetAttributes()) {
+                std::string name = attr.GetName().GetString();
+                VtValue value;
+                if (attr.Get(&value)) {
+                    addChild(StringToQString(name), StringToQString(value.GetTypeName()));
+                }
+            }
+            d.tree->expandAll();
+            d.path = path;
         }
-        d.tree->expandAll();
-        d.path = path;
+        else {
+            updateStage(d.stage);
+        }
     }
-    else {
-        updateStage(d.stage);
-    }
+    endGuard();
 }
 
 std::string
@@ -189,7 +202,7 @@ PropertyTree::PropertyTree(QWidget* parent)
     p->init();
 }
 
-PropertyTree::~PropertyTree() {}
+PropertyTree::~PropertyTree() = default;
 
 void
 PropertyTree::close()

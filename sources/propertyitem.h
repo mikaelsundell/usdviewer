@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2025 - present Mikael Sundell
+// https://github.com/mikaelsundell/usdviewer
+
+#pragma once
+
+#include <QTreeWidgetItem>
+
+namespace usd {
+
+class PropertyItemPrivate;
+
+/**
+ * @class PropertyItem
+ * @brief Tree item representing a USD property entry.
+ *
+ * Used by PropertyTree to display property data such as
+ * attribute names and values. Each item corresponds to
+ * a row in the property tree and typically represents
+ * attributes, relationships, or metadata of a USD prim.
+ */
+class PropertyItem : public QTreeWidgetItem {
+public:
+    /**
+     * @brief Column indices used by the property tree.
+     */
+    enum Column {
+        Name = 0,  ///< Property name column.
+        Value      ///< Property value column.
+    };
+
+    /**
+     * @brief Constructs a property item attached to a tree widget.
+     *
+     * @param parent Parent tree widget.
+     */
+    PropertyItem(QTreeWidget* parent);
+
+    /**
+     * @brief Constructs a property item attached to another item.
+     *
+     * @param parent Parent tree item.
+     */
+    PropertyItem(QTreeWidgetItem* parent);
+
+    /**
+     * @brief Destroys the PropertyItem instance.
+     */
+    virtual ~PropertyItem();
+
+private:
+    QScopedPointer<PropertyItemPrivate> p;
+};
+
+}  // namespace usd

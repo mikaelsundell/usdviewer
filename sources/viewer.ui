@@ -1,0 +1,1098 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Viewer</class>
+ <widget class="QMainWindow" name="Viewer">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1576</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>800</width>
+    <height>600</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>USDViewer</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="focusPolicy">
+    <enum>Qt::FocusPolicy::ClickFocus</enum>
+   </property>
+   <property name="styleSheet">
+    <string notr="true"/>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>2</number>
+    </property>
+    <property name="leftMargin">
+     <number>8</number>
+    </property>
+    <property name="topMargin">
+     <number>8</number>
+    </property>
+    <property name="rightMargin">
+     <number>8</number>
+    </property>
+    <property name="bottomMargin">
+     <number>8</number>
+    </property>
+    <item>
+     <widget class="QWidget" name="renderWidget" native="true">
+      <property name="styleSheet">
+       <string notr="true"/>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QWidget" name="widget_3" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>50</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>50</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>4</number>
+          </property>
+          <item>
+           <widget class="QPushButton" name="open">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Open</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="exportSelected">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Export selected ...</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="exportImage">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Export image ...</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="frameSelected">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Frame selected</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="frameAll">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Frame all</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="resetView">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Reset view</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="frame">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::Shape::NoFrame</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="usd::RenderView" name="renderView" native="true">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="widget_2" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>50</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QWidget" name="widget" native="true">
+            <layout class="QVBoxLayout" name="verticalLayout_5">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>8</number>
+             </property>
+             <item>
+              <widget class="QCheckBox" name="enableDefaultCameraLight">
+               <property name="font">
+                <font>
+                 <pointsize>11</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Camera light </string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="enableSceneLights">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Scene lights </string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="enableSceneMaterials">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Scene materials </string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Draw</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="wireframe">
+            <property name="text">
+             <string>Wireframe</string>
+            </property>
+            <property name="shortcut">
+             <string>W</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="font">
+             <font>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Background</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QWidget" name="widget_4" native="true">
+            <property name="minimumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_6">
+             <property name="topMargin">
+              <number>14</number>
+             </property>
+             <property name="bottomMargin">
+              <number>14</number>
+             </property>
+             <item>
+              <widget class="QFrame" name="backgroundColor">
+               <property name="minimumSize">
+                <size>
+                 <width>32</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true"/>
+               </property>
+               <property name="frameShape">
+                <enum>QFrame::Shape::StyledPanel</enum>
+               </property>
+               <property name="frameShadow">
+                <enum>QFrame::Shadow::Raised</enum>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="font">
+    <font>
+     <pointsize>11</pointsize>
+    </font>
+   </property>
+  </widget>
+  <widget class="usd::DockWidget" name="outlinerDock">
+   <property name="minimumSize">
+    <size>
+     <width>400</width>
+     <height>469</height>
+    </size>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>524287</width>
+     <height>524287</height>
+    </size>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>1</number>
+   </attribute>
+   <widget class="QWidget" name="outlinerContents">
+    <property name="styleSheet">
+     <string notr="true"/>
+    </property>
+    <property name="DockWidget" stdset="0">
+     <bool>true</bool>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout_4">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <property name="leftMargin">
+      <number>4</number>
+     </property>
+     <property name="topMargin">
+      <number>4</number>
+     </property>
+     <property name="rightMargin">
+      <number>4</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item>
+      <widget class="usd::OutlinerView" name="outlinerView" native="true"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1576</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuDisplay">
+    <property name="title">
+     <string>Display</string>
+    </property>
+    <addaction name="displayIsolate"/>
+    <addaction name="separator"/>
+    <addaction name="displayFrameAll"/>
+    <addaction name="displayFrameSelected"/>
+    <addaction name="displayResetView"/>
+    <addaction name="separator"/>
+    <addaction name="displayExpand"/>
+    <addaction name="displayCollapse"/>
+   </widget>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <widget class="QMenu" name="filePolicy">
+     <property name="title">
+      <string>Policy</string>
+     </property>
+     <addaction name="policyAll"/>
+     <addaction name="policyPayload"/>
+    </widget>
+    <widget class="QMenu" name="fileRecent">
+     <property name="title">
+      <string>Recent</string>
+     </property>
+     <addaction name="actionClear"/>
+    </widget>
+    <addaction name="fileOpen"/>
+    <addaction name="filePolicy"/>
+    <addaction name="fileRecent"/>
+    <addaction name="separator"/>
+    <addaction name="fileSave"/>
+    <addaction name="fileSaveAs"/>
+    <addaction name="fileSaveCopy"/>
+    <addaction name="separator"/>
+    <addaction name="fileReload"/>
+    <addaction name="fileClose"/>
+    <addaction name="separator"/>
+    <addaction name="fileExportAll"/>
+    <addaction name="fileExportSelected"/>
+    <addaction name="separator"/>
+    <addaction name="fileExportImage"/>
+    <addaction name="separator"/>
+    <addaction name="fileSaveSettings"/>
+    <addaction name="separator"/>
+    <addaction name="fileExit"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+    <addaction name="helpGithubReadme"/>
+    <addaction name="helpGithubIssues"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <widget class="QMenu" name="editShow">
+     <property name="title">
+      <string>Show</string>
+     </property>
+     <addaction name="editShowSelected"/>
+     <addaction name="editShowRecursive"/>
+    </widget>
+    <widget class="QMenu" name="editHide">
+     <property name="title">
+      <string>Hide</string>
+     </property>
+     <addaction name="editHideSelected"/>
+     <addaction name="editHideRecursive"/>
+    </widget>
+    <widget class="QMenu" name="editLoad">
+     <property name="title">
+      <string>Load</string>
+     </property>
+     <addaction name="separator"/>
+     <addaction name="editLoadSelected"/>
+     <addaction name="editLoadRecursive"/>
+     <addaction name="separator"/>
+     <addaction name="editLoadVariant1"/>
+     <addaction name="editLoadVariant2"/>
+     <addaction name="editLoadVariant3"/>
+     <addaction name="editLoadVariant4"/>
+     <addaction name="editLoadVariant5"/>
+     <addaction name="editLoadVariant6"/>
+     <addaction name="editLoadVariant7"/>
+     <addaction name="editLoadVariant8"/>
+     <addaction name="editLoadVariant9"/>
+    </widget>
+    <widget class="QMenu" name="editUnload">
+     <property name="title">
+      <string>Unload</string>
+     </property>
+     <addaction name="editUnloadSelected"/>
+     <addaction name="editUnloadRecursive"/>
+    </widget>
+    <addaction name="editUndo"/>
+    <addaction name="editRedo"/>
+    <addaction name="separator"/>
+    <addaction name="editCopyImage"/>
+    <addaction name="separator"/>
+    <addaction name="editShow"/>
+    <addaction name="editHide"/>
+    <addaction name="separator"/>
+    <addaction name="editLoad"/>
+    <addaction name="editUnload"/>
+    <addaction name="separator"/>
+    <addaction name="editDelete"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>Theme</string>
+     </property>
+     <addaction name="themeLight"/>
+     <addaction name="themeDark"/>
+    </widget>
+    <addaction name="menuTheme"/>
+    <addaction name="separator"/>
+    <addaction name="viewStatistics"/>
+    <addaction name="separator"/>
+    <addaction name="viewOutliner"/>
+    <addaction name="viewProgress"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuDisplay"/>
+   <addaction name="menuView"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="usd::DockWidget" name="progressDock">
+   <property name="minimumSize">
+    <size>
+     <width>400</width>
+     <height>387</height>
+    </size>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="progressContents">
+    <property name="styleSheet">
+     <string notr="true"/>
+    </property>
+    <property name="DockWidget" stdset="0">
+     <bool>true</bool>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout_3">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <property name="leftMargin">
+      <number>4</number>
+     </property>
+     <property name="topMargin">
+      <number>4</number>
+     </property>
+     <property name="rightMargin">
+      <number>4</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item>
+      <widget class="usd::ProgressView" name="progressView" native="true"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <action name="displayFrameAll">
+   <property name="text">
+    <string>Frame all</string>
+   </property>
+   <property name="shortcut">
+    <string>A</string>
+   </property>
+  </action>
+  <action name="displayResetView">
+   <property name="text">
+    <string>Reset view</string>
+   </property>
+   <property name="shortcut">
+    <string>R</string>
+   </property>
+  </action>
+  <action name="displayFrameSelected">
+   <property name="text">
+    <string>Frame selected</string>
+   </property>
+   <property name="shortcut">
+    <string>F</string>
+   </property>
+  </action>
+  <action name="fileOpen">
+   <property name="text">
+    <string>Open</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="fileExportSelected">
+   <property name="text">
+    <string>Export selected ...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+E</string>
+   </property>
+  </action>
+  <action name="fileExportImage">
+   <property name="text">
+    <string>Export image ...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
+   </property>
+  </action>
+  <action name="helpGithubReadme">
+   <property name="text">
+    <string>Open Github README</string>
+   </property>
+  </action>
+  <action name="helpGithubIssues">
+   <property name="text">
+    <string>Open Github Issues</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
+  <action name="editCopyImage">
+   <property name="text">
+    <string>Copy image ...</string>
+   </property>
+   <property name="font">
+    <font/>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
+   </property>
+  </action>
+  <action name="fileExportAll">
+   <property name="text">
+    <string>Export ...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="asComplexityLow">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Low</string>
+   </property>
+  </action>
+  <action name="asComplexityMedium">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Medium</string>
+   </property>
+  </action>
+  <action name="asComplexityHigh">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>High</string>
+   </property>
+  </action>
+  <action name="asComplexityVeryHigh">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Very high</string>
+   </property>
+  </action>
+  <action name="editDelete">
+   <property name="text">
+    <string>Delete</string>
+   </property>
+   <property name="shortcut">
+    <string>Del</string>
+   </property>
+  </action>
+  <action name="displayExpand">
+   <property name="text">
+    <string>Expand</string>
+   </property>
+   <property name="shortcut">
+    <string>E</string>
+   </property>
+  </action>
+  <action name="displayCollapse">
+   <property name="text">
+    <string>Collapse</string>
+   </property>
+   <property name="shortcut">
+    <string>C</string>
+   </property>
+  </action>
+  <action name="themeLight">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Light</string>
+   </property>
+  </action>
+  <action name="themeDark">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Dark</string>
+   </property>
+  </action>
+  <action name="fileReload">
+   <property name="text">
+    <string>Reload</string>
+   </property>
+  </action>
+  <action name="viewOutliner">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Outliner</string>
+   </property>
+   <property name="shortcut">
+    <string>O</string>
+   </property>
+  </action>
+  <action name="policyAll">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>All</string>
+   </property>
+  </action>
+  <action name="policyPayload">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Payload</string>
+   </property>
+  </action>
+  <action name="fileClose">
+   <property name="text">
+    <string>Close</string>
+   </property>
+  </action>
+  <action name="viewProgress">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Progress</string>
+   </property>
+   <property name="shortcut">
+    <string>P</string>
+   </property>
+  </action>
+  <action name="editShowSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>S</string>
+   </property>
+  </action>
+  <action name="editShowRecursive">
+   <property name="text">
+    <string>Recursive</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+S</string>
+   </property>
+  </action>
+  <action name="editHideSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>H</string>
+   </property>
+  </action>
+  <action name="editHideRecursive">
+   <property name="text">
+    <string>Recursive</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+H</string>
+   </property>
+  </action>
+  <action name="displayIsolate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Isolate</string>
+   </property>
+   <property name="shortcut">
+    <string>I</string>
+   </property>
+  </action>
+  <action name="actionClear">
+   <property name="text">
+    <string>No recent files</string>
+   </property>
+  </action>
+  <action name="fileSave">
+   <property name="text">
+    <string>Save</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="fileSaveCopy">
+   <property name="text">
+    <string>Save copy ...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+S</string>
+   </property>
+  </action>
+  <action name="fileSaveAs">
+   <property name="text">
+    <string>Save as ...</string>
+   </property>
+  </action>
+  <action name="editLoadVariant1">
+   <property name="text">
+    <string>Variant 1</string>
+   </property>
+   <property name="shortcut">
+    <string>1</string>
+   </property>
+  </action>
+  <action name="editLoadVariant2">
+   <property name="text">
+    <string>Variant 2</string>
+   </property>
+   <property name="shortcut">
+    <string>2</string>
+   </property>
+  </action>
+  <action name="editLoadVariant3">
+   <property name="text">
+    <string>Variant 3</string>
+   </property>
+   <property name="shortcut">
+    <string>3</string>
+   </property>
+  </action>
+  <action name="editLoadVariant4">
+   <property name="text">
+    <string>Variant 4</string>
+   </property>
+   <property name="shortcut">
+    <string>4</string>
+   </property>
+  </action>
+  <action name="editLoadVariant5">
+   <property name="text">
+    <string>Variant 5</string>
+   </property>
+   <property name="shortcut">
+    <string>5</string>
+   </property>
+  </action>
+  <action name="editLoadVariant6">
+   <property name="text">
+    <string>Variant 6</string>
+   </property>
+   <property name="shortcut">
+    <string>6</string>
+   </property>
+  </action>
+  <action name="editLoadVariant7">
+   <property name="text">
+    <string>Variant 7</string>
+   </property>
+   <property name="shortcut">
+    <string>7</string>
+   </property>
+  </action>
+  <action name="editLoadVariant8">
+   <property name="text">
+    <string>Variant 8</string>
+   </property>
+   <property name="shortcut">
+    <string>8</string>
+   </property>
+  </action>
+  <action name="editLoadVariant9">
+   <property name="text">
+    <string>Variant 9</string>
+   </property>
+   <property name="shortcut">
+    <string>9</string>
+   </property>
+  </action>
+  <action name="editLoadSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>L</string>
+   </property>
+  </action>
+  <action name="editUnloadSelected">
+   <property name="text">
+    <string>Selected</string>
+   </property>
+   <property name="shortcut">
+    <string>U</string>
+   </property>
+  </action>
+  <action name="editUnloadRecursive">
+   <property name="text">
+    <string>Recursive</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+U</string>
+   </property>
+  </action>
+  <action name="editLoadRecursive">
+   <property name="text">
+    <string>Recursive</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+L</string>
+   </property>
+  </action>
+  <action name="editUndo">
+   <property name="text">
+    <string>Undo</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Z</string>
+   </property>
+  </action>
+  <action name="editRedo">
+   <property name="text">
+    <string>Redo</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+Z</string>
+   </property>
+  </action>
+  <action name="viewStatistics">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Statistics</string>
+   </property>
+  </action>
+  <action name="fileSaveSettings">
+   <property name="text">
+    <string>Save settings</string>
+   </property>
+  </action>
+  <action name="fileExit">
+   <property name="text">
+    <string>Exit</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>usd::DockWidget</class>
+   <extends>QDockWidget</extends>
+   <header>../../../sources/dockwidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>usd::OutlinerView</class>
+   <extends>QWidget</extends>
+   <header>../../../sources/outlinerview.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>usd::ProgressView</class>
+   <extends>QWidget</extends>
+   <header>../../../sources/progressview.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>usd::RenderView</class>
+   <extends>QWidget</extends>
+   <header>../../../sources/renderview.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="usdviewer.qrc"/>
+ </resources>
+ <connections/>
+</ui>

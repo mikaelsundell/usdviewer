@@ -1,11 +1,11 @@
-﻿// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
 #include "command.h"
 #include "commandstack.h"
-#include "usdqtutils.h"
-#include "usdstageutils.h"
+#include "qtutils.h"
+#include "stageutils.h"
 #include <QPointer>
 #include <QtConcurrent>
 #include <pxr/usd/usd/prim.h>

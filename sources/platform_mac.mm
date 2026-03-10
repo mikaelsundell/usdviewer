@@ -13,96 +13,10 @@
 
 namespace platform
 {
-    namespace {
-        QPointF toNativeCursor(int x, int y)
-        {
-            QScreen* screen = QGuiApplication::primaryScreen();
-            QPointF cursor = QPointF(x, y);
-            qreal reverse = screen->geometry().height() - cursor.y();
-            return QPointF(cursor.x(), reverse);
-        }
-    
-        NSWindow* toNativeWindow(WId winId)
-        {
-            NSView *view = (NSView*)winId;
-            return [view window];
-        }
-    
-        NSScreen* toNativeScreen(WId winId)
-        {
-            NSWindow *window = toNativeWindow(winId);
-            return [window screen];
-        }
-    
-        struct ColorSyncProfile {
-            uint32_t screenNumber;
-            CFStringRef displayProfileUrl;
-            ColorSyncProfile() : screenNumber(0), displayProfileUrl(nullptr) {}
-            ColorSyncProfile(const ColorSyncProfile& other)
-            : screenNumber(other.screenNumber) {
-                displayProfileUrl = other.displayProfileUrl ? static_cast<CFStringRef>(CFRetain(other.displayProfileUrl)) : nullptr;
-            }
-            ColorSyncProfile& operator=(const ColorSyncProfile& other) {
-                if (this != &other) {
-                    screenNumber = other.screenNumber;
-                    if (displayProfileUrl) CFRelease(displayProfileUrl);
-                    displayProfileUrl = other.displayProfileUrl ? static_cast<CFStringRef>(CFRetain(other.displayProfileUrl)) : nullptr;
-                }
-                return *this;
-            }
-            ~ColorSyncProfile() {
-                if (displayProfileUrl) CFRelease(displayProfileUrl);
-            }
-        };
-        QMap<uint32_t, ColorSyncProfile> colorsynccache;
-        ColorSyncProfile getColorSyncProfile(NSScreen* screen)
-        {
-            ColorSyncProfile colorSyncProfile;
-            NSDictionary* screenDescription = [screen deviceDescription];
-            NSNumber* screenID = [screenDescription objectForKey:@"NSScreenNumber"];
-            colorSyncProfile.screenNumber = [screenID unsignedIntValue];
-            ColorSyncProfileRef csProfileRef = ColorSyncProfileCreateWithDisplayID((CGDirectDisplayID)colorSyncProfile.screenNumber);
-            if (csProfileRef) {
-                CFURLRef iccURLRef = ColorSyncProfileGetURL(csProfileRef, NULL);
-                if (iccURLRef) {
-                    colorSyncProfile.displayProfileUrl = CFURLCopyFileSystemPath(iccURLRef, kCFURLPOSIXPathStyle);
-                }
-                CFRelease(csProfileRef);
-            }
-            return colorSyncProfile;
-        }
-    
-        ColorSyncProfile getDisplayProfile(NSScreen* screen) {
-            NSDictionary* screenDescription = [screen deviceDescription];
-            CGDirectDisplayID displayId = [[screenDescription objectForKey:@"NSScreenNumber"] unsignedIntValue];
-            if (colorsynccache.contains(displayId)) {
-                return colorsynccache.value(displayId);
-            }
-            ColorSyncProfile colorSyncProfile = getColorSyncProfile(screen);
-            colorsynccache.insert(displayId, colorSyncProfile);
-            return colorSyncProfile;
-        }
-    }
-
     void setDarkTheme()
     {
         // we force dark aque no matter appearance set in system settings
         [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
-    }
-
-    IccProfile getIccProfile(WId wid)
-    {
-        NSScreen* screen = toNativeScreen(wid);
-        ColorSyncProfile colorsyncProfile = getDisplayProfile(screen);
-        return IccProfile {
-            int(colorsyncProfile.screenNumber),
-            QString::fromCFString(colorsyncProfile.displayProfileUrl)
-        };
-    }
-
-    QString getIccProfileUrl(WId wid)
-    {
-        return getIccProfile(wid).displayProfileUrl;
     }
 
     QString getApplicationPath()

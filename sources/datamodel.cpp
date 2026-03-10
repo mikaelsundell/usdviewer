@@ -3,8 +3,8 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "datamodel.h"
-#include "usdqtutils.h"
-#include "usdstageutils.h"
+#include "qtutils.h"
+#include "stageutils.h"
 #include <QMap>
 #include <QThreadPool>
 #include <QVariant>

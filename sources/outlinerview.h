@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2025 - present Mikael Sundell
+// https://github.com/mikaelsundell/usdviewer
+
+#pragma once
+
+#include "datamodel.h"
+#include "selectionmodel.h"
+#include <QTreeWidget>
+#include <pxr/usd/usd/stage.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace usd {
+
+class OutlinerViewPrivate;
+
+/**
+ * @class OutlinerView
+ * @brief Widget providing a hierarchical view of USD prims.
+ *
+ * Displays the prim hierarchy of the current USD stage and allows
+ * users to navigate and inspect the scene structure. The view is
+ * connected to a DataModel for stage data and a SelectionModel
+ * to synchronize prim selections with other viewer components.
+ */
+class OutlinerView : public QWidget {
+    Q_OBJECT
+public:
+    /**
+     * @brief Constructs the outliner view widget.
+     *
+     * @param parent Optional parent widget.
+     */
+    OutlinerView(QWidget* parent = nullptr);
+
+    /**
+     * @brief Destroys the OutlinerView instance.
+     */
+    virtual ~OutlinerView();
+
+    /** @name Data Models */
+    ///@{
+
+    /**
+     * @brief Returns the associated data model.
+     */
+    DataModel* dataModel() const;
+
+    /**
+     * @brief Sets the data model used by the view.
+     *
+     * @param dataModel Scene data model.
+     */
+    void setDataModel(DataModel* dataModel);
+
+    /**
+     * @brief Returns the associated selection model.
+     */
+    SelectionModel* selectionModel();
+
+    /**
+     * @brief Sets the selection model used by the view.
+     *
+     * @param selectionModel Selection model.
+     */
+    void setSelectionModel(SelectionModel* selectionModel);
+
+    ///@}
+
+public Q_SLOTS:
+
+    /** @name Tree Control */
+    ///@{
+
+    /**
+     * @brief Collapses all nodes in the outliner.
+     */
+    void collapse();
+
+    /**
+     * @brief Expands all nodes in the outliner.
+     */
+    void expand();
+
+    ///@}
+
+private:
+    QScopedPointer<OutlinerViewPrivate> p;
+};
+
+}  // namespace usd

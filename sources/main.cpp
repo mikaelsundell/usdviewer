@@ -3,9 +3,9 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "platform.h"
+#include "qtutils.h"
 #include "test.h"
-#include "usdqtutils.h"
-#include "usdviewer.h"
+#include "viewer.h"
 #include <QApplication>
 #include <QDir>
 #include <pxr/base/plug/plugin.h>

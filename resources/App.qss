@@ -124,12 +124,10 @@ QMenu::item {
 
 QMenu::item:disabled {
     color: $textdisabled;
-    background-color: transparent;
 }
 
 QMenu::item:selected {
     background-color: $highlight;
-    color: $text;
 }
 
 QMenu::separator {
@@ -147,20 +145,12 @@ QMenu::indicator:checked {
     image: url(":/icons/resources/Checked.png");
 }
 
-QMenu::indicator:unchecked {
-    image: none;
-}
-
 QMenu::right-arrow {
     image: url(":/icons/resources/Left.png");
-    width: 10px;
-    height: 10px;
 }
 
 QMenu::left-arrow {
     image: url(":/icons/resources/Right.png");
-    width: 10px;
-    height: 10px;
 }
 
 QProgressBar {
@@ -214,82 +204,6 @@ QPushButton:pressed
     );
 }
 
-QScrollBar:horizontal {
-    background: $base;
-    height: 16px;
-    margin: 0;
-    border: none;
-}
-
-QScrollBar::handle:horizontal {
-    background: $scrollbar;
-    min-width: 40px;
-    border-radius: 4px;
-    margin: 4px 4px;
-}
-
-QScrollBar::handle:horizontal:hover {
-    background: $scrollbar;
-}
-
-QScrollBar::add-line:horizontal,
-QScrollBar::sub-line:horizontal {
-    background: none;
-    width: 0;
-}
-
-QScrollBar::left-arrow:horizontal,
-QScrollBar::right-arrow:horizontal {
-    background: none;
-    width: 0;
-    height: 0;
-}
-
-QScrollBar::add-page:horizontal,
-QScrollBar::sub-page:horizontal {
-    background: none;
-}
-
-QScrollBar:vertical {
-    background: $base;
-    width: 16px;
-    margin: 0;
-    border: none;
-}
-
-QScrollBar::handle:vertical {
-    background: $scrollbar;
-    min-width: 20px;
-    border-radius: 4px;
-    margin: 4px 4px;
-}
-
-QScrollBar::handle:vertical:hover {
-    background:$scrollbar;;
-}
-
-QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {
-    background: none;
-    height: 0;
-}
-
-QScrollBar::up-arrow:vertical,
-QScrollBar::down-arrow:vertical {
-    background: none;
-    width: 0;
-    height: 0;
-}
-
-QScrollBar::add-page:vertical,
-QScrollBar::sub-page:vertical {
-    background: none;
-}
-
-QAbstractScrollArea::corner { 
-    background: $base;
-}
-
 QSplitter::handle {
     background-color: $dock;
     height: 5px;
@@ -310,24 +224,6 @@ QTextBrowser
     alternate-background-color: $base;
 }
 
-QToolButton
-{
-    color: $text;
-    font-size: $defaultsize;
-    background-color: 
-    QLinearGradient( 
-        x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $button,
-        stop: 1.0 $buttonalt
-    );
-    height: 20px;     
-    border: 1px solid $borderalt;
-    border-radius: 0px;        
-    padding: 2px;
-    padding-left: 5px;
-    padding-right: 5px;
-}
-
 QTreeView
 {
     font-size: $defaultsize;
@@ -346,33 +242,6 @@ QTreeView QHeaderView:section
     background-color: $dockalt;
     border: none;
     padding: 4px 6px;
-}
-
-QTreeView::indicator {
-    width: 12px;
-    height: 12px;
-    background-color: $basealt;
-    border: 1px solid $border;
-}
-
-QTreeView::indicator:checked {
-    image: url(":/icons/resources/Checked.png");
-}
-
-QTreeView::indicator:indeterminate {
-    image: url(":/icons/resources/PartiallyChecked.png");
-}
-
-QTreeView::branch:has-children:!has-siblings:closed,
-QTreeView::branch:has-children:has-siblings:closed {
-    image: url(":/icons/resources/Closed.png");
-    background: transparent;    
-}
-
-QTreeView::branch:has-children:!has-siblings:open,
-QTreeView::branch:has-children:has-siblings:open {
-    image: url(":/icons/resources/Open.png");
-    background: transparent;    
 }
 
 QTreeView::item {

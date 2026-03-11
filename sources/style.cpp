@@ -15,8 +15,6 @@
 
 namespace usd {
 
-QScopedPointer<Style, Style::Deleter> Style::pi;
-
 class StylePrivate {
 public:
     StylePrivate();
@@ -206,17 +204,6 @@ Style::Style()
 }
 
 Style::~Style() = default;
-
-Style*
-Style::instance()
-{
-    static QMutex mutex;
-    QMutexLocker locker(&mutex);
-    if (!pi) {
-        pi.reset(new Style());
-    }
-    return pi.data();
-}
 
 void
 Style::setTheme(Style::Theme theme)

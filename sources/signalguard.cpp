@@ -3,19 +3,21 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "signalguard.h"
+#include <QVector>
 
 namespace usd {
+
 class SignalGuardPrivate : public QObject {
 public:
-    SignalGuardPrivate();
+    SignalGuardPrivate() = default;
+
     struct Data {
-        QObject* object = nullptr;
+        QVector<QObject*> objects;
         bool guarding = false;
     };
+
     Data d;
 };
-
-SignalGuardPrivate::SignalGuardPrivate() {}
 
 SignalGuard::SignalGuard()
     : p(new SignalGuardPrivate)
@@ -26,7 +28,11 @@ SignalGuard::~SignalGuard() = default;
 void
 SignalGuard::attach(QObject* object)
 {
-    p->d.object = object;
+    if (!object)
+        return;
+
+    if (!p->d.objects.contains(object))
+        p->d.objects.append(object);
 }
 
 void
@@ -34,9 +40,13 @@ SignalGuard::beginGuard()
 {
     if (p->d.guarding)
         return;
+
     p->d.guarding = true;
-    if (p->d.object)
-        p->d.object->blockSignals(true);
+
+    for (QObject* object : std::as_const(p->d.objects)) {
+        if (object)
+            object->blockSignals(true);
+    }
 }
 
 void
@@ -44,8 +54,12 @@ SignalGuard::endGuard()
 {
     if (!p->d.guarding)
         return;
-    if (p->d.object)
-        p->d.object->blockSignals(false);
+
+    for (QObject* object : std::as_const(p->d.objects)) {
+        if (object)
+            object->blockSignals(false);
+    }
+
     p->d.guarding = false;
 }
 
@@ -54,4 +68,18 @@ SignalGuard::isGuarding() const
 {
     return p->d.guarding;
 }
+
+SignalGuard::Scope::Scope(SignalGuard* guard)
+    : m_guard(guard)
+{
+    if (m_guard)
+        m_guard->beginGuard();
+}
+
+SignalGuard::Scope::~Scope()
+{
+    if (m_guard)
+        m_guard->endGuard();
+}
+
 }  // namespace usd

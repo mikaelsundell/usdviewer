@@ -4,34 +4,41 @@
 
 #include "outlinerview.h"
 #include "propertytree.h"
+#include "signalguard.h"
 #include "stagetree.h"
 #include <QPointer>
 #include <QTimer>
+#include <pxr/usd/usd/prim.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 // generated files
 #include "ui_outlinerview.h"
 
 namespace usd {
-class OutlinerViewPrivate : public QObject {
+class OutlinerViewPrivate : public QObject, public SignalGuard {
 public:
     OutlinerViewPrivate();
     void init();
     void initDataModel();
     void initSelection();
+    void initDepth();
     PropertyTree* propertyTree();
     StageTree* stageTree();
-    void updateFilter();
     bool eventFilter(QObject* obj, QEvent* event);
-
 public Q_SLOTS:
+    void clearFilter();
+    void clearDepth();
     void collapse();
     void expand();
     void filterChanged(const QString& filter);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void depthChanged(int value);
 
 public:
+    void updateDepth(const SdfPath& path = SdfPath());
     struct Data {
         QScopedPointer<Ui_OutlinerView> ui;
         QPointer<DataModel> dataModel;
@@ -48,17 +55,21 @@ OutlinerViewPrivate::init()
 {
     d.ui.reset(new Ui_OutlinerView());
     d.ui->setupUi(d.view.data());
+    attach(d.ui->depth);
     stageTree()->setHeaderLabels(QStringList() << "Name"
                                                << "Type"
                                                << "Vis");
     propertyTree()->setHeaderLabels(QStringList() << "Name"
                                                   << "Value");
-    d.ui->filter->setFocusPolicy(Qt::NoFocus);
     // event filter
     stageTree()->installEventFilter(this);
     propertyTree()->installEventFilter(this);
     // connect
     connect(d.ui->filter, &QLineEdit::textChanged, this, &OutlinerViewPrivate::filterChanged);
+    connect(d.ui->clear, &QToolButton::clicked, this, &OutlinerViewPrivate::clearFilter);
+    connect(d.ui->collapse, &QToolButton::clicked, this, &OutlinerViewPrivate::collapse);
+    connect(d.ui->expand, &QToolButton::clicked, this, &OutlinerViewPrivate::expand);
+    connect(d.ui->depth, &QSlider::valueChanged, this, &OutlinerViewPrivate::depthChanged);
 }
 
 void
@@ -73,6 +84,10 @@ OutlinerViewPrivate::initSelection()
 {
     connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
 }
+
+void
+OutlinerViewPrivate::initDepth()
+{}
 
 PropertyTree*
 OutlinerViewPrivate::propertyTree()
@@ -106,6 +121,21 @@ OutlinerViewPrivate::eventFilter(QObject* obj, QEvent* event)
 }
 
 void
+OutlinerViewPrivate::clearFilter()
+{
+    d.ui->filter->setText(QString());
+}
+
+void
+OutlinerViewPrivate::clearDepth()
+{
+    d.ui->depth->setMinimum(0);
+    d.ui->depth->setMaximum(10);
+    d.ui->depth->setValue(0);
+    d.ui->depth->setEnabled(false);
+}
+
+void
 OutlinerViewPrivate::collapse()
 {
     if (d.selectionModel->paths().size()) {
@@ -123,8 +153,13 @@ void
 OutlinerViewPrivate::filterChanged(const QString& filter)
 {
     stageTree()->setFilter(filter);
+    if (filter.size()) {
+        d.ui->clear->setEnabled(true);
+    }
+    else {
+        d.ui->clear->setEnabled(false);
+    }
 }
-
 
 void
 OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths)
@@ -136,8 +171,17 @@ OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths)
 void
 OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
+    SignalGuard::Scope guard(this);
     propertyTree()->updateSelection(paths);
     stageTree()->updateSelection(paths);
+    if (paths.size() == 1) {
+        updateDepth(paths.first());
+    }
+    else {
+        updateDepth();
+    }
+    d.ui->collapse->setEnabled(true);
+    d.ui->expand->setEnabled(true);
 }
 
 void
@@ -152,11 +196,41 @@ OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy p
         }
         stageTree()->updateStage(stage);
         propertyTree()->updateStage(stage);
+        d.ui->filter->setEnabled(true);
+        d.ui->depth->setEnabled(true);
+        updateDepth();
     }
     else {
         propertyTree()->close();
         stageTree()->close();
+        d.ui->clear->setEnabled(false);
+        d.ui->filter->setEnabled(false);
+        d.ui->depth->setEnabled(false);
+        clearFilter();
+        clearDepth();
     }
+}
+
+void
+OutlinerViewPrivate::depthChanged(int value)
+{
+    QList<SdfPath> paths = d.selectionModel->paths();
+    if (paths.size() == 1) {
+        stageTree()->expandDepth(value, paths.first());
+    }
+    else {
+        stageTree()->expandDepth(value);
+    }
+}
+
+void
+OutlinerViewPrivate::updateDepth(const SdfPath& path)
+{
+    SignalGuard::Scope guard(this);
+    d.ui->depth->setEnabled(true);
+    d.ui->depth->setMinimum(0);
+    d.ui->depth->setMaximum(stageTree()->maxDepth(path));
+    d.ui->depth->setValue(stageTree()->depth(path));
 }
 
 OutlinerView::OutlinerView(QWidget* parent)

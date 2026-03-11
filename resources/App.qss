@@ -85,6 +85,10 @@ QDockWidget {
     background: $dock;
 }
 
+QFrame {
+    border: 1px solid $border;
+}
+
 QWidget[DockWidget="true"] {
     background-color: $dock;
 }
@@ -93,6 +97,7 @@ QLabel
 {
     font-size: $defaultsize;
     color: $text;
+    border: 0px;
 }
 
 QLineEdit
@@ -204,6 +209,82 @@ QPushButton:pressed
     );
 }
 
+QScrollBar:horizontal {
+    background: $base;
+    height: 16px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background: $scrollbar;
+    min-width: 40px;
+    border-radius: 4px;
+    margin: 4px 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: $scrollbar;
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: none;
+    width: 0;
+}
+
+QScrollBar::left-arrow:horizontal,
+QScrollBar::right-arrow:horizontal {
+    background: none;
+    width: 0;
+    height: 0;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
+QScrollBar:vertical {
+    background: $base;
+    width: 16px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background: $scrollbar;
+    min-width: 20px;
+    border-radius: 4px;
+    margin: 4px 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background:$scrollbar;;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: none;
+    height: 0;
+}
+
+QScrollBar::up-arrow:vertical,
+QScrollBar::down-arrow:vertical {
+    background: none;
+    width: 0;
+    height: 0;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QAbstractScrollArea::corner { 
+    background: $base;
+}
+
 QSplitter::handle {
     background-color: $dock;
     height: 5px;
@@ -222,6 +303,27 @@ QTextBrowser
     background-color: $base;
     selection-background-color: $highlight;
     alternate-background-color: $base;
+}
+
+QSlider {
+    background: transparent;
+}
+
+QSlider::tick:horizontal {
+    background: green;
+    width: 1px;
+    height: 6px;
+}
+
+QSlider::tick:vertical {
+    background: blue;
+    width: 6px;
+    height: 1px;
+}
+
+QSplitter
+{
+    border: 0px;
 }
 
 QTreeView

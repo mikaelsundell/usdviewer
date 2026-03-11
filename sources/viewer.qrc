@@ -11,10 +11,14 @@
     <file>../resources/CollapseDisabled.png</file>
     <file>../resources/Expand.png</file>
     <file>../resources/ExpandDisabled.png</file>
+    <file>../resources/Export.png</file>
+    <file>../resources/FrameAll.png</file>
+    <file>../resources/Image.png</file>
     <file>../resources/Left.png</file>
-    <file>../resources/Open.png</file>
     <file>../resources/Open.png</file>
     <file>../resources/PartiallyChecked.png</file>
     <file>../resources/Right.png</file>
+    <file>../resources/Shaded.png</file>
+    <file>../resources/Wireframe.png</file>
   </qresource>
 </RCC>

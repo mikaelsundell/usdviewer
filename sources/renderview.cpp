@@ -222,7 +222,7 @@ RenderView::defaultCameraLightEnabled() const
 void
 RenderView::setDefaultCameraLightEnabled(bool enabled)
 {
-    p->imageGLWidget()->setDefaultCameraLightEnabled(enabled);
+    p->imageGLWidget()->enableDefaultCameraLight(enabled);
 }
 
 bool
@@ -234,19 +234,19 @@ RenderView::sceneLightsEnabled() const
 void
 RenderView::setSceneLightsEnabled(bool enabled)
 {
-    p->imageGLWidget()->setSceneLightsEnabled(enabled);
+    p->imageGLWidget()->enableSceneLights(enabled);
 }
 
 bool
 RenderView::sceneMaterialsEnabled() const
 {
-    return p->imageGLWidget()->sceneMaterialsEnabled();
+    return p->imageGLWidget()->sceneShadersEnabled();
 }
 
 void
 RenderView::setSceneMaterialsEnabled(bool enabled)
 {
-    p->imageGLWidget()->setSceneMaterialsEnabled(enabled);
+    p->imageGLWidget()->enableSceneShaders(enabled);
 }
 
 bool
@@ -258,7 +258,7 @@ RenderView::statisticsEnabled() const
 void
 RenderView::setStatisticsEnabled(bool enabled)
 {
-    p->imageGLWidget()->setStatisticsEnabled(enabled);
+    p->imageGLWidget()->enableStatistics(enabled);
 }
 
 DataModel*

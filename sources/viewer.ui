@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1576</width>
-    <height>800</height>
+    <height>799</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -58,7 +58,7 @@
         <number>0</number>
        </property>
        <property name="bottomMargin">
-        <number>0</number>
+        <number>2</number>
        </property>
        <item>
         <widget class="QWidget" name="widget_3" native="true">
@@ -91,38 +91,53 @@
            <number>4</number>
           </property>
           <item>
-           <widget class="QPushButton" name="open">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
+           <widget class="QToolButton" name="open">
             <property name="text">
-             <string>Open</string>
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset resource="viewer.qrc">
+              <normaloff>:/icons/resources/Open.png</normaloff>:/icons/resources/Open.png</iconset>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="exportSelected">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
+           <widget class="QToolButton" name="exportSelected">
             <property name="text">
-             <string>Export selected ...</string>
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset resource="viewer.qrc">
+              <normaloff>:/icons/resources/Export.png</normaloff>:/icons/resources/Export.png</iconset>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="exportImage">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
+           <widget class="QToolButton" name="exportImage">
             <property name="text">
-             <string>Export image ...</string>
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset resource="viewer.qrc">
+              <normaloff>:/icons/resources/Image.png</normaloff>:/icons/resources/Image.png</iconset>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
             </property>
            </widget>
           </item>
@@ -140,260 +155,121 @@
            </spacer>
           </item>
           <item>
-           <widget class="QPushButton" name="frameSelected">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
+           <widget class="QToolButton" name="frameAll">
             <property name="text">
-             <string>Frame selected</string>
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset resource="viewer.qrc">
+              <normaloff>:/icons/resources/FrameAll.png</normaloff>:/icons/resources/FrameAll.png</iconset>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="frameAll">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
+           <widget class="QToolButton" name="shaded">
             <property name="text">
-             <string>Frame all</string>
+             <string>...</string>
             </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="resetView">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
+            <property name="icon">
+             <iconset resource="viewer.qrc">
+              <normaloff>:/icons/resources/Shaded.png</normaloff>:/icons/resources/Shaded.png</iconset>
             </property>
-            <property name="text">
-             <string>Reset view</string>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
             </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QFrame" name="frame">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="styleSheet">
-          <string notr="true"/>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::Shape::NoFrame</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Raised</enum>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_3">
-          <property name="spacing">
-           <number>0</number>
-          </property>
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-          <item>
-           <widget class="usd::RenderView" name="renderView" native="true">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QWidget" name="widget_2" native="true">
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>50</height>
-          </size>
-         </property>
-         <property name="styleSheet">
-          <string notr="true"/>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout">
-          <property name="leftMargin">
-           <number>8</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-          <item>
-           <widget class="QWidget" name="widget" native="true">
-            <layout class="QVBoxLayout" name="verticalLayout_5">
-             <property name="leftMargin">
-              <number>0</number>
-             </property>
-             <property name="rightMargin">
-              <number>8</number>
-             </property>
-             <item>
-              <widget class="QCheckBox" name="enableDefaultCameraLight">
-               <property name="font">
-                <font>
-                 <pointsize>11</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>Camera light </string>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="enableSceneLights">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Scene lights </string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="enableSceneMaterials">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Scene materials </string>
+            <property name="checkable">
+             <bool>true</bool>
             </property>
             <property name="checked">
              <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer_2">
-            <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QLabel" name="label_3">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Draw</string>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QToolButton" name="wireframe">
             <property name="text">
-             <string>Wireframe</string>
+             <string>...</string>
             </property>
-            <property name="shortcut">
-             <string>W</string>
+            <property name="icon">
+             <iconset resource="viewer.qrc">
+              <normaloff>:/icons/resources/Wireframe.png</normaloff>:/icons/resources/Wireframe.png</iconset>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
             </property>
             <property name="checkable">
              <bool>true</bool>
             </property>
-            <property name="checked">
-             <bool>false</bool>
-            </property>
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_2">
-            <property name="font">
-             <font>
-              <pointsize>11</pointsize>
-             </font>
+           <widget class="QFrame" name="backgroundColor">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
             </property>
-            <property name="text">
-             <string>Background</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QWidget" name="widget_4" native="true">
             <property name="minimumSize">
              <size>
-              <width>32</width>
-              <height>32</height>
+              <width>24</width>
+              <height>24</height>
              </size>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout_6">
-             <property name="topMargin">
-              <number>14</number>
-             </property>
-             <property name="bottomMargin">
-              <number>14</number>
-             </property>
-             <item>
-              <widget class="QFrame" name="backgroundColor">
-               <property name="minimumSize">
-                <size>
-                 <width>32</width>
-                 <height>0</height>
-                </size>
-               </property>
-               <property name="styleSheet">
-                <string notr="true"/>
-               </property>
-               <property name="frameShape">
-                <enum>QFrame::Shape::StyledPanel</enum>
-               </property>
-               <property name="frameShadow">
-                <enum>QFrame::Shadow::Raised</enum>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <property name="styleSheet">
+             <string notr="true"/>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::Shape::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Shadow::Raised</enum>
+            </property>
            </widget>
           </item>
          </layout>
         </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="usd::RenderView" name="renderView" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
@@ -465,7 +341,20 @@
     <property name="title">
      <string>Display</string>
     </property>
+    <widget class="QMenu" name="displayRender">
+     <property name="title">
+      <string>Render</string>
+     </property>
+     <addaction name="renderShaded"/>
+     <addaction name="renderWireframe"/>
+    </widget>
     <addaction name="displayIsolate"/>
+    <addaction name="separator"/>
+    <addaction name="displayRender"/>
+    <addaction name="separator"/>
+    <addaction name="displayCameraLight"/>
+    <addaction name="displaySceneLights"/>
+    <addaction name="displaySceneShaders"/>
     <addaction name="separator"/>
     <addaction name="displayFrameAll"/>
     <addaction name="displayFrameSelected"/>
@@ -592,6 +481,9 @@
     <addaction name="separator"/>
     <addaction name="viewOutliner"/>
     <addaction name="viewProgress"/>
+    <addaction name="viewScriptEditor"/>
+    <addaction name="viewConsole"/>
+    <addaction name="separator"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -651,7 +543,7 @@
     <string>Reset view</string>
    </property>
    <property name="shortcut">
-    <string>R</string>
+    <string>V</string>
    </property>
   </action>
   <action name="displayFrameSelected">
@@ -802,6 +694,9 @@
    <property name="text">
     <string>Reload</string>
    </property>
+   <property name="shortcut">
+    <string>R</string>
+   </property>
   </action>
   <action name="viewOutliner">
    <property name="checkable">
@@ -860,7 +755,7 @@
     <string>Selected</string>
    </property>
    <property name="shortcut">
-    <string>S</string>
+    <string>Alt+S</string>
    </property>
   </action>
   <action name="editShowRecursive">
@@ -884,7 +779,7 @@
     <string>Recursive</string>
    </property>
    <property name="shortcut">
-    <string>Shift+H</string>
+    <string>Alt+Shift+S</string>
    </property>
   </action>
   <action name="displayIsolate">
@@ -1004,7 +899,7 @@
     <string>Selected</string>
    </property>
    <property name="shortcut">
-    <string>L</string>
+    <string>Alt+L</string>
    </property>
   </action>
   <action name="editUnloadSelected">
@@ -1012,7 +907,7 @@
     <string>Selected</string>
    </property>
    <property name="shortcut">
-    <string>U</string>
+    <string>Alt+U</string>
    </property>
   </action>
   <action name="editUnloadRecursive">
@@ -1020,7 +915,7 @@
     <string>Recursive</string>
    </property>
    <property name="shortcut">
-    <string>Shift+U</string>
+    <string>Alt+Shift+U</string>
    </property>
   </action>
   <action name="editLoadRecursive">
@@ -1028,7 +923,7 @@
     <string>Recursive</string>
    </property>
    <property name="shortcut">
-    <string>Shift+L</string>
+    <string>Alt+Shift+L</string>
    </property>
   </action>
   <action name="editUndo">
@@ -1054,6 +949,9 @@
    <property name="text">
     <string>Statistics</string>
    </property>
+   <property name="shortcut">
+    <string>Space</string>
+   </property>
   </action>
   <action name="fileSaveSettings">
    <property name="text">
@@ -1063,6 +961,79 @@
   <action name="fileExit">
    <property name="text">
     <string>Exit</string>
+   </property>
+  </action>
+  <action name="viewScriptEditor">
+   <property name="text">
+    <string>Script editor</string>
+   </property>
+  </action>
+  <action name="viewConsole">
+   <property name="text">
+    <string>Console</string>
+   </property>
+  </action>
+  <action name="displayCameraLight">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Default light</string>
+   </property>
+  </action>
+  <action name="displaySceneLights">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Scene lights</string>
+   </property>
+  </action>
+  <action name="renderShaded">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="viewer.qrc">
+     <normaloff>:/icons/resources/Shaded.png</normaloff>:/icons/resources/Shaded.png</iconset>
+   </property>
+   <property name="text">
+    <string>Shaded</string>
+   </property>
+   <property name="shortcut">
+    <string>S</string>
+   </property>
+  </action>
+  <action name="renderWireframe">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="viewer.qrc">
+     <normaloff>:/icons/resources/Wireframe.png</normaloff>:/icons/resources/Wireframe.png</iconset>
+   </property>
+   <property name="text">
+    <string>Wireframe</string>
+   </property>
+   <property name="shortcut">
+    <string>W</string>
+   </property>
+  </action>
+  <action name="displaySceneShaders">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Scene shaders</string>
    </property>
   </action>
  </widget>
@@ -1092,7 +1063,7 @@
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="usdviewer.qrc"/>
+  <include location="viewer.qrc"/>
  </resources>
  <connections/>
 </ui>

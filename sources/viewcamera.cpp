@@ -256,19 +256,10 @@ void
 ViewCamera::setFocusPoint(const GfVec3d& point)
 {
     GfCamera cam = p->camera();
-    GfMatrix4d oldXf = cam.GetTransform();
-    GfVec3d oldPos = oldXf.ExtractTranslation();
-
-    GfVec3d viewDir = -oldXf.GetRow3(2);
-    viewDir.Normalize();
-
-    double dist = p->d.distance;
-    GfVec3d newPos = point - viewDir * dist;
-    GfMatrix4d xf = oldXf;
-    xf.SetTranslate(newPos);
-    cam.SetTransform(xf);
-    p->d.camera = cam;
+    GfVec3d camPos = cam.GetTransform().ExtractTranslation();
     p->d.focusPoint = point;
+    p->d.center = point;
+    p->d.distance = (camPos - point).GetLength();
     p->d.valid = false;
 }
 

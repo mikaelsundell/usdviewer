@@ -2,7 +2,7 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "platform.h"
+#include "os.h"
 
 #import <Foundation/Foundation.h>
 #import <Cocoa/Cocoa.h>
@@ -11,7 +11,7 @@
 #include <QApplication>
 #include <QScreen>
 
-namespace platform
+namespace os
 {
     void setDarkTheme()
     {

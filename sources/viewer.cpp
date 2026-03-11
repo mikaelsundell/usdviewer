@@ -3,16 +3,18 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "viewer.h"
+#include "application.h"
 #include "commanddispatcher.h"
 #include "commandstack.h"
 #include "datamodel.h"
 #include "mouseevent.h"
+#include "os.h"
 #include "outlinerview.h"
-#include "platform.h"
 #include "progressview.h"
 #include "qtutils.h"
 #include "renderview.h"
 #include "selectionmodel.h"
+#include "settings.h"
 #include "style.h"
 #include <QActionGroup>
 #include <QClipboard>
@@ -40,13 +42,13 @@ public:
     void initRecentFiles();
     void initSettings();
     bool loadFile(const QString& filename);
+    DockWidget* outlinerDock();
+    DockWidget* progressDock();
     OutlinerView* outlinerView();
     ProgressView* progressView();
     RenderView* renderView();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
-    QVariant settingsValue(const QString& key, const QVariant& defaultValue = QVariant());
-    void setSettingsValue(const QString& key, const QVariant& value);
 
 public Q_SLOTS:
     void open();
@@ -77,10 +79,11 @@ public Q_SLOTS:
     void resetView();
     void collapse();
     void expand();
-    void defaultCameraLightEnabled(bool checked);
-    void sceneLightsEnabled(bool checked);
-    void sceneMaterialsEnabled(bool checked);
-    void wireframeChanged(bool checked);
+    void cameraLight(bool checked);
+    void sceneLights(bool checked);
+    void sceneShaders(bool checked);
+    void renderShaded();
+    void renderWireframe();
     void light();
     void dark();
     void toggleOutliner(bool checked);
@@ -126,13 +129,11 @@ ViewerPrivate::ViewerPrivate()
 void
 ViewerPrivate::init()
 {
-    platform::setDarkTheme();
+    os::setDarkTheme();
     d.ui.reset(new Ui_Viewer());
     d.ui->setupUi(d.viewer.data());
-    // style
-    Style::instance();
     // background color
-    d.backgroundColor = QColor(settingsValue("backgroundColor", "#4f4f4f").toString());
+    d.backgroundColor = QColor(settings()->value("backgroundColor", "#4f4f4f").toString());
     d.ui->backgroundColor->setStyleSheet("background-color: " + d.backgroundColor.name() + ";");
     d.backgroundColorFilter.reset(new MouseEvent);
     d.ui->backgroundColor->installEventFilter(d.backgroundColorFilter.data());
@@ -162,11 +163,11 @@ ViewerPrivate::init()
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
         d.loadPolicy = DataModel::load_all;
-        setSettingsValue("loadType", "all");
+        settings()->setValue("loadType", "all");
     });
     connect(d.ui->policyPayload, &QAction::triggered, this, [this]() {
         d.loadPolicy = DataModel::load_payload;
-        setSettingsValue("loadType", "payload");
+        settings()->setValue("loadType", "payload");
     });
     {
         QActionGroup* actions = new QActionGroup(this);
@@ -204,17 +205,20 @@ ViewerPrivate::init()
     connect(d.ui->editLoadVariant9, &QAction::triggered, this, [=]() { loadVariant(9); });
     connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
     connect(d.ui->editUnloadRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
+    connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
+    connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
+    connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
+    connect(d.ui->displaySceneShaders, &QAction::toggled, this, &ViewerPrivate::sceneShaders);
+    connect(d.ui->renderShaded, &QAction::triggered, this, &ViewerPrivate::renderShaded);
+    connect(d.ui->renderWireframe, &QAction::triggered, this, &ViewerPrivate::renderWireframe);
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         {
-            actions->addAction(d.ui->asComplexityLow);
-            actions->addAction(d.ui->asComplexityMedium);
-            actions->addAction(d.ui->asComplexityHigh);
-            actions->addAction(d.ui->asComplexityVeryHigh);
+            actions->addAction(d.ui->renderShaded);
+            actions->addAction(d.ui->renderWireframe);
         }
     }
-    connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
     connect(d.ui->displayFrameSelected, &QAction::triggered, this, &ViewerPrivate::frameSelected);
     connect(d.ui->displayResetView, &QAction::triggered, this, &ViewerPrivate::resetView);
@@ -222,16 +226,14 @@ ViewerPrivate::init()
     connect(d.ui->displayExpand, &QAction::triggered, this, &ViewerPrivate::expand);
     connect(d.ui->helpGithubReadme, &QAction::triggered, this, &ViewerPrivate::openGithubReadme);
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
-    connect(d.ui->open, &QPushButton::clicked, this, &ViewerPrivate::open);
-    connect(d.ui->exportSelected, &QPushButton::clicked, this, &ViewerPrivate::exportSelected);
-    connect(d.ui->exportImage, &QPushButton::clicked, this, &ViewerPrivate::exportImage);
-    connect(d.ui->frameAll, &QPushButton::clicked, this, &ViewerPrivate::frameAll);
-    connect(d.ui->frameSelected, &QPushButton::clicked, this, &ViewerPrivate::frameSelected);
-    connect(d.ui->resetView, &QPushButton::clicked, this, &ViewerPrivate::resetView);
-    connect(d.ui->enableDefaultCameraLight, &QCheckBox::toggled, this, &ViewerPrivate::defaultCameraLightEnabled);
-    connect(d.ui->enableSceneLights, &QCheckBox::toggled, this, &ViewerPrivate::sceneLightsEnabled);
-    connect(d.ui->enableSceneMaterials, &QCheckBox::toggled, this, &ViewerPrivate::sceneMaterialsEnabled);
-    connect(d.ui->wireframe, &QToolButton::toggled, this, &ViewerPrivate::wireframeChanged);
+    connect(d.ui->open, &QToolButton::clicked, this, &ViewerPrivate::open);
+    connect(d.ui->exportImage, &QToolButton::clicked, this, &ViewerPrivate::exportImage);
+    connect(d.ui->exportSelected, &QToolButton::clicked, this, &ViewerPrivate::exportSelected);
+    connect(d.ui->frameAll, &QToolButton::clicked, this, &ViewerPrivate::frameAll);
+    {
+        d.ui->wireframe->setDefaultAction(d.ui->renderShaded);
+        d.ui->shaded->setDefaultAction(d.ui->renderWireframe);
+    }
     connect(d.backgroundColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::backgroundColor);
     connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
     connect(d.ui->themeDark, &QAction::triggered, this, &ViewerPrivate::dark);
@@ -262,7 +264,9 @@ ViewerPrivate::init()
             [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this, &ViewerPrivate::toggleOutliner);
     connect(d.ui->viewProgress, &QAction::toggled, this, &ViewerPrivate::toggleProgress);
-    // settings
+    // setup
+    progressDock()->hide();
+    renderView()->setFocus();
     initSettings();
     enable(false);
 }
@@ -294,7 +298,7 @@ ViewerPrivate::initRecentFiles()
     QAction* clearAction = new QAction("Clear", recentMenu);
     connect(clearAction, &QAction::triggered, this, [this, recentMenu]() {
         d.recentFiles.clear();
-        setSettingsValue("recentFiles", QStringList());
+        settings()->setValue("recentFiles", QStringList());
         initRecentFiles();
     });
     recentMenu->addAction(clearAction);
@@ -303,7 +307,7 @@ ViewerPrivate::initRecentFiles()
 void
 ViewerPrivate::initSettings()
 {
-    QString loadType = settingsValue("loadType", "all").toString();
+    QString loadType = settings()->value("loadType", "all").toString();
     if (loadType == "all") {
         d.loadPolicy = DataModel::load_all;
         d.ui->policyAll->setChecked(true);
@@ -312,14 +316,14 @@ ViewerPrivate::initSettings()
         d.loadPolicy = DataModel::load_payload;
         d.ui->policyPayload->setChecked(true);
     }
-    bool statistics = settingsValue("statistics", false).toBool();
+    bool statistics = settings()->value("statistics", false).toBool();
     if (statistics) {
         d.ui->viewStatistics->setChecked(true);
     }
     else {
         d.ui->viewStatistics->setChecked(false);
     }
-    QString theme = settingsValue("theme", "dark").toString();
+    QString theme = settings()->value("theme", "dark").toString();
     if (theme == "dark") {
         dark();
         d.ui->themeDark->setChecked(true);
@@ -328,7 +332,7 @@ ViewerPrivate::initSettings()
         light();
         d.ui->themeLight->setChecked(true);
     }
-    d.recentFiles = settingsValue("recentFiles", QStringList()).toStringList();
+    d.recentFiles = settings()->value("recentFiles", QStringList()).toStringList();
     initRecentFiles();
 }
 
@@ -350,7 +354,7 @@ ViewerPrivate::loadFile(const QString& filename)
 
         QString shortName = fileInfo.fileName();
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(shortName));
-        setSettingsValue("openDir", fileInfo.absolutePath());
+        settings()->setValue("openDir", fileInfo.absolutePath());
         updateRecentFiles(filename);
         updateStatus(QString("Loaded %1 in %2 seconds").arg(shortName).arg(QString::number(elapsedSec, 'f', 2)), false);
         return true;
@@ -361,10 +365,16 @@ ViewerPrivate::loadFile(const QString& filename)
     }
 }
 
-RenderView*
-ViewerPrivate::renderView()
+DockWidget*
+ViewerPrivate::outlinerDock()
 {
-    return d.ui->renderView;
+    return d.ui->outlinerDock;
+}
+
+DockWidget*
+ViewerPrivate::progressDock()
+{
+    return d.ui->progressDock;
 }
 
 OutlinerView*
@@ -377,6 +387,12 @@ ProgressView*
 ViewerPrivate::progressView()
 {
     return d.ui->progressView;
+}
+
+RenderView*
+ViewerPrivate::renderView()
+{
+    return d.ui->renderView;
 }
 
 bool
@@ -412,24 +428,10 @@ ViewerPrivate::enable(bool enable)
     d.ui->editHide->setEnabled(enable);
 }
 
-QVariant
-ViewerPrivate::settingsValue(const QString& key, const QVariant& defaultValue)
-{
-    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
-    return settings.value(key, defaultValue);
-}
-
-void
-ViewerPrivate::setSettingsValue(const QString& key, const QVariant& value)
-{
-    QSettings settings(PROJECT_IDENTIFIER, PROJECT_NAME);
-    settings.setValue(key, value);
-}
-
 void
 ViewerPrivate::open()
 {
-    QString openDir = settingsValue("openDir", QDir::homePath()).toString();
+    QString openDir = settings()->value("openDir", QDir::homePath()).toString();
     QStringList filters;
     for (const QString& ext : d.extensions) {
         filters.append("*." + ext);
@@ -457,7 +459,7 @@ ViewerPrivate::save()
 void
 ViewerPrivate::saveAs()
 {
-    QString saveDir = settingsValue("saveDir", QDir::homePath()).toString();
+    QString saveDir = settings()->value("saveDir", QDir::homePath()).toString();
     QString currentFile = d.dataModel->filename();
     QString defaultName;
 
@@ -482,7 +484,7 @@ ViewerPrivate::saveAs()
         return;
 
     if (d.dataModel->saveToFile(filename)) {
-        setSettingsValue("saveDir", QFileInfo(filename).absolutePath());
+        settings()->setValue("saveDir", QFileInfo(filename).absolutePath());
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
         updateRecentFiles(filename);
     }
@@ -491,7 +493,7 @@ ViewerPrivate::saveAs()
 void
 ViewerPrivate::saveCopy()
 {
-    QString copyDir = settingsValue("copyDir", QDir::homePath()).toString();
+    QString copyDir = settings()->value("copyDir", QDir::homePath()).toString();
     QString currentFile = d.dataModel->filename();
     QString defaultName;
 
@@ -516,7 +518,7 @@ ViewerPrivate::saveCopy()
         return;
 
     if (d.dataModel->exportToFile(filename)) {
-        setSettingsValue("copyDir", QFileInfo(filename).absolutePath());
+        settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
     }
 }
 
@@ -553,7 +555,7 @@ ViewerPrivate::backgroundColor()
     if (color.isValid()) {
         renderView()->setBackgroundColor(color);
         d.ui->backgroundColor->setStyleSheet("background-color: " + color.name() + ";");
-        setSettingsValue("backgroundColor", color.name());
+        settings()->setValue("backgroundColor", color.name());
         d.backgroundColor = color;
     }
 }
@@ -561,7 +563,7 @@ ViewerPrivate::backgroundColor()
 void
 ViewerPrivate::exportAll()
 {
-    QString exportDir = settingsValue("exportDir", QDir::homePath()).toString();
+    QString exportDir = settings()->value("exportDir", QDir::homePath()).toString();
     QString defaultFormat = "usd";
     QString exportName = exportDir + "/all." + defaultFormat;
     QStringList filters;
@@ -572,7 +574,7 @@ ViewerPrivate::exportAll()
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
     if (!filename.isEmpty()) {
         if (d.dataModel->exportToFile(filename)) {
-            setSettingsValue("exportDir", QFileInfo(filename).absolutePath());
+            settings()->setValue("exportDir", QFileInfo(filename).absolutePath());
         }
         else {
             qWarning() << "Failed to export stage to:" << filename;
@@ -583,7 +585,7 @@ ViewerPrivate::exportAll()
 void
 ViewerPrivate::exportSelected()
 {
-    QString exportSelectedDir = settingsValue("exportSelectedDir", QDir::homePath()).toString();
+    QString exportSelectedDir = settings()->value("exportSelectedDir", QDir::homePath()).toString();
     QString defaultFormat = "usd";
     QString exportName = exportSelectedDir + "/selected." + defaultFormat;
     QStringList filters;
@@ -594,7 +596,7 @@ ViewerPrivate::exportSelected()
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
         if (d.dataModel->exportPathsToFile(d.selectionModel->paths(), filename)) {
-            setSettingsValue("exportSelectedDir", QFileInfo(filename).absolutePath());
+            settings()->value("exportSelectedDir", QFileInfo(filename).absolutePath());
         }
         else {
             qWarning() << "Failed to export stage to:" << filename;
@@ -605,7 +607,7 @@ ViewerPrivate::exportSelected()
 void
 ViewerPrivate::exportImage()
 {
-    QString exportImageDir = settingsValue("exportImageDir", QDir::homePath()).toString();
+    QString exportImageDir = settings()->value("exportImageDir", QDir::homePath()).toString();
     QImage image = renderView()->captureImage();
     QStringList filters;
     QList<QByteArray> formats = QImageWriter::supportedImageFormats();
@@ -633,7 +635,7 @@ ViewerPrivate::exportImage()
             extension = defaultFormat;
         }
         if (image.save(filename, extension.toUtf8().constData())) {
-            setSettingsValue("exportImageDir", QFileInfo(filename).absolutePath());
+            settings()->setValue("exportImageDir", QFileInfo(filename).absolutePath());
         }
         else {
             qWarning() << "failed to save image: " << filename;
@@ -644,8 +646,8 @@ ViewerPrivate::exportImage()
 void
 ViewerPrivate::saveSettings()
 {
-    setSettingsValue("recentFiles", d.recentFiles);
-    setSettingsValue("statistics", d.ui->viewStatistics->isChecked());
+    settings()->setValue("recentFiles", d.recentFiles);
+    settings()->setValue("statistics", d.ui->viewStatistics->isChecked());
 }
 
 void
@@ -770,46 +772,47 @@ ViewerPrivate::expand()
 }
 
 void
-ViewerPrivate::defaultCameraLightEnabled(bool checked)
+ViewerPrivate::cameraLight(bool checked)
 {
     renderView()->setDefaultCameraLightEnabled(checked);
 }
 
 void
-ViewerPrivate::sceneLightsEnabled(bool checked)
+ViewerPrivate::sceneLights(bool checked)
 {
     renderView()->setSceneLightsEnabled(checked);
 }
 
 void
-ViewerPrivate::sceneMaterialsEnabled(bool checked)
+ViewerPrivate::sceneShaders(bool checked)
 {
     renderView()->setSceneMaterialsEnabled(checked);
 }
 
 void
-ViewerPrivate::wireframeChanged(bool checked)
+ViewerPrivate::renderShaded()
 {
-    if (checked) {
-        renderView()->setDrawMode(RenderView::render_mode::render_wireframe);
-    }
-    else {
-        renderView()->setDrawMode(RenderView::render_mode::render_shaded);
-    }
+    renderView()->setDrawMode(RenderView::render_mode::render_shaded);
+}
+
+void
+ViewerPrivate::renderWireframe()
+{
+    renderView()->setDrawMode(RenderView::render_mode::render_wireframe);
 }
 
 void
 ViewerPrivate::light()
 {
-    Style::instance()->setTheme(Style::Light);
-    setSettingsValue("theme", "light");
+    style()->setTheme(Style::Light);
+    settings()->setValue("theme", "light");
 }
 
 void
 ViewerPrivate::dark()
 {
-    Style::instance()->setTheme(Style::Dark);
-    setSettingsValue("theme", "dark");
+    style()->setTheme(Style::Dark);
+    settings()->setValue("theme", "dark");
 }
 
 void
@@ -903,7 +906,7 @@ ViewerPrivate::updateRecentFiles(const QString& filename)
     const int maxRecent = 10;
     while (d.recentFiles.size() > maxRecent)
         d.recentFiles.removeLast();
-    setSettingsValue("recentFiles", d.recentFiles);
+    settings()->setValue("recentFiles", d.recentFiles);
     initRecentFiles();
 }
 

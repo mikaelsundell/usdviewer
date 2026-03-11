@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "stagetree.h"
+#include "application.h"
 #include "command.h"
 #include "commanddispatcher.h"
 #include "primitem.h"
@@ -32,6 +33,9 @@ public:
     void close();
     void collapse();
     void expand();
+    void expandDepth(int targetDepth, const SdfPath& path);
+    int maxDepth(const SdfPath& path) const;
+    int depth(const SdfPath& path) const;
     void addItem(PrimItem* parent, const SdfPath& parentPath);
     void addChildren(PrimItem* parent, const SdfPath& parentPath);
     void toggleVisible(PrimItem* item);
@@ -48,6 +52,8 @@ public Q_SLOTS:
     void checkStateChanged(PrimItem* item);
 
 public:
+    int parentDepth(const SdfPath& path) const;
+    QTreeWidgetItem* itemFromPath(const SdfPath& path) const;
     class ItemDelegate : public QStyledItemDelegate {
     public:
         ItemDelegate(QObject* parent = nullptr)
@@ -108,15 +114,14 @@ public:
                 return false;
             };
             opt.state &= ~QStyle::State_HasFocus;
-            auto style = Style::instance();
             if (opt.state & QStyle::State_Selected) {
-                painter->fillRect(opt.rect, style->color(Style::ColorRole::Highlight));
+                painter->fillRect(opt.rect, style()->color(Style::ColorRole::Highlight));
             }
             if (hasSelectedChildren(item)) {
                 opt.font.setBold(true);
                 opt.font.setItalic(true);
                 painter->save();
-                painter->fillRect(opt.rect, style->color(Style::ColorRole::HighlightAlt));
+                painter->fillRect(opt.rect, style()->color(Style::ColorRole::HighlightAlt));
                 painter->restore();
             }
             QStyledItemDelegate::paint(painter, opt, index);
@@ -132,7 +137,6 @@ public:
             return false;
         }
     };
-
     struct Data {
         int pending;
         bool payloadEnabled;
@@ -151,6 +155,8 @@ StageTreePrivate::StageTreePrivate() { d.pending = 0; }
 void
 StageTreePrivate::init()
 {
+    attach(d.tree);
+    attach(d.tree->selectionModel());
     d.delegate = new ItemDelegate(d.tree.data());
     d.tree->setItemDelegate(d.delegate);
     connect(d.tree.data(), &StageTree::itemSelectionChanged, this, &StageTreePrivate::itemSelectionChanged);
@@ -198,9 +204,6 @@ StageTreePrivate::initTree()
     for (int i = 0; i < topLevelCount; ++i) {
         QTreeWidgetItem* topItem = d.tree->topLevelItem(i);
         d.tree->expandItem(topItem);
-        for (int j = 0; j < topItem->childCount(); ++j) {
-            d.tree->expandItem(topItem->child(j));
-        }
     }
 }
 
@@ -241,6 +244,99 @@ StageTreePrivate::expand()
     if (selected.size()) {
         d.tree->scrollToItem(selected.first(), QAbstractItemView::PositionAtCenter);
     }
+}
+
+void
+StageTreePrivate::expandDepth(int targetDepth, const SdfPath& path)
+{
+    if (d.tree->topLevelItemCount() == 0)
+        return;
+
+    d.tree->setUpdatesEnabled(false);
+    if (path.IsEmpty()) {
+        QTreeWidgetItem* root = d.tree->topLevelItem(0);
+
+        std::function<void(QTreeWidgetItem*, int)> expand = [&](QTreeWidgetItem* item, int depth) {
+            item->setExpanded(depth < targetDepth);
+
+            for (int i = 0; i < item->childCount(); ++i)
+                expand(item->child(i), depth + 1);
+        };
+        expand(root, 0);
+    }
+    else {
+        QTreeWidgetItem* item = itemFromPath(path);
+        if (!item)
+            return;
+
+        int selectedDepth = depth(path);
+
+        QTreeWidgetItem* parent = item->parent();
+        int parentDepth = selectedDepth - 1;
+
+        while (parent) {
+            parent->setExpanded(parentDepth < targetDepth);
+            parent = parent->parent();
+            parentDepth--;
+        }
+        std::function<void(QTreeWidgetItem*, int)> expand = [&](QTreeWidgetItem* node, int depth) {
+            node->setExpanded(depth < targetDepth);
+            for (int i = 0; i < node->childCount(); ++i)
+                expand(node->child(i), depth + 1);
+        };
+        expand(item, selectedDepth);
+    }
+    d.tree->setUpdatesEnabled(true);
+}
+
+int
+StageTreePrivate::maxDepth(const SdfPath& path) const
+{
+    QTreeWidgetItem* root = nullptr;
+
+    if (d.tree->topLevelItemCount() > 0)
+        root = d.tree->topLevelItem(0);
+
+    if (!root)
+        return 0;
+
+    std::function<int(QTreeWidgetItem*, int)> subtreeDepth = [&](QTreeWidgetItem* item, int d) {
+        int max = d;
+
+        for (int i = 0; i < item->childCount(); ++i)
+            max = std::max(max, subtreeDepth(item->child(i), d + 1));
+
+        return max;
+    };
+    if (path.IsEmpty())
+        return subtreeDepth(root, 0);
+
+    QTreeWidgetItem* item = itemFromPath(path);
+    if (!item)
+        return subtreeDepth(root, 0);
+
+    int parentDepth = depth(path);
+    int childDepth = subtreeDepth(item, 0);
+    return parentDepth + childDepth;
+}
+
+int
+StageTreePrivate::depth(const SdfPath& path) const
+{
+    if (path.IsEmpty())
+        return 0;
+
+    QTreeWidgetItem* item = itemFromPath(path);
+    if (!item)
+        return 0;
+
+    int d = 0;
+    while (item->parent()) {
+        d++;
+        item = item->parent();
+    }
+
+    return d;
 }
 
 void
@@ -480,19 +576,16 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 void
 StageTreePrivate::updateStage(UsdStageRefPtr stage)
 {
-    beginGuard();
-    {
-        close();
-        d.stage = stage;
-        UsdPrim prim = stage->GetPseudoRoot();
-        PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
-        itemCheckState(rootItem, false, true);
-        addChildren(rootItem, prim.GetPath());
-        initTree();
-        if (d.payloadEnabled)
-            itemCheckState(rootItem, true, true);
-    }
-    endGuard();
+    SignalGuard::Scope guard(this);
+    close();
+    d.stage = stage;
+    UsdPrim prim = stage->GetPseudoRoot();
+    PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
+    itemCheckState(rootItem, false, true);
+    addChildren(rootItem, prim.GetPath());
+    initTree();
+    if (d.payloadEnabled)
+        itemCheckState(rootItem, true, true);
 }
 
 void
@@ -527,34 +620,52 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
 void
 StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
-    beginGuard();
-    {
-        QSet<SdfPath> selectedSet = QSet<SdfPath>(paths.begin(), paths.end());
-        std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
-            QString itemData = item->data(0, Qt::UserRole).toString();
-            if (!itemData.isEmpty()) {
-                SdfPath itemPath(QStringToString(itemData));
-                bool isSelected = false;
-                if (selectedSet.contains(itemPath))
-                    isSelected = true;
-                else if (d.payloadEnabled && !item->childCount()) {
-                    for (const SdfPath& path : selectedSet) {
-                        if (path.HasPrefix(itemPath) && path != itemPath) {
-                            isSelected = true;
-                            break;
-                        }
+    SignalGuard::Scope guard(this);
+    QSet<SdfPath> selectedSet = QSet<SdfPath>(paths.begin(), paths.end());
+    std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
+        QString itemData = item->data(0, Qt::UserRole).toString();
+        if (!itemData.isEmpty()) {
+            SdfPath itemPath(QStringToString(itemData));
+            bool isSelected = false;
+            if (selectedSet.contains(itemPath))
+                isSelected = true;
+            else if (d.payloadEnabled && !item->childCount()) {
+                for (const SdfPath& path : selectedSet) {
+                    if (path.HasPrefix(itemPath) && path != itemPath) {
+                        isSelected = true;
+                        break;
                     }
                 }
-                item->setSelected(isSelected);
             }
-            for (int i = 0; i < item->childCount(); ++i)
-                selectItems(item->child(i));
-        };
-        for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
-            selectItems(d.tree->topLevelItem(i));
-        d.tree->update();
+            item->setSelected(isSelected);
+        }
+        for (int i = 0; i < item->childCount(); ++i)
+            selectItems(item->child(i));
+    };
+    for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
+        selectItems(d.tree->topLevelItem(i));
+    d.tree->update();
+}
+
+QTreeWidgetItem*
+StageTreePrivate::itemFromPath(const SdfPath& path) const
+{
+    QString target = StringToQString(path.GetString());
+    std::function<QTreeWidgetItem*(QTreeWidgetItem*)> find = [&](QTreeWidgetItem* item) -> QTreeWidgetItem* {
+        QString data = item->data(0, Qt::UserRole).toString();
+        if (!data.isEmpty() && data == target)
+            return item;
+        for (int i = 0; i < item->childCount(); ++i) {
+            if (QTreeWidgetItem* found = find(item->child(i)))
+                return found;
+        }
+        return nullptr;
+    };
+    for (int i = 0; i < d.tree->topLevelItemCount(); ++i) {
+        if (QTreeWidgetItem* found = find(d.tree->topLevelItem(i)))
+            return found;
     }
-    endGuard();
+    return nullptr;
 }
 
 StageTree::StageTree(QWidget* parent)
@@ -584,6 +695,23 @@ StageTree::expand()
     p->expand();
 }
 
+void
+StageTree::expandDepth(int targetDepth, const SdfPath& path)
+{
+    p->expandDepth(targetDepth, path);
+}
+
+int
+StageTree::maxDepth(const SdfPath& path) const
+{
+    return p->maxDepth(path);
+}
+
+int
+StageTree::depth(const SdfPath& path) const
+{
+    return p->depth(path);
+}
 
 QString
 StageTree::filter() const

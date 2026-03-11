@@ -122,7 +122,7 @@ ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::progre
 
         d.running = false;
         qint64 ms = d.timer.elapsed();
-        QString timeStr = QTime(0, 0).addMSecs(ms).toString("hh:mm:ss");
+        QString timeStr = QTime(0, 0).addMSecs(static_cast<int>(ms)).toString("hh:mm:ss");
         d.ui->status->setText(QString("Finished: %1 (Time: %2)").arg(name).arg(timeStr));
     }
 }
@@ -152,7 +152,7 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
         QString col1;
         if (!notify.paths.isEmpty()) {
             QString first = StringToQString(notify.paths.first().GetName());
-            int count = notify.paths.size();
+            qsizetype count = notify.paths.size();
             col1 = QString("%1 (%2)").arg(first).arg(count);
         }
         else {
@@ -197,7 +197,7 @@ QString
 ProgressViewPrivate::updateStatus(size_t completed, size_t expected)
 {
     qint64 ms = d.timer.elapsed();
-    QString timeStr = QTime(0, 0).addMSecs(ms).toString("hh:mm:ss");
+    QString timeStr = QTime(0, 0).addMSecs(static_cast<int>(ms)).toString("hh:mm:ss");
     return QString("Time: %1 (%2/%3)").arg(timeStr).arg(completed).arg(expected);
 }
 

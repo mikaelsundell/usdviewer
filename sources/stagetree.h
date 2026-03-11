@@ -59,6 +59,14 @@ public:
 
     ///@}
 
+    void expandDepth(int depth, const SdfPath& path = SdfPath());
+
+    int depth(const SdfPath& path = SdfPath()) const;
+
+    int maxDepth(const SdfPath& path = SdfPath()) const;
+
+
+
     /** @name Filtering */
     ///@{
 

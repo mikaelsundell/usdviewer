@@ -52,9 +52,14 @@ public:
     Q_ENUM(Theme)
 
     /**
-     * @brief Returns the global Style instance.
+     * @brief Constructs a Style instance.
      */
-    static Style* instance();
+    Style();
+
+    /**
+     * @brief Destroys the Style instance.
+     */
+    ~Style() override;
 
     /** @name Theme */
     ///@{
@@ -124,16 +129,7 @@ Q_SIGNALS:
     void fontChanged(FontRole role);
 
 private:
-    Style();
-    ~Style();
-    Style(const Style&) = delete;
-    Style& operator=(const Style&) = delete;
-
-    class Deleter {
-    public:
-        static void cleanup(Style* pointer) { delete pointer; }
-    };
-    static QScopedPointer<Style, Deleter> pi;
+    Q_DISABLE_COPY_MOVE(Style)
     QScopedPointer<StylePrivate> p;
 };
 

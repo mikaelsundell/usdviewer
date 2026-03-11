@@ -6,7 +6,7 @@
 #include <QProcess>
 #include <QWidget>
 
-namespace platform {
+namespace os {
 
 /** @name Application Appearance */
 ///@{
@@ -75,4 +75,4 @@ console(const QString& message);
 
 ///@}
 
-}  // namespace platform
+}  // namespace os

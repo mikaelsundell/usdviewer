@@ -3,12 +3,14 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "imagingglwidget.h"
+#include "application.h"
 #include "command.h"
 #include "commanddispatcher.h"
-#include "platform.h"
+#include "os.h"
 #include "qtutils.h"
 #include "signalguard.h"
 #include "stageutils.h"
+#include "style.h"
 #include "viewcamera.h"
 #include <QApplication>
 #include <QColor>
@@ -78,7 +80,7 @@ public:
         float defaultShininess;
         bool defaultCameraLightEnabled;
         bool sceneLightsEnabled;
-        bool sceneMaterialsEnabled;
+        bool sceneShadersEnabled;
         bool statisticsEnabled;
         bool drag;
         bool sweep;
@@ -118,7 +120,7 @@ ImagingGLWidgetPrivate::init()
     d.defaultShininess = 32.0f;
     d.defaultCameraLightEnabled = true;
     d.sceneLightsEnabled = true;
-    d.sceneMaterialsEnabled = true;
+    d.sceneShadersEnabled = false;
     d.drag = false;
     d.drawMode = ImagingGLWidget::draw_shadedsmooth;
 }
@@ -277,7 +279,7 @@ ImagingGLWidgetPrivate::paintGL()
             }
             d.params.enableSampleAlphaToCoverage = true;
             d.params.enableSceneLights = d.sceneLightsEnabled;
-            d.params.enableSceneMaterials = d.sceneMaterialsEnabled;
+            d.params.enableSceneMaterials = d.sceneShadersEnabled;  // shaders not materials
             d.params.flipFrontFacing = true;
             d.params.highlight = true;
             d.params.showGuides = false;
@@ -703,38 +705,60 @@ ImagingGLWidgetPrivate::updateStatistics()
                 instances++;
         }
     }
-    double dpr = 2.0;
-    int w = 300 * dpr;
-    int h = 200 * dpr;
-    d.overlayStats = QImage(300, 200, QImage::Format_ARGB32_Premultiplied);
+
+    double dpr = d.glwidget->devicePixelRatioF();
+    QFont font = app()->font();
+    font.setPointSize(style()->fontSize(Style::SmallSize));
+    font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
+
+    QLocale locale = QLocale::system();
+    auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
+
+    struct Row {
+        QString label;
+        QString value;
+    };
+
+    QVector<Row> rows { { "Prims", fmt(prims) },       { "Meshes", fmt(meshes) },       { "Xforms", fmt(xforms) },
+                        { "Payloads", fmt(payloads) }, { "Instances", fmt(instances) }, { "Vertices", fmt(vertices) },
+                        { "Normals", fmt(normals) },   { "Faces", fmt(faces) } };
+
+    QFontMetrics fm(font);
+    int rowHeight = fm.lineSpacing() + 2;
+    int marginLeft = 18;
+    int marginTop = 16;
+    int columnSpacing = 20;
+    int labelWidth = 0;
+    int valueWidth = 0;
+
+    for (const auto& r : rows) {
+        labelWidth = std::max(labelWidth, fm.horizontalAdvance(r.label));
+        valueWidth = std::max(valueWidth, fm.horizontalAdvance(r.value));
+    }
+
+    qsizetype width = labelWidth + columnSpacing + valueWidth + marginLeft;
+    qsizetype height = rows.size() * rowHeight + marginTop;
+    d.overlayStats = QImage(width * dpr, height * dpr, QImage::Format_ARGB32_Premultiplied);
+    d.overlayStats.setDevicePixelRatio(dpr);
     d.overlayStats.fill(Qt::transparent);
-    {
-        QPainter p(&d.overlayStats);
-        p.setRenderHint(QPainter::Antialiasing, true);
 
-        QFont font("Monospace");
-        font.setStyleHint(QFont::Monospace);
-        font.setPointSize(10);
-        p.setFont(font);
+    QPainter p(&d.overlayStats);
+    p.setPen(style()->color(Style::Text));
+    p.setRenderHint(QPainter::TextAntialiasing);
+    p.setFont(font);
 
-        QLocale locale = QLocale::system();
-        auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
+    int y = marginTop + fm.ascent();
 
-        QStringList lines;
-        lines << "Statistics" << QString("Prims:      %1").arg(fmt(prims)) << QString("Meshes:     %1").arg(fmt(meshes))
-              << QString("Xforms:     %1").arg(fmt(xforms)) << QString("Payloads:   %1").arg(fmt(payloads))
-              << QString("Instances:  %1").arg(fmt(instances)) << QString("Vertices:   %1").arg(fmt(vertices))
-              << QString("Normals:    %1").arg(fmt(normals)) << QString("Faces:      %1").arg(fmt(faces));
-
-        QString overlay = lines.join("\n");
-        QFontMetrics fm(font);
-        QRect textRect = fm.boundingRect(QRect(0, 0, 300, 200), Qt::AlignLeft | Qt::AlignTop, overlay);
-        textRect.translate(10, 10);
-        p.setBrush(QColor(0, 0, 0, 140));
-        p.setPen(Qt::NoPen);
-        p.drawRect(textRect);
+    for (const auto& r : rows) {
+        int labelX = marginLeft;
+        int valueX = marginLeft + labelWidth + columnSpacing;
+        p.setPen(QColor(0, 0, 0, 180));
+        p.drawText(labelX + 1, y + 1, r.label);
+        p.drawText(valueX + 1, y + 1, r.value);
         p.setPen(Qt::white);
-        p.drawText(textRect, overlay);
+        p.drawText(labelX, y, r.label);
+        p.drawText(valueX, y, r.value);
+        y += rowHeight;
     }
 }
 
@@ -818,7 +842,7 @@ ImagingGLWidget::defaultCameraLightEnabled() const
 }
 
 void
-ImagingGLWidget::setDefaultCameraLightEnabled(bool enabled)
+ImagingGLWidget::enableDefaultCameraLight(bool enabled)
 {
     if (enabled != p->d.defaultCameraLightEnabled) {
         p->d.defaultCameraLightEnabled = enabled;
@@ -833,7 +857,7 @@ ImagingGLWidget::sceneLightsEnabled() const
 }
 
 void
-ImagingGLWidget::setSceneLightsEnabled(bool enabled)
+ImagingGLWidget::enableSceneLights(bool enabled)
 {
     if (enabled != p->d.defaultCameraLightEnabled) {
         p->d.defaultCameraLightEnabled = enabled;
@@ -842,16 +866,16 @@ ImagingGLWidget::setSceneLightsEnabled(bool enabled)
 }
 
 bool
-ImagingGLWidget::sceneMaterialsEnabled() const
+ImagingGLWidget::sceneShadersEnabled() const
 {
-    return p->d.sceneMaterialsEnabled;
+    return p->d.sceneShadersEnabled;
 }
 
 void
-ImagingGLWidget::setSceneMaterialsEnabled(bool enabled)
+ImagingGLWidget::enableSceneShaders(bool enabled)
 {
-    if (enabled != p->d.sceneMaterialsEnabled) {
-        p->d.sceneMaterialsEnabled = enabled;
+    if (enabled != p->d.sceneShadersEnabled) {
+        p->d.sceneShadersEnabled = enabled;
         update();
     }
 }
@@ -863,7 +887,7 @@ ImagingGLWidget::statisticsEnabled() const
 }
 
 void
-ImagingGLWidget::setStatisticsEnabled(bool enabled)
+ImagingGLWidget::enableStatistics(bool enabled)
 {
     if (enabled != p->d.statisticsEnabled) {
         p->d.statisticsEnabled = enabled;

@@ -142,7 +142,7 @@ public:
      *
      * @param enabled Light state.
      */
-    void setDefaultCameraLightEnabled(bool enabled);
+    void enableDefaultCameraLight(bool enabled);
 
     /**
      * @brief Returns whether scene lights are enabled.
@@ -154,19 +154,19 @@ public:
      *
      * @param enabled Light state.
      */
-    void setSceneLightsEnabled(bool enabled);
+    void enableSceneLights(bool enabled);
 
     /**
      * @brief Returns whether scene materials are enabled.
      */
-    bool sceneMaterialsEnabled() const;
+    bool sceneShadersEnabled() const;
 
     /**
      * @brief Enables or disables USD materials during rendering.
      *
      * @param enabled Material state.
      */
-    void setSceneMaterialsEnabled(bool enabled);
+    void enableSceneShaders(bool enabled);
 
     /**
      * @brief Returns whether rendering statistics are displayed.
@@ -178,7 +178,7 @@ public:
      *
      * @param enabled Statistics display state.
      */
-    void setStatisticsEnabled(bool enabled);
+    void enableStatistics(bool enabled);
 
     ///@}
 

@@ -132,7 +132,7 @@ StylePrivate::updateTheme(Style::Theme theme)
         map(Style::HighlightAlt, QColor::fromHsl(216, 10, 60));
         map(Style::Border, QColor::fromHsl(220, 3, 32));
         map(Style::BorderAlt, QColor::fromHsl(220, 3, 64));
-        map(Style::Scrollbar, QColor::fromHsl(0, 0, 70));
+        map(Style::Handle, QColor::fromHsl(0, 0, 120));
         map(Style::Progress, QColor::fromHsl(216, 82, 20));
         map(Style::Button, QColor::fromHsl(220, 6, 40));
         map(Style::ButtonAlt, QColor::fromHsl(220, 6, 54));
@@ -152,7 +152,7 @@ StylePrivate::updateTheme(Style::Theme theme)
         map(Style::HighlightAlt, QColor::fromHsl(210, 60, 220));
         map(Style::Border, QColor::fromHsl(0, 0, 200));
         map(Style::BorderAlt, QColor::fromHsl(0, 0, 180));
-        map(Style::Scrollbar, QColor::fromHsl(0, 0, 180));
+        map(Style::Handle, QColor::fromHsl(0, 0, 120));
         map(Style::Progress, QColor::fromHsl(210, 90, 45));
         map(Style::Button, QColor::fromHsl(0, 0, 180));
         map(Style::ButtonAlt, QColor::fromHsl(0, 0, 160));

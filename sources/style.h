@@ -30,7 +30,7 @@ public:
         HighlightAlt,
         Border,
         BorderAlt,
-        Scrollbar,
+        Handle,
         Progress,
         Button,
         ButtonAlt,

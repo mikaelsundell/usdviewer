@@ -175,19 +175,19 @@
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_2">
              <property name="leftMargin">
-              <number>0</number>
+              <number>8</number>
              </property>
              <property name="topMargin">
               <number>6</number>
              </property>
              <property name="rightMargin">
-              <number>0</number>
+              <number>8</number>
              </property>
              <property name="bottomMargin">
               <number>2</number>
              </property>
              <item>
-              <widget class="QSlider" name="depth">
+              <widget class="usd::Slider" name="depth">
                <property name="maximum">
                 <number>10</number>
                </property>
@@ -254,6 +254,11 @@
    <class>usd::PropertyTree</class>
    <extends>QTreeWidget</extends>
    <header>../../../sources/propertytree.h</header>
+  </customwidget>
+  <customwidget>
+   <class>usd::Slider</class>
+   <extends>QSlider</extends>
+   <header>../../../sources/slider.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

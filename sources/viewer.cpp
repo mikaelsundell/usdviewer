@@ -227,10 +227,10 @@ ViewerPrivate::init()
     connect(d.ui->helpGithubReadme, &QAction::triggered, this, &ViewerPrivate::openGithubReadme);
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
     connect(d.ui->open, &QToolButton::clicked, this, &ViewerPrivate::open);
-    connect(d.ui->exportImage, &QToolButton::clicked, this, &ViewerPrivate::exportImage);
-    connect(d.ui->exportSelected, &QToolButton::clicked, this, &ViewerPrivate::exportSelected);
-    connect(d.ui->frameAll, &QToolButton::clicked, this, &ViewerPrivate::frameAll);
     {
+        d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
+        d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
+        d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
         d.ui->wireframe->setDefaultAction(d.ui->renderShaded);
         d.ui->shaded->setDefaultAction(d.ui->renderWireframe);
     }
@@ -415,17 +415,19 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 void
 ViewerPrivate::enable(bool enable)
 {
-    QList<QAction*> actions
-        = { d.ui->fileReload,           d.ui->fileClose,        d.ui->fileSave,           d.ui->fileSaveAs,
-            d.ui->fileSaveCopy,         d.ui->fileExportAll,    d.ui->fileExportSelected, d.ui->fileExportImage,
-            d.ui->editCopyImage,        d.ui->editDelete,       d.ui->displayIsolate,     d.ui->displayFrameAll,
-            d.ui->displayFrameSelected, d.ui->displayResetView, d.ui->displayExpand,      d.ui->displayCollapse };
+    QList<QAction*> actions = { d.ui->fileReload,           d.ui->fileClose,        d.ui->fileSave,
+                                d.ui->fileSaveAs,           d.ui->fileSaveCopy,     d.ui->fileExportAll,
+                                d.ui->fileExportSelected,   d.ui->fileExportImage,  d.ui->editCopyImage,
+                                d.ui->editDelete,           d.ui->displayIsolate,   d.ui->displayFrameAll,
+                                d.ui->displayFrameSelected, d.ui->displayResetView, d.ui->displayExpand,
+                                d.ui->displayCollapse,      d.ui->renderShaded,     d.ui->renderWireframe };
     for (QAction* action : actions) {
         if (action)
             action->setEnabled(enable);
     }
     d.ui->editShow->setEnabled(enable);
     d.ui->editHide->setEnabled(enable);
+    d.ui->backgroundColor->setEnabled(enable);
 }
 
 void

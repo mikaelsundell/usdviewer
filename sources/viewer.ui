@@ -108,7 +108,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="exportSelected">
+           <widget class="QToolButton" name="exportAll">
             <property name="text">
              <string>...</string>
             </property>
@@ -531,6 +531,11 @@
    </widget>
   </widget>
   <action name="displayFrameAll">
+   <property name="icon">
+    <iconset resource="viewer.qrc">
+     <normaloff>:/icons/resources/FrameAll.png</normaloff>
+     <disabledoff>:/icons/resources/FrameAllDisabled.png</disabledoff>:/icons/resources/FrameAll.png</iconset>
+   </property>
    <property name="text">
     <string>Frame all</string>
    </property>
@@ -571,6 +576,10 @@
    </property>
   </action>
   <action name="fileExportImage">
+   <property name="icon">
+    <iconset resource="viewer.qrc">
+     <normaloff>:/icons/resources/Image.png</normaloff>:/icons/resources/Image.png</iconset>
+   </property>
    <property name="text">
     <string>Export image ...</string>
    </property>
@@ -605,6 +614,11 @@
    </property>
   </action>
   <action name="fileExportAll">
+   <property name="icon">
+    <iconset resource="viewer.qrc">
+     <normaloff>:/icons/resources/Export.png</normaloff>
+     <disabledoff>:/icons/resources/ExportDisabled.png</disabledoff>:/icons/resources/Export.png</iconset>
+   </property>
    <property name="text">
     <string>Export ...</string>
    </property>
@@ -1004,7 +1018,8 @@
    </property>
    <property name="icon">
     <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/Shaded.png</normaloff>:/icons/resources/Shaded.png</iconset>
+     <normaloff>:/icons/resources/Shaded.png</normaloff>
+     <disabledoff>:/icons/resources/ShadedDisabled.png</disabledoff>:/icons/resources/Shaded.png</iconset>
    </property>
    <property name="text">
     <string>Shaded</string>
@@ -1019,7 +1034,8 @@
    </property>
    <property name="icon">
     <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/Wireframe.png</normaloff>:/icons/resources/Wireframe.png</iconset>
+     <normaloff>:/icons/resources/Wireframe.png</normaloff>
+     <disabledoff>:/icons/resources/WireframeDisabled.png</disabledoff>:/icons/resources/Wireframe.png</iconset>
    </property>
    <property name="text">
     <string>Wireframe</string>

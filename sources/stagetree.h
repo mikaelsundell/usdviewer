@@ -57,15 +57,24 @@ public:
      */
     void expand();
 
-    ///@}
-
+    /**
+      * @brief Expands the tree to the specified depth.
+      *
+      * If a path is provided, the expansion is applied relative to that node.
+      */
     void expandDepth(int depth, const SdfPath& path = SdfPath());
 
+    /**
+      * @brief Returns the depth of a node in the tree.
+      */
     int depth(const SdfPath& path = SdfPath()) const;
 
+    /**
+      * @brief Returns the maximum depth reachable from a node.
+      */
     int maxDepth(const SdfPath& path = SdfPath()) const;
 
-
+    ///@}
 
     /** @name Filtering */
     ///@{

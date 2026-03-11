@@ -217,14 +217,14 @@ QScrollBar:horizontal {
 }
 
 QScrollBar::handle:horizontal {
-    background: $scrollbar;
+    background: $handle;
     min-width: 40px;
     border-radius: 4px;
     margin: 4px 4px;
 }
 
 QScrollBar::handle:horizontal:hover {
-    background: $scrollbar;
+    background: $handle;
 }
 
 QScrollBar::add-line:horizontal,
@@ -253,14 +253,14 @@ QScrollBar:vertical {
 }
 
 QScrollBar::handle:vertical {
-    background: $scrollbar;
+    background: $handle;
     min-width: 20px;
     border-radius: 4px;
     margin: 4px 4px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background:$scrollbar;;
+    background:$handle;
 }
 
 QScrollBar::add-line:vertical,
@@ -309,16 +309,17 @@ QSlider {
     background: transparent;
 }
 
-QSlider::tick:horizontal {
-    background: green;
-    width: 1px;
-    height: 6px;
+QSlider::groove:horizontal {
+    height: 4px;
+    border-radius: 4px;
+    background: $base;
 }
 
-QSlider::tick:vertical {
-    background: blue;
-    width: 6px;
-    height: 1px;
+QSlider::handle:horizontal {
+    width: 8px;
+    background: $handle;
+    border-radius: 4px;
+    margin: -5px 0;
 }
 
 QSplitter

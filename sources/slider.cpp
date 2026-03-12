@@ -38,23 +38,15 @@ Slider::paintEvent(QPaintEvent* event)
     QStyleOptionSlider opt;
     initStyleOption(&opt);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    QRect groove = style()->subControlRect(
-        QStyle::CC_Slider,
-        &opt,
-        QStyle::SC_SliderGroove,
-        this);
+    QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, this);
 
     QColor grooveColor = app()->style()->color(Style::Base);
     QColor outline = app()->style()->color(Style::BorderAlt);
 
     painter.setPen(QPen(outline, 1));
     painter.setBrush(grooveColor);
-    painter.drawRoundedRect(groove.adjusted(0,0,-1,-1), 2, 2);
-    QRect handle = style()->subControlRect(
-        QStyle::CC_Slider,
-        &opt,
-        QStyle::SC_SliderHandle,
-        this);
+    painter.drawRoundedRect(groove.adjusted(0, 0, -1, -1), 2, 2);
+    QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderHandle, this);
 
     int sliderMin = groove.left() + handle.width() / 2;
     int sliderMax = groove.right() - handle.width() / 2;

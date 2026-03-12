@@ -69,6 +69,7 @@ public:
     double widgetAspectRatio() const;
     GfVec2i widgetSize() const;
     GfVec4d widgetViewport() const;
+    void drawBorder(QPainter& painter);
     void drawAxis(QPainter& painter);
     void updateSceneTree();
     void updateGpuPerformance();
@@ -358,11 +359,7 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
     if (d.cameraAxisEnabled) {
         drawAxis(painter);
     }
-    {
-        painter.setPen(QPen(QColor(0,0,0,120), 1));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRect(d.glwidget->rect().adjusted(0,0,-1,-1));
-    }
+    drawBorder(painter);
 }
 
 void
@@ -684,6 +681,16 @@ ImagingGLWidgetPrivate::widgetViewport() const
 }
 
 void
+ImagingGLWidgetPrivate::drawBorder(QPainter& painter)
+{
+    const int w = 2;
+    painter.setPen(QPen(style()->color(Style::BorderAlt), w));
+    painter.setBrush(Qt::NoBrush);
+    QRect r = d.glwidget->rect().adjusted(w / 2, w / 2, -w / 2, -w / 2);
+    painter.drawRect(r);
+}
+
+void
 ImagingGLWidgetPrivate::drawAxis(QPainter& painter)
 {
     GfCamera camera = d.viewCamera.camera();
@@ -867,11 +874,11 @@ ImagingGLWidgetPrivate::updateGpuPerformance()
         QString label;
         QString value;
     };
-    
+
     double fps = 0.0;
     if (d.gpuPerformanceMs > 0.0)
         fps = 1000.0 / d.gpuPerformanceMs;
-    
+
     QVector<Row> rows;
     rows.append({ "GPU time", QString::number(d.gpuPerformanceMs, 'f', 2) + " ms" });
     rows.append({ "GPU fps", QString::number(fps, 'f', 1) });

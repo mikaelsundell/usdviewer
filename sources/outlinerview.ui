@@ -65,7 +65,7 @@
          <string>...</string>
         </property>
         <property name="icon">
-         <iconset>
+         <iconset resource="viewer.qrc">
           <normaloff>:/icons/resources/Clear.png</normaloff>
           <disabledoff>:/icons/resources/ClearDisabled.png</disabledoff>:/icons/resources/Clear.png</iconset>
         </property>
@@ -80,7 +80,7 @@
          <string>...</string>
         </property>
         <property name="icon">
-         <iconset>
+         <iconset resource="viewer.qrc">
           <normaloff>:/icons/resources/Collapse.png</normaloff>
           <disabledoff>:/icons/resources/CollapseDisabled.png</disabledoff>:/icons/resources/Collapse.png</iconset>
         </property>
@@ -98,12 +98,33 @@
          <string>...</string>
         </property>
         <property name="icon">
-         <iconset>
+         <iconset resource="viewer.qrc">
           <normaloff>:/icons/resources/Expand.png</normaloff>
           <disabledoff>:/icons/resources/ExpandDisabled.png</disabledoff>:/icons/resources/Expand.png</iconset>
         </property>
         <property name="shortcut">
          <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="follow">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>...</string>
+        </property>
+        <property name="icon">
+         <iconset resource="viewer.qrc">
+          <normaloff>:/icons/resources/Follow.png</normaloff>
+          <disabledoff>:/icons/resources/FollowDisabled.png</disabledoff>:/icons/resources/Follow.png</iconset>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -157,6 +178,9 @@
            <widget class="usd::StageTree" name="stageTree">
             <property name="alternatingRowColors">
              <bool>true</bool>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
             </property>
             <column>
              <property name="text">
@@ -261,6 +285,8 @@
    <header>../../../sources/slider.h</header>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="viewer.qrc"/>
+ </resources>
  <connections/>
 </ui>

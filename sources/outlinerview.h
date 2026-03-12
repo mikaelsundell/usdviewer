@@ -68,8 +68,6 @@ public:
 
     ///@}
 
-public Q_SLOTS:
-
     /** @name Tree Control */
     ///@{
 
@@ -82,6 +80,18 @@ public Q_SLOTS:
      * @brief Expands all nodes in the outliner.
      */
     void expand();
+
+    /**
+     * @brief Returns whether follow is enabled for outliner.
+     */
+    bool followEnabled();
+
+    /**
+     * @brief Enables or disables follow in the outliner
+     *
+     * @param enabled Follow state.
+     */
+    void enableFollow(bool enable);
 
     ///@}
 

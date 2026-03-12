@@ -31,6 +31,7 @@ public Q_SLOTS:
     void clearDepth();
     void collapse();
     void expand();
+    void follow(bool enabled);
     void filterChanged(const QString& filter);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
@@ -40,6 +41,7 @@ public Q_SLOTS:
 public:
     void updateDepth(const SdfPath& path = SdfPath());
     struct Data {
+        bool followEnabled;
         QScopedPointer<Ui_OutlinerView> ui;
         QPointer<DataModel> dataModel;
         QPointer<SelectionModel> selectionModel;
@@ -48,7 +50,7 @@ public:
     Data d;
 };
 
-OutlinerViewPrivate::OutlinerViewPrivate() {}
+OutlinerViewPrivate::OutlinerViewPrivate() { d.followEnabled = true; }
 
 void
 OutlinerViewPrivate::init()
@@ -69,6 +71,7 @@ OutlinerViewPrivate::init()
     connect(d.ui->clear, &QToolButton::clicked, this, &OutlinerViewPrivate::clearFilter);
     connect(d.ui->collapse, &QToolButton::clicked, this, &OutlinerViewPrivate::collapse);
     connect(d.ui->expand, &QToolButton::clicked, this, &OutlinerViewPrivate::expand);
+    connect(d.ui->follow, &QToolButton::toggled, this, &OutlinerViewPrivate::follow);
     connect(d.ui->depth, &QSlider::valueChanged, this, &OutlinerViewPrivate::depthChanged);
 }
 
@@ -150,6 +153,14 @@ OutlinerViewPrivate::expand()
 }
 
 void
+OutlinerViewPrivate::follow(bool enabled)
+{
+    if (enabled)
+        expand();
+    d.followEnabled = enabled;
+}
+
+void
 OutlinerViewPrivate::filterChanged(const QString& filter)
 {
     stageTree()->setFilter(filter);
@@ -174,6 +185,9 @@ OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
     SignalGuard::Scope guard(this);
     propertyTree()->updateSelection(paths);
     stageTree()->updateSelection(paths);
+    if (paths.size() > 0 && d.followEnabled) {
+        expand();
+    }
     if (paths.size() == 1) {
         updateDepth(paths.first());
     }
@@ -198,6 +212,7 @@ OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy p
         propertyTree()->updateStage(stage);
         d.ui->filter->setEnabled(true);
         d.ui->depth->setEnabled(true);
+        d.ui->follow->setEnabled(true);
         updateDepth();
     }
     else {
@@ -206,6 +221,7 @@ OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy p
         d.ui->clear->setEnabled(false);
         d.ui->filter->setEnabled(false);
         d.ui->depth->setEnabled(false);
+        d.ui->follow->setEnabled(false);
         clearFilter();
         clearDepth();
     }
@@ -252,6 +268,18 @@ void
 OutlinerView::expand()
 {
     p->expand();
+}
+
+bool
+OutlinerView::followEnabled()
+{
+    return p->d.followEnabled;
+}
+
+void
+OutlinerView::enableFollow(bool enable)
+{
+    p->follow(enable);
 }
 
 SelectionModel*

@@ -89,6 +89,10 @@ QFrame {
     border: 1px solid $border;
 }
 
+QGLWidget {
+    border: 1px solid red;
+}
+
 QWidget[DockWidget="true"] {
     background-color: $dock;
 }

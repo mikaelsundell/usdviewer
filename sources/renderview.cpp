@@ -250,15 +250,39 @@ RenderView::setSceneMaterialsEnabled(bool enabled)
 }
 
 bool
-RenderView::statisticsEnabled() const
+RenderView::sceneTreeEnabled() const
 {
-    return p->imageGLWidget()->statisticsEnabled();
+    return p->imageGLWidget()->sceneTreeEnabled();
 }
 
 void
-RenderView::setStatisticsEnabled(bool enabled)
+RenderView::enableSceneTree(bool enabled)
 {
-    p->imageGLWidget()->enableStatistics(enabled);
+    p->imageGLWidget()->enableSceneTree(enabled);
+}
+
+bool
+RenderView::gpuPerformanceEnabled() const
+{
+    return p->imageGLWidget()->gpuPerformanceEnabled();
+}
+
+void
+RenderView::enableGpuPerformance(bool enabled)
+{
+    p->imageGLWidget()->enableGpuPerformance(enabled);
+}
+
+bool
+RenderView::cameraAxisEnabled() const
+{
+    return p->imageGLWidget()->cameraAxisEnabled();
+}
+
+void
+RenderView::enableCameraAxis(bool enabled)
+{
+    p->imageGLWidget()->enableCameraAxis(enabled);
 }
 
 DataModel*

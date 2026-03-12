@@ -169,16 +169,40 @@ public:
     void enableSceneShaders(bool enabled);
 
     /**
-     * @brief Returns whether rendering statistics are displayed.
+     * @brief Returns whether  scene tree hud is displayed.
      */
-    bool statisticsEnabled() const;
+    bool sceneTreeEnabled() const;
 
     /**
-     * @brief Enables or disables rendering statistics.
+     * @brief Enables or disables scene tree hud.
      *
-     * @param enabled Statistics display state.
+     * @param enabled Scene tree statistics display state.
      */
-    void enableStatistics(bool enabled);
+    void enableSceneTree(bool enabled);
+
+    /**
+     * @brief Returns whether rendering gpu performance hud are displayed.
+     */
+    bool gpuPerformanceEnabled() const;
+
+    /**
+     * @brief Enables or disables gpu performance hud.
+     *
+     * @param enabled Gpu performance hud display state.
+     */
+    void enableGpuPerformance(bool enabled);
+
+    /**
+     * @brief Returns whether rendering camera axis hud are displayed.
+     */
+    bool cameraAxisEnabled() const;
+
+    /**
+     * @brief Enables or disables camera axis hud.
+     *
+     * @param enabled Camera axis hud display state.
+     */
+    void enableCameraAxis(bool enabled);
 
     ///@}
 

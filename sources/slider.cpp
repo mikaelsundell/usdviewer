@@ -33,25 +33,41 @@ void
 Slider::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
+
     QPainter painter(this);
     QStyleOptionSlider opt;
     initStyleOption(&opt);
-    opt.subControls = QStyle::SC_SliderGroove;
-    style()->drawComplexControl(QStyle::CC_Slider, &opt, &painter, this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QRect groove = style()->subControlRect(
+        QStyle::CC_Slider,
+        &opt,
+        QStyle::SC_SliderGroove,
+        this);
 
-    QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, this);
-    QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderHandle, this);
+    QColor grooveColor = app()->style()->color(Style::Base);
+    QColor outline = app()->style()->color(Style::BorderAlt);
+
+    painter.setPen(QPen(outline, 1));
+    painter.setBrush(grooveColor);
+    painter.drawRoundedRect(groove.adjusted(0,0,-1,-1), 2, 2);
+    QRect handle = style()->subControlRect(
+        QStyle::CC_Slider,
+        &opt,
+        QStyle::SC_SliderHandle,
+        this);
 
     int sliderMin = groove.left() + handle.width() / 2;
     int sliderMax = groove.right() - handle.width() / 2;
     int sliderLength = sliderMax - sliderMin;
 
+    painter.setRenderHint(QPainter::Antialiasing, false);
     painter.setPen(QPen(app()->style()->color(Style::Base), 2));
+
     int min = minimum();
     int max = maximum();
     if (max > min) {
-        int y1 = groove.center().y() - 3;
-        int y2 = groove.center().y() + 5;
+        int y1 = groove.center().y() - 2;
+        int y2 = groove.center().y() + 3;
 
         for (int v = min; v <= max; ++v) {
             int pos = QStyle::sliderPositionFromValue(min, max, v, sliderLength);

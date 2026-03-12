@@ -132,7 +132,7 @@ StylePrivate::updateTheme(Style::Theme theme)
         map(Style::HighlightAlt, QColor::fromHsl(216, 10, 60));
         map(Style::Border, QColor::fromHsl(220, 3, 32));
         map(Style::BorderAlt, QColor::fromHsl(220, 3, 64));
-        map(Style::Handle, QColor::fromHsl(0, 0, 120));
+        map(Style::Handle, QColor::fromHsl(0, 0, 150));
         map(Style::Progress, QColor::fromHsl(216, 82, 20));
         map(Style::Button, QColor::fromHsl(220, 6, 40));
         map(Style::ButtonAlt, QColor::fromHsl(220, 6, 54));

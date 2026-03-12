@@ -475,9 +475,17 @@
      <addaction name="themeLight"/>
      <addaction name="themeDark"/>
     </widget>
+    <widget class="QMenu" name="viewStatistics_2">
+     <property name="title">
+      <string>Head-up display</string>
+     </property>
+     <addaction name="hudSceneTree"/>
+     <addaction name="hudGpuPerformance"/>
+     <addaction name="hudCameraAxis"/>
+    </widget>
     <addaction name="menuTheme"/>
     <addaction name="separator"/>
-    <addaction name="viewStatistics"/>
+    <addaction name="viewStatistics_2"/>
     <addaction name="separator"/>
     <addaction name="viewOutliner"/>
     <addaction name="viewProgress"/>
@@ -956,17 +964,6 @@
     <string>Ctrl+Shift+Z</string>
    </property>
   </action>
-  <action name="viewStatistics">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Statistics</string>
-   </property>
-   <property name="shortcut">
-    <string>Space</string>
-   </property>
-  </action>
   <action name="fileSaveSettings">
    <property name="text">
     <string>Save settings</string>
@@ -1050,6 +1047,50 @@
    </property>
    <property name="text">
     <string>Scene shaders</string>
+   </property>
+  </action>
+  <action name="actionGPU_Statistics">
+   <property name="text">
+    <string>GPU Statistics</string>
+   </property>
+  </action>
+  <action name="hudSceneTree">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Scene tree</string>
+   </property>
+   <property name="shortcut">
+    <string>Space</string>
+   </property>
+  </action>
+  <action name="hudGpuPerformance">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>GPU performance</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+Space</string>
+   </property>
+  </action>
+  <action name="hudCameraAxis">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Camera axis</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+Space</string>
    </property>
   </action>
  </widget>

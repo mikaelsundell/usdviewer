@@ -251,8 +251,11 @@ ViewerPrivate::init()
     connect(d.dataModel.data(), &DataModel::stageChanged, this, &ViewerPrivate::stageChanged);
     connect(d.dataModel.data(), &DataModel::statusChanged, this, &ViewerPrivate::statusChanged);
     // views
-    connect(d.ui->viewStatistics, &QAction::toggled, this,
-            [=](bool checked) { renderView()->setStatisticsEnabled(checked); });
+    connect(d.ui->hudSceneTree, &QAction::toggled, this, [=](bool checked) { renderView()->enableSceneTree(checked); });
+    connect(d.ui->hudGpuPerformance, &QAction::toggled, this,
+            [=](bool checked) { renderView()->enableGpuPerformance(checked); });
+    connect(d.ui->hudCameraAxis, &QAction::toggled, this,
+            [=](bool checked) { renderView()->enableCameraAxis(checked); });
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
@@ -316,13 +319,19 @@ ViewerPrivate::initSettings()
         d.loadPolicy = DataModel::load_payload;
         d.ui->policyPayload->setChecked(true);
     }
-    bool statistics = settings()->value("statistics", false).toBool();
-    if (statistics) {
-        d.ui->viewStatistics->setChecked(true);
-    }
-    else {
-        d.ui->viewStatistics->setChecked(false);
-    }
+
+    bool sceneTree = settings()->value("sceneTree", true).toBool();
+    d.ui->hudSceneTree->setChecked(sceneTree);
+    renderView()->enableSceneTree(sceneTree);
+
+    bool gpuPerformance = settings()->value("gpuPerformance", false).toBool();
+    d.ui->hudGpuPerformance->setChecked(gpuPerformance);
+    renderView()->enableGpuPerformance(gpuPerformance);
+
+    bool cameraAxis = settings()->value("cameraAxis", true).toBool();
+    d.ui->hudCameraAxis->setChecked(cameraAxis);
+    renderView()->enableCameraAxis(cameraAxis);
+
     QString theme = settings()->value("theme", "dark").toString();
     if (theme == "dark") {
         dark();
@@ -649,7 +658,9 @@ void
 ViewerPrivate::saveSettings()
 {
     settings()->setValue("recentFiles", d.recentFiles);
-    settings()->setValue("statistics", d.ui->viewStatistics->isChecked());
+    settings()->setValue("sceneTree", d.ui->hudSceneTree->isChecked());
+    settings()->setValue("gpuPerformance", d.ui->hudGpuPerformance->isChecked());
+    settings()->setValue("cameraAxis", d.ui->hudCameraAxis->isChecked());
 }
 
 void

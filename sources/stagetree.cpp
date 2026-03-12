@@ -59,38 +59,38 @@ public:
         ItemDelegate(QObject* parent = nullptr)
             : QStyledItemDelegate(parent)
         {}
+        QRect checkRect(const QStyleOptionViewItem& opt) const
+        {
+            const int size = 14;
+            const int margin = 6;
+            return QRect(opt.rect.left() + margin, opt.rect.center().y() - size / 2, size, size);
+        }
         bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option,
                          const QModelIndex& index) override
         {
+            if (index.column() != 0)
+                return false;
             if (!(index.flags() & Qt::ItemIsUserCheckable))
-                return QStyledItemDelegate::editorEvent(event, model, option, index);
+                return false;
+            if (event->type() != QEvent::MouseButtonRelease)
+                return false;
 
-            if (event->type() != QEvent::MouseButtonRelease && event->type() != QEvent::MouseButtonDblClick
-                && event->type() != QEvent::KeyPress)
-                return QStyledItemDelegate::editorEvent(event, model, option, index);
+            auto* mouse = static_cast<QMouseEvent*>(event);
+            if (mouse->button() != Qt::LeftButton)
+                return false;
 
-            QStyleOptionViewItem opt = option;
-            initStyleOption(&opt, index);
-            const QWidget* w = option.widget;
-            const QStyle* style = w ? w->style() : QApplication::style();
-            QRect checkRect = style->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &opt, w);
+            QRect rect = checkRect(option);
+            if (!rect.contains(mouse->pos()))
+                return false;
 
-            if (event->type() == QEvent::MouseButtonRelease || event->type() == QEvent::MouseButtonDblClick) {
-                auto* mouseEvent = dynamic_cast<QMouseEvent*>(event);
-                if (mouseEvent) {
-                    if (mouseEvent->button() != Qt::LeftButton)
-                        return false;
-                    if (!checkRect.contains(mouseEvent->pos()))
-                        return QStyledItemDelegate::editorEvent(event, model, option, index);
-                }
-                Qt::CheckState s = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-                switch (s) {
-                case Qt::Unchecked: s = Qt::Checked; break;
-                case Qt::Checked: s = Qt::Unchecked; break;
-                case Qt::PartiallyChecked: s = Qt::Unchecked; break;
-                }
-                model->setData(index, s, Qt::CheckStateRole);
+            Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
+
+            switch (state) {
+            case Qt::Unchecked: state = Qt::Checked; break;
+            case Qt::Checked: state = Qt::Unchecked; break;
+            case Qt::PartiallyChecked: state = Qt::Unchecked; break;
             }
+            model->setData(index, state, Qt::CheckStateRole);
             return true;
         }
         QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
@@ -103,28 +103,64 @@ public:
         {
             QStyleOptionViewItem opt(option);
             initStyleOption(&opt, index);
-            QTreeWidgetItem* item = static_cast<const QTreeWidget*>(opt.widget)->itemFromIndex(index);
-            std::function<bool(QTreeWidgetItem*)> hasSelectedChildren = [&](QTreeWidgetItem* parentItem) -> bool {
-                for (int i = 0; i < parentItem->childCount(); ++i) {
-                    QTreeWidgetItem* child = parentItem->child(i);
-                    if (child->isSelected() || hasSelectedChildren(child)) {
+            painter->save();
+
+            const QTreeWidget* tree = static_cast<const QTreeWidget*>(opt.widget);
+            QTreeWidgetItem* item = tree ? tree->itemFromIndex(index) : nullptr;
+            std::function<bool(QTreeWidgetItem*)> hasSelectedChildren = [&](QTreeWidgetItem* parent) -> bool {
+                if (!parent)
+                    return false;
+
+                for (int i = 0; i < parent->childCount(); ++i) {
+                    QTreeWidgetItem* child = parent->child(i);
+                    if (child->isSelected() || hasSelectedChildren(child))
                         return true;
-                    }
                 }
                 return false;
             };
             opt.state &= ~QStyle::State_HasFocus;
-            if (opt.state & QStyle::State_Selected) {
-                painter->fillRect(opt.rect, style()->color(Style::ColorRole::Highlight));
-            }
-            if (hasSelectedChildren(item)) {
+            if (opt.state & QStyle::State_Selected)
+                painter->fillRect(opt.rect, style()->color(Style::Highlight));
+            if (item && hasSelectedChildren(item)) {
+                painter->fillRect(opt.rect, style()->color(Style::HighlightAlt));
                 opt.font.setBold(true);
                 opt.font.setItalic(true);
-                painter->save();
-                painter->fillRect(opt.rect, style()->color(Style::ColorRole::HighlightAlt));
-                painter->restore();
             }
-            QStyledItemDelegate::paint(painter, opt, index);
+
+            const int iconSize = 16;
+            if (index.column() == 0 && (index.flags() & Qt::ItemIsUserCheckable)) {
+                static const QString checkedPath = ":/icons/resources/Checked.png";
+                static const QString partialPath = ":/icons/resources/PartiallyChecked.png";
+
+                static QPixmap iconChecked
+                    = QPixmap(checkedPath).scaled(iconSize, iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+                static QPixmap iconPartial
+                    = QPixmap(partialPath).scaled(iconSize, iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+                Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
+
+                QRect iconRect(opt.rect.left() + 4, opt.rect.center().y() - iconSize / 2, iconSize, iconSize);
+
+                QColor bg = style()->color(Style::BaseAlt);
+                QColor border = style()->color(Style::BorderAlt);
+
+                painter->setPen(border);
+                painter->setBrush(bg);
+                painter->drawRect(iconRect.adjusted(0, 0, -1, -1));
+
+                if (state == Qt::Checked)
+                    painter->drawPixmap(iconRect.topLeft(), iconChecked);
+
+                else if (state == Qt::PartiallyChecked)
+                    painter->drawPixmap(iconRect.topLeft(), iconPartial);
+                opt.rect.setLeft(iconRect.right() + 6);
+            }
+            painter->setPen(style()->color(Style::Text));
+            painter->setFont(opt.font);
+            painter->drawText(opt.rect.adjusted(4, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft,
+                              index.data().toString());
+            painter->restore();
         }
         bool hasSelectedChildren(QTreeWidgetItem* item) const
         {

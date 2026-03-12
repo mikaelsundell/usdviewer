@@ -40,7 +40,7 @@
      <number>8</number>
     </property>
     <property name="bottomMargin">
-     <number>8</number>
+     <number>4</number>
     </property>
     <item>
      <widget class="QWidget" name="renderWidget" native="true">
@@ -48,6 +48,9 @@
        <string notr="true"/>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
+       <property name="spacing">
+        <number>0</number>
+       </property>
        <property name="leftMargin">
         <number>0</number>
        </property>
@@ -58,7 +61,7 @@
         <number>0</number>
        </property>
        <property name="bottomMargin">
-        <number>2</number>
+        <number>8</number>
        </property>
        <item>
         <widget class="QWidget" name="widget_3" native="true">
@@ -89,6 +92,9 @@
           </property>
           <property name="topMargin">
            <number>4</number>
+          </property>
+          <property name="bottomMargin">
+           <number>8</number>
           </property>
           <item>
            <widget class="QToolButton" name="open">
@@ -257,7 +263,7 @@
           <number>0</number>
          </property>
          <property name="bottomMargin">
-          <number>8</number>
+          <number>4</number>
          </property>
          <item>
           <widget class="usd::RenderView" name="renderView" native="true">

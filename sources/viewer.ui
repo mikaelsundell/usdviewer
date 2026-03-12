@@ -434,15 +434,6 @@
      <addaction name="editLoadSelected"/>
      <addaction name="editLoadRecursive"/>
      <addaction name="separator"/>
-     <addaction name="editLoadVariant1"/>
-     <addaction name="editLoadVariant2"/>
-     <addaction name="editLoadVariant3"/>
-     <addaction name="editLoadVariant4"/>
-     <addaction name="editLoadVariant5"/>
-     <addaction name="editLoadVariant6"/>
-     <addaction name="editLoadVariant7"/>
-     <addaction name="editLoadVariant8"/>
-     <addaction name="editLoadVariant9"/>
     </widget>
     <widget class="QMenu" name="editUnload">
      <property name="title">

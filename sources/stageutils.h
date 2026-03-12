@@ -32,6 +32,44 @@ QMap<QString, QList<QString>>
 findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = false);
 
 /**
+ * @brief Collects payload prim paths under the specified prim paths.
+ *
+ * Traverses the given prim paths and collects all prims that contain
+ * payloads. When @p recursive is enabled, all descendants are also
+ * traversed.
+ *
+ * @param stage USD stage to query.
+ * @param paths Root prim paths.
+ * @param recursive Traverse children recursively.
+ *
+ * @return List of payload prim paths.
+ */
+QList<SdfPath>
+payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = true);
+
+/**
+ * @brief Filters a list of prim paths to only top-most paths.
+ *
+ * Removes paths that are descendants of other paths in the list.
+ * This prevents redundant traversal when operating recursively
+ * on hierarchies.
+ *
+ * Example:
+ *   /A
+ *   /A/B
+ *   /A/B/C
+ *
+ * Result:
+ *   /A
+ *
+ * @param paths Prim paths to filter.
+ *
+ * @return List of top-most prim paths.
+ */
+QList<SdfPath>
+rootPaths(const QList<SdfPath>& paths);
+
+/**
  * @brief Computes the bounding box for the specified prim paths.
  *
  * Evaluates the world-space bounding box of the given prims

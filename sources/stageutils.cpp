@@ -81,6 +81,47 @@ findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursiv
     return result;
 }
 
+QList<SdfPath>
+payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive)
+{
+    QList<SdfPath> payloadPaths;
+    std::function<void(const UsdPrim&)> collect = [&](const UsdPrim& prim) {
+        if (!prim)
+            return;
+        if (prim.HasPayload())
+            payloadPaths.append(prim.GetPath());
+        if (!recursive)
+            return;
+        for (const UsdPrim& c : prim.GetAllChildren())
+            collect(c);
+    };
+    for (const SdfPath& p : paths) {
+        UsdPrim prim = stage->GetPrimAtPath(p);
+        if (prim)
+            collect(prim);
+    }
+    return payloadPaths;
+}
+
+QList<SdfPath>
+rootPaths(const QList<SdfPath>& paths)
+{
+    QList<SdfPath> result;
+    result.reserve(paths.size());
+    for (const SdfPath& path : paths) {
+        bool isChild = false;
+        for (const SdfPath& other : paths) {
+            if (path != other && path.HasPrefix(other)) {
+                isChild = true;
+                break;
+            }
+        }
+        if (!isChild)
+            result.append(path);
+    }
+    return result;
+}
+
 GfBBox3d
 boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths)
 {

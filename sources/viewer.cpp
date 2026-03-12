@@ -15,6 +15,7 @@
 #include "renderview.h"
 #include "selectionmodel.h"
 #include "settings.h"
+#include "stageutils.h"
 #include "style.h"
 #include <QActionGroup>
 #include <QClipboard>
@@ -893,6 +894,41 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
     else {
         d.ui->displayExpand->setEnabled(false);
         d.ui->displayIsolate->setEnabled(false);
+    }
+    for (QObject* child : d.ui->editLoad->children()) {
+        QMenu* m = qobject_cast<QMenu*>(child);
+        if (m && m->property("variantMenu").toBool()) {
+            delete m;
+        }
+    }
+    if (!paths.isEmpty()) {
+        QMap<QString, QList<QString>> variantSets = findVariantSets(d.dataModel->stage(), paths, true);
+
+        if (!variantSets.isEmpty()) {
+            d.ui->editLoad->addSeparator();
+            int index = 0;
+            for (auto it = variantSets.begin(); it != variantSets.end(); ++it) {
+                const QString& setName = it.key();
+                const QList<QString>& values = it.value();
+
+                QMenu* setMenu = d.ui->editLoad->addMenu(setName);
+                setMenu->setProperty("variantMenu", true);
+
+                for (const QString& value : values) {
+                    QAction* action = setMenu->addAction(value);
+                    if (index < 10) {
+                        int key = (index == 9) ? Qt::Key_0 : (Qt::Key_1 + index);
+                        action->setShortcut(QKeySequence(key));
+                    }
+                    QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
+                        QList<SdfPath> payloadPaths = usd::payloadPaths(d.dataModel->stage(), usd::rootPaths(paths));
+
+                        CommandDispatcher::run(new Command(loadPayloads(payloadPaths, setName, value)));
+                    });
+                    index++;
+                }
+            }
+        }
     }
 }
 

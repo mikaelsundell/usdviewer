@@ -119,7 +119,7 @@ QLineEdit
 }
 
 QMenu {
-    background-color: $base;
+    background-color: $basealt;
     border: 1px solid $borderalt;
     padding: 4px;
 }
@@ -148,17 +148,18 @@ QMenu::separator {
 QMenu::indicator {
     width: 16px;
     height: 16px;
-}
-
-QMenu::indicator:checked {
-    image: url(":/icons/resources/Checked.png");
+    border: 1px solid red;
 }
 
 QMenu::right-arrow {
+    width: 16px;
+    height: 16px;
     image: url(":/icons/resources/Left.png");
 }
 
 QMenu::left-arrow {
+    width: 16px;
+    height: 16px;
     image: url(":/icons/resources/Right.png");
 }
 

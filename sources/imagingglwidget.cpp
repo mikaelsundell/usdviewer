@@ -112,6 +112,7 @@ public:
 void
 ImagingGLWidgetPrivate::init()
 {
+    attach(d.glwidget);
     QSurfaceFormat format;
     format.setSamples(4);
     format.setDepthBufferSize(24);
@@ -582,66 +583,51 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
 void
 ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
 {
-    beginGuard();
-    {
-        d.stage = stage;
-        initCamera();
-        d.glEngine.reset();
-        initGL();
-        if (d.sceneTreeEnabled) {
-            updateSceneTree();
-        }
+    SignalGuard::Scope guard(this);
+    d.stage = stage;
+    initCamera();
+    d.glEngine.reset();
+    initGL();
+    if (d.sceneTreeEnabled) {
+        updateSceneTree();
     }
-    endGuard();
 }
 
 void
 ImagingGLWidgetPrivate::updateBoundingBox(const GfBBox3d& bbox)
 {
-    beginGuard();
-    {
-        d.bbox = bbox;
-        d.glwidget->update();
-    }
-    endGuard();
+    SignalGuard::Scope guard(this);
+    d.bbox = bbox;
+    d.glwidget->update();
 }
 
 void
 ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
 {
-    beginGuard();
-    {
-        d.mask = paths;
-        d.glwidget->update();
-    }
-    endGuard();
+    SignalGuard::Scope guard(this);
+    d.mask = paths;
+    d.glwidget->update();
 }
 
 void
 ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths)
 {
-    beginGuard();
-    {
-        if (d.sceneTreeEnabled) {
-            updateSceneTree();
-        }
-        d.glwidget->update();
+    SignalGuard::Scope guard(this);
+    if (d.sceneTreeEnabled) {
+        updateSceneTree();
     }
-    endGuard();
+    d.glwidget->update();
 }
 
 void
 ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 {
-    beginGuard();
-    {
-        Q_ASSERT("gl engine is not set" && d.glEngine);
-        d.glEngine->SetSelected(QListToSdfPathVector(paths));
-        updateSceneTree();
-        d.glwidget->update();
-        d.selection = paths;
-    }
-    endGuard();
+    SignalGuard::Scope guard(this);
+    Q_ASSERT("gl engine is not set" && d.glEngine);
+    d.glEngine->SetSelected(QListToSdfPathVector(paths));
+    updateSceneTree();
+    d.glwidget->update();
+    d.selection = paths;
 }
 
 QPoint

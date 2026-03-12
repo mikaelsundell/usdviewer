@@ -234,15 +234,19 @@ StageTreePrivate::expand()
 {
     const QList<QTreeWidgetItem*> selected = d.tree->selectedItems();
     for (QTreeWidgetItem* item : selected) {
-        item->setExpanded(true);
         QTreeWidgetItem* parent = item->parent();
         while (parent) {
             parent->setExpanded(true);
             parent = parent->parent();
         }
     }
-    if (selected.size()) {
-        d.tree->scrollToItem(selected.first(), QAbstractItemView::PositionAtCenter);
+    if (!selected.isEmpty()) {
+        QTreeWidgetItem* item = selected.first();
+        QRect itemRect = d.tree->visualItemRect(item);
+        QRect viewRect = d.tree->viewport()->rect();
+        if (!viewRect.intersects(itemRect)) {
+            d.tree->scrollToItem(item, QAbstractItemView::PositionAtCenter);
+        }
     }
 }
 
@@ -450,55 +454,28 @@ StageTreePrivate::checkStateChanged(PrimItem* item)
 void
 StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 {
-    QTreeWidgetItem* item = d.tree->itemAt(event->pos());
     QList<SdfPath> paths;
     for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
-        QString p = selected->data(0, Qt::UserRole).toString();
-        if (!p.isEmpty())
-            paths.append(SdfPath(usd::QStringToString(p)));
+        const QString path = selected->data(0, Qt::UserRole).toString();
+        if (!path.isEmpty())
+            paths.append(SdfPath(usd::QStringToString(path)));
     }
     if (paths.isEmpty())
         return;
 
-    std::vector<SdfPath> filtered;
-    filtered.reserve(paths.size());
-    for (const SdfPath& p : paths) {
-        bool isChild = false;
-        for (const SdfPath& other : paths) {
-            if (p != other && p.HasPrefix(other)) {
-                isChild = true;
-                break;
-            }
-        }
-        if (!isChild)
-            filtered.push_back(p);
-    }
-    QList<SdfPath> payloadPaths;
-    std::function<void(const UsdPrim&)> collectPayloads = [&](const UsdPrim& prim) {
-        if (!prim)
-            return;
-        if (prim.HasPayload())
-            payloadPaths.append(prim.GetPath());
-        for (const UsdPrim& c : prim.GetAllChildren())
-            collectPayloads(c);
-    };
-
-    for (const SdfPath& rootPath : filtered) {
-        UsdPrim root = d.stage->GetPrimAtPath(rootPath);
-        if (root)
-            collectPayloads(root);
-    }
-    QMap<QString, QList<QString>> variantSets = findVariantSets(d.stage, paths, true);
+    const QList<SdfPath> rootPaths = usd::rootPaths(paths);
+    const QList<SdfPath> payloadPaths = usd::payloadPaths(d.stage, rootPaths);
+    const QMap<QString, QList<QString>> variantSets = findVariantSets(d.stage, paths, true);
 
     QMenu menu(d.tree.data());
     struct VariantSelection {
         QString setName;
         QString value;
     };
+
     QAction* loadSelected = nullptr;
     QAction* unloadSelected = nullptr;
     QMap<QAction*, VariantSelection> variantActions;
-
     if (!payloadPaths.isEmpty()) {
         if (!variantSets.isEmpty()) {
             QMenu* loadMenu = menu.addMenu("Load");
@@ -509,13 +486,12 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
             loadMenu->addSeparator();
 
             for (auto it = variantSets.begin(); it != variantSets.end(); ++it) {
-                QString setName = it.key();
+                const QString& setName = it.key();
                 const QList<QString>& values = it.value();
 
-                QMenu* variantMenu = loadMenu->addMenu(QString("%1").arg(setName));
-
+                QMenu* setMenu = loadMenu->addMenu(setName);
                 for (const QString& value : values) {
-                    QAction* action = variantMenu->addAction(value);
+                    QAction* action = setMenu->addAction(value);
                     variantActions[action] = { setName, value };
                 }
             }
@@ -526,39 +502,34 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         }
     }
     menu.addSeparator();
+    QMenu* showMenu = menu.addMenu("Show");
+    QAction* showSelected = showMenu->addAction("Selected");
+    QAction* showRecursive = showMenu->addAction("Recursively");
 
-    QMenu* menuShow = menu.addMenu("Show");
-    QAction* showSelected = menuShow->addAction("Selected");
-    QAction* showRecursive = menuShow->addAction("Recursively");
+    QMenu* hideMenu = menu.addMenu("Hide");
+    QAction* hideSelected = hideMenu->addAction("Selected");
+    QAction* hideRecursive = hideMenu->addAction("Recursively");
 
-    QMenu* menuHide = menu.addMenu("Hide");
-    QAction* hideSelected = menuHide->addAction("Selected");
-    QAction* hideRecursive = menuHide->addAction("Recursively");
     menu.addSeparator();
-
     QAction* isolateSelected = menu.addAction("Isolate");
     QAction* isolateClear = menu.addAction("Clear");
 
     QAction* chosen = menu.exec(d.tree->mapToGlobal(event->pos()));
     if (!chosen)
         return;
-
     if (chosen == loadSelected) {
         CommandDispatcher::run(new Command(loadPayloads(payloadPaths)));
         return;
     }
-
     if (chosen == unloadSelected) {
         CommandDispatcher::run(new Command(unloadPayloads(payloadPaths)));
         return;
     }
-
     if (variantActions.contains(chosen)) {
-        VariantSelection sel = variantActions[chosen];
+        const VariantSelection& sel = variantActions[chosen];
         CommandDispatcher::run(new Command(loadPayloads(payloadPaths, sel.setName, sel.value)));
         return;
     }
-
     if (chosen == showSelected)
         CommandDispatcher::run(new Command(show(paths, false)));
     else if (chosen == showRecursive)

@@ -130,7 +130,7 @@
   <customwidget>
    <class>usd::TreeWidget</class>
    <extends>QTreeWidget</extends>
-   <header>../../../treewidget.h</header>
+   <header>../../../sources/treewidget.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

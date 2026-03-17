@@ -55,8 +55,7 @@ OutlinerViewPrivate::init()
     d.ui->setupUi(d.view.data());
     attach(d.ui->depth);
     stageTree()->setHeaderLabels(QStringList() << "Name"
-                                               << "Type"
-                                               << "Vis");
+                                               << "");
     propertyTree()->setHeaderLabels(QStringList() << "Name"
                                                   << "Value");
     // event filter
@@ -93,12 +92,14 @@ OutlinerViewPrivate::eventFilter(QObject* obj, QEvent* event)
     if (event->type() == QEvent::Show) {
         if (auto* tree = qobject_cast<QTreeWidget*>(obj)) {
             if (tree == stageTree()) {
-                tree->setColumnWidth(0, 220);
+                auto* header = tree->header();
+                header->setStretchLastSection(false);
+                header->setSectionResizeMode(0, QHeaderView::Stretch);
+                header->setSectionResizeMode(1, QHeaderView::Fixed);
                 tree->setColumnWidth(1, 60);
-                tree->header()->setSectionResizeMode(2, QHeaderView::Stretch);
             }
             else if (tree == propertyTree()) {
-                tree->setColumnWidth(0, 220);
+                tree->setColumnWidth(0, 200);
                 tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
             }
         }

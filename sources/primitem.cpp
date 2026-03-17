@@ -71,13 +71,20 @@ PrimItem::data(int column, int role) const
         return QVariant();
 
     const UsdPrim prim = p->d.stage->GetPrimAtPath(p->d.path);
-    if (role == Qt::DisplayRole || role == Qt::ToolTipRole) {
+    if (role == Qt::DisplayRole) {
         switch (column) {
         case Name: return prim ? StringToQString(prim.GetName().GetString()) : StringToQString(p->d.path.GetName());
-        case Type: return prim ? StringToQString(prim.GetTypeName().GetString()) : QString();
         case Vis: return QString();
         default: break;
         }
+    }
+    if (role == Qt::ToolTipRole) {
+        if (!prim)
+            return QVariant();
+
+        return QString("%1 (%2)")
+            .arg(StringToQString(prim.GetPath().GetString()))
+            .arg(StringToQString(prim.GetTypeName().GetString()));
     }
     if (role == Qt::DecorationRole && column == Name) {
         if (prim) {

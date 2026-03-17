@@ -30,8 +30,7 @@ public:
      */
     enum Column {
         Name = 0,  ///< Prim name column.
-        Type = 1,  ///< Prim type column.
-        Vis = 2    ///< Visibility state column.
+        Vis = 1    ///< Visibility state column.
     };
 
     /**

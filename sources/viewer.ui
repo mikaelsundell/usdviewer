@@ -450,6 +450,7 @@
     </widget>
     <addaction name="editUndo"/>
     <addaction name="editRedo"/>
+    <addaction name="editClear"/>
     <addaction name="separator"/>
     <addaction name="editCopyImage"/>
     <addaction name="separator"/>
@@ -946,6 +947,9 @@
    </property>
   </action>
   <action name="editUndo">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Undo</string>
    </property>
@@ -954,6 +958,9 @@
    </property>
   </action>
   <action name="editRedo">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Redo</string>
    </property>
@@ -1088,6 +1095,14 @@
    </property>
    <property name="shortcut">
     <string>Alt+Space</string>
+   </property>
+  </action>
+  <action name="editClear">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Clear</string>
    </property>
   </action>
  </widget>

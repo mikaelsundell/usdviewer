@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "outlinerview.h"
+#include "application.h"
 #include "propertytree.h"
 #include "signalguard.h"
 #include "stagetree.h"
@@ -20,9 +21,6 @@ class OutlinerViewPrivate : public QObject, public SignalGuard {
 public:
     OutlinerViewPrivate();
     void init();
-    void initDataModel();
-    void initSelection();
-    void initDepth();
     PropertyTree* propertyTree();
     StageTree* stageTree();
     bool eventFilter(QObject* obj, QEvent* event);
@@ -35,7 +33,7 @@ public Q_SLOTS:
     void filterChanged(const QString& filter);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
     void depthChanged(int value);
 
 public:
@@ -43,8 +41,6 @@ public:
     struct Data {
         bool followEnabled;
         QScopedPointer<Ui_OutlinerView> ui;
-        QPointer<DataModel> dataModel;
-        QPointer<SelectionModel> selectionModel;
         QPointer<OutlinerView> view;
     };
     Data d;
@@ -73,24 +69,11 @@ OutlinerViewPrivate::init()
     connect(d.ui->expand, &QToolButton::clicked, this, &OutlinerViewPrivate::expand);
     connect(d.ui->follow, &QToolButton::toggled, this, &OutlinerViewPrivate::follow);
     connect(d.ui->depth, &QSlider::valueChanged, this, &OutlinerViewPrivate::depthChanged);
+    // models
+    connect(dataModel(), &DataModel::stageChanged, this, &OutlinerViewPrivate::stageChanged);
+    connect(dataModel(), &DataModel::primsChanged, this, &OutlinerViewPrivate::primsChanged);
+    connect(selectionModel(), &SelectionModel::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
 }
-
-void
-OutlinerViewPrivate::initDataModel()
-{
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &OutlinerViewPrivate::stageChanged);
-    connect(d.dataModel.data(), &DataModel::primsChanged, this, &OutlinerViewPrivate::primsChanged);
-}
-
-void
-OutlinerViewPrivate::initSelection()
-{
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
-}
-
-void
-OutlinerViewPrivate::initDepth()
-{}
 
 PropertyTree*
 OutlinerViewPrivate::propertyTree()
@@ -110,12 +93,12 @@ OutlinerViewPrivate::eventFilter(QObject* obj, QEvent* event)
     if (event->type() == QEvent::Show) {
         if (auto* tree = qobject_cast<QTreeWidget*>(obj)) {
             if (tree == stageTree()) {
-                tree->setColumnWidth(0, 180);
-                tree->setColumnWidth(1, 80);
+                tree->setColumnWidth(0, 220);
+                tree->setColumnWidth(1, 60);
                 tree->header()->setSectionResizeMode(2, QHeaderView::Stretch);
             }
             else if (tree == propertyTree()) {
-                tree->setColumnWidth(0, 180);
+                tree->setColumnWidth(0, 220);
                 tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
             }
         }
@@ -141,7 +124,7 @@ OutlinerViewPrivate::clearDepth()
 void
 OutlinerViewPrivate::collapse()
 {
-    if (d.selectionModel->paths().size()) {
+    if (selectionModel()->paths().size()) {
         d.ui->stageTree->collapse();
     }
 }
@@ -199,10 +182,10 @@ OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 }
 
 void
-OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
+OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
-    if (status == DataModel::stage_loaded) {
-        if (policy == DataModel::load_payload) {
+    if (status == DataModel::StageLoaded) {
+        if (policy == DataModel::LoadPayload) {
             stageTree()->setPayloadEnabled(true);
         }
         else {
@@ -230,7 +213,7 @@ OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy p
 void
 OutlinerViewPrivate::depthChanged(int value)
 {
-    QList<SdfPath> paths = d.selectionModel->paths();
+    QList<SdfPath> paths = selectionModel()->paths();
     if (paths.size() == 1) {
         stageTree()->expandDepth(value, paths.first());
     }
@@ -282,35 +265,4 @@ OutlinerView::enableFollow(bool enable)
     p->follow(enable);
 }
 
-SelectionModel*
-OutlinerView::selectionModel()
-{
-    return p->d.selectionModel;
-}
-
-void
-OutlinerView::setSelectionModel(SelectionModel* selectionModel)
-{
-    if (p->d.selectionModel != selectionModel) {
-        p->d.selectionModel = selectionModel;
-        p->initSelection();
-        update();
-    }
-}
-
-DataModel*
-OutlinerView::dataModel() const
-{
-    return p->d.dataModel;
-}
-
-void
-OutlinerView::setDataModel(DataModel* dataModel)
-{
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-        p->initDataModel();
-        update();
-    }
-}
 }  // namespace usd

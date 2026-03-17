@@ -563,7 +563,7 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     }
 
     if (update) {
-        CommandDispatcher::run(new Command(select(d.selection)));
+        CommandDispatcher::run(new Command(selectPaths(d.selection)));
     }
 
     d.glwidget->update();
@@ -670,7 +670,7 @@ void
 ImagingGLWidgetPrivate::drawBorder(QPainter& painter)
 {
     const int w = 2;
-    painter.setPen(QPen(style()->color(Style::BorderAlt), w));
+    painter.setPen(QPen(style()->color(Style::ColorBorderAlt), w));
     painter.setBrush(Qt::NoBrush);
     QRect r = d.glwidget->rect().adjusted(w / 2, w / 2, -w / 2, -w / 2);
     painter.drawRect(r);
@@ -715,7 +715,7 @@ ImagingGLWidgetPrivate::drawAxis(QPainter& painter)
     painter.drawEllipse(center, radius - 10, radius - 10);
 
     QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::SmallSize));
+    font.setPointSize(style()->fontSize(Style::UISmall));
     font.setBold(true);
     painter.setFont(font);
 
@@ -793,7 +793,7 @@ ImagingGLWidgetPrivate::updateSceneTree()
 
     double dpr = d.glwidget->devicePixelRatioF();
     QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::SmallSize));
+    font.setPointSize(style()->fontSize(Style::UISmall));
     font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
 
     QLocale locale = QLocale::system();
@@ -828,7 +828,7 @@ ImagingGLWidgetPrivate::updateSceneTree()
     d.sceneTree.fill(Qt::transparent);
 
     QPainter p(&d.sceneTree);
-    p.setPen(style()->color(Style::Text));
+    p.setPen(style()->color(Style::ColorText));
     p.setRenderHint(QPainter::TextAntialiasing);
     p.setFont(font);
 
@@ -881,7 +881,7 @@ ImagingGLWidgetPrivate::updateGpuPerformance()
 
     double dpr = d.glwidget->devicePixelRatioF();
     QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::SmallSize));
+    font.setPointSize(style()->fontSize(Style::UISmall));
     font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
 
     QFontMetrics fm(font);

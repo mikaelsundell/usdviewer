@@ -137,6 +137,23 @@ boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     return bbox;
 }
 
+bool
+visibility(UsdStageRefPtr stage, const SdfPath& path)
+{
+    UsdPrim prim = stage->GetPrimAtPath(path);
+    if (!prim)
+        return true;
+
+    UsdGeomImageable imageable(prim);
+    if (!imageable)
+        return true;
+
+    TfToken vis;
+    if (!imageable.GetVisibilityAttr().Get(&vis))
+        return true;
+    return vis != UsdGeomTokens->invisible;
+}
+
 void
 setVisibility(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive)
 {

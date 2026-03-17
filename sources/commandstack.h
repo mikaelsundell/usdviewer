@@ -58,34 +58,10 @@ public:
      */
     bool canRedo() const;
 
-    ///@}
-
-    /** @name Data Models */
-    ///@{
-
     /**
-     * @brief Returns the associated data model.
+     * @brief Returns whether clear is available.
      */
-    DataModel* dataModel() const;
-
-    /**
-     * @brief Sets the data model used by commands.
-     *
-     * @param dataModel Scene data model.
-     */
-    void setDataModel(DataModel* dataModel);
-
-    /**
-     * @brief Returns the associated selection model.
-     */
-    SelectionModel* selectionModel();
-
-    /**
-     * @brief Sets the selection model used by commands.
-     *
-     * @param selectionModel Selection model.
-     */
-    void setSelectionModel(SelectionModel* selectionModel);
+    bool canClear() const;
 
     ///@}
 
@@ -104,14 +80,16 @@ public Q_SLOTS:
      */
     void redo();
 
+    /**
+     * @brief Clears the command history.
+     */
+    void clear();
+
     ///@}
 
 Q_SIGNALS:
-
     /**
-     * @brief Emitted when a command has been executed.
-     *
-     * @param command Executed command.
+     * @brief Emitted after a command is executed.
      */
     void commandExecuted(Command* command);
 
@@ -119,6 +97,21 @@ Q_SIGNALS:
      * @brief Emitted when the command stack state changes.
      */
     void changed();
+
+    /**
+     * @brief Emitted when clear availability changes.
+     */
+    void canClearChanged(bool enabled);
+
+    /**
+     * @brief Emitted when undo availability changes.
+     */
+    void canUndoChanged(bool enabled);
+
+    /**
+     * @brief Emitted when redo availability changes.
+     */
+    void canRedoChanged(bool enabled);
 
 private:
     QScopedPointer<CommandStackPrivate> p;

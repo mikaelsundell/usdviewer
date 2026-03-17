@@ -37,26 +37,26 @@ public:
     /**
      * @brief Stage loading policy.
      */
-    enum load_policy {
-        load_all,     ///< Load the entire stage.
-        load_payload  ///< Load stage with payloads deferred.
+    enum LoadPolicy {
+        LoadAll,     ///< Load the entire stage.
+        LoadPayload  ///< Load stage with payloads deferred.
     };
 
     /**
      * @brief Progress block state.
      */
-    enum progress_mode {
-        progress_idle,    ///< No progress operation running.
-        progress_running  ///< Progress operation active.
+    enum ProgressMode {
+        ProgressIdle,    ///< No progress operation running.
+        ProgressRunning  ///< Progress operation active.
     };
 
     /**
      * @brief Stage loading status.
      */
-    enum stage_status {
-        stage_loaded,  ///< Stage successfully loaded.
-        stage_failed,  ///< Stage loading failed.
-        stage_closed   ///< Stage has been closed.
+    enum StageStatus {
+        StageLoaded,  ///< Stage successfully loaded.
+        StageFailed,  ///< Stage loading failed.
+        StageClosed   ///< Stage has been closed.
     };
 
 public:
@@ -93,7 +93,7 @@ public:
      * @param filename USD file to load.
      * @param policy Stage loading policy.
      */
-    DataModel(const QString& filename, load_policy policy = load_all);
+    DataModel(const QString& filename, LoadPolicy policy = LoadAll);
 
     /**
      * @brief Copy constructor.
@@ -152,7 +152,7 @@ public:
      *
      * @return True if loading succeeded.
      */
-    bool loadFromFile(const QString& filename, load_policy policy = load_all);
+    bool loadFromFile(const QString& filename, LoadPolicy policy = LoadAll);
 
     /**
      * @brief Saves the current stage to file.
@@ -190,6 +190,11 @@ public:
     ///@{
 
     /**
+     * @brief Returns the current mask.
+     */
+    QList<SdfPath> mask() const;
+
+    /**
      * @brief Sets the active prim mask.
      */
     void setMask(const QList<SdfPath>& paths);
@@ -202,7 +207,7 @@ public:
     /**
      * @brief Returns the current loading policy.
      */
-    load_policy loadPolicy() const;
+    LoadPolicy loadPolicy() const;
 
     /**
      * @brief Returns the scene bounding box.
@@ -231,7 +236,7 @@ Q_SIGNALS:
     /**
      * @brief Emitted when a progress block begins or ends.
      */
-    void progressBlockChanged(const QString& name, progress_mode mode);
+    void progressBlockChanged(const QString& name, ProgressMode mode);
 
     /**
      * @brief Emitted when progress updates occur.
@@ -256,7 +261,7 @@ Q_SIGNALS:
     /**
      * @brief Emitted when the stage changes.
      */
-    void stageChanged(UsdStageRefPtr stage, load_policy policy, stage_status status);
+    void stageChanged(UsdStageRefPtr stage, LoadPolicy policy, StageStatus status);
 
     /**
      * @brief Emitted when the status message changes.

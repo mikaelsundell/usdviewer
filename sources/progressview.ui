@@ -66,14 +66,14 @@
          </font>
         </property>
         <property name="text">
-         <string></string>
+         <string/>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QTreeWidget" name="progressTree">
+       <widget class="usd::TreeWidget" name="progressTree">
         <property name="alternatingRowColors">
-         <bool>true</bool>
+         <bool>false</bool>
         </property>
         <column>
          <property name="text">
@@ -126,6 +126,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>usd::TreeWidget</class>
+   <extends>QTreeWidget</extends>
+   <header>../../../treewidget.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

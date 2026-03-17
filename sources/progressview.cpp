@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "progressview.h"
+#include "application.h"
 #include "qtutils.h"
 #include <QDir>
 #include <QFileInfo>
@@ -17,18 +18,16 @@ namespace usd {
 class ProgressViewPrivate : public QObject {
 public:
     void init();
-    void initDataModel();
-    void initSelection();
     QTreeWidget* progressTree();
     bool eventFilter(QObject* obj, QEvent* event);
 
 public Q_SLOTS:
     void cancel();
     void clear();
-    void progressBlockChanged(const QString& name, DataModel::progress_mode mode);
+    void progressBlockChanged(const QString& name, DataModel::ProgressMode mode);
     void progressNotifyChanged(const DataModel::Notify& notify, size_t completed, size_t expected);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
 
 public:
     QString updateStatus(size_t completed, size_t expected);
@@ -38,8 +37,6 @@ public:
         bool running = false;
         QElapsedTimer timer;
         QScopedPointer<Ui_ProgressView> ui;
-        QPointer<DataModel> dataModel;
-        QPointer<SelectionModel> selectionModel;
         QPointer<ProgressView> view;
     };
     Data d;
@@ -57,20 +54,10 @@ ProgressViewPrivate::init()
                                                   << "Paths");
     // connect
     connect(d.ui->clear, &QPushButton::clicked, this, &ProgressViewPrivate::clear);
-}
-
-void
-ProgressViewPrivate::initDataModel()
-{
-    connect(d.dataModel.data(), &DataModel::progressBlockChanged, this, &ProgressViewPrivate::progressBlockChanged);
-    connect(d.dataModel.data(), &DataModel::progressNotifyChanged, this, &ProgressViewPrivate::progressNotifyChanged);
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &ProgressViewPrivate::stageChanged);
-}
-
-void
-ProgressViewPrivate::initSelection()
-{
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &ProgressViewPrivate::selectionChanged);
+    connect(dataModel(), &DataModel::progressBlockChanged, this, &ProgressViewPrivate::progressBlockChanged);
+    connect(dataModel(), &DataModel::progressNotifyChanged, this, &ProgressViewPrivate::progressNotifyChanged);
+    connect(dataModel(), &DataModel::stageChanged, this, &ProgressViewPrivate::stageChanged);
+    connect(selectionModel(), &SelectionModel::selectionChanged, this, &ProgressViewPrivate::selectionChanged);
 }
 
 QTreeWidget*
@@ -96,7 +83,7 @@ ProgressViewPrivate::eventFilter(QObject* obj, QEvent* event)
 void
 ProgressViewPrivate::cancel()
 {
-    d.dataModel->endProgressBlock();
+    dataModel()->endProgressBlock();
 }
 
 void
@@ -106,9 +93,9 @@ ProgressViewPrivate::clear()
 }
 
 void
-ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::progress_mode mode)
+ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::ProgressMode mode)
 {
-    if (mode == DataModel::progress_mode::progress_running) {
+    if (mode == DataModel::ProgressMode::ProgressRunning) {
         qDebug() << "RUNNING:" << name;
 
         clear();
@@ -183,7 +170,7 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
 }
 
 void
-ProgressViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
+ProgressViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
     progressTree()->clear();
     d.stage = stage;
@@ -211,35 +198,4 @@ ProgressView::ProgressView(QWidget* parent)
 
 ProgressView::~ProgressView() = default;
 
-DataModel*
-ProgressView::dataModel() const
-{
-    return p->d.dataModel;
-}
-
-void
-ProgressView::setDataModel(DataModel* dataModel)
-{
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-        p->initDataModel();
-        update();
-    }
-}
-
-SelectionModel*
-ProgressView::selectionModel()
-{
-    return p->d.selectionModel;
-}
-
-void
-ProgressView::setSelectionModel(SelectionModel* selectionModel)
-{
-    if (p->d.selectionModel != selectionModel) {
-        p->d.selectionModel = selectionModel;
-        p->initSelection();
-        update();
-    }
-}
 }  // namespace usd

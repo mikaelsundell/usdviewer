@@ -15,41 +15,60 @@ class Style : public QObject {
     Q_OBJECT
 public:
     /**
+     * @brief Global theme modes.
+     */
+    enum Theme { ThemeDark, ThemeLight };
+    Q_ENUM(Theme)
+
+    /**
      * @brief Semantic color roles.
      */
     enum ColorRole {
-        Base,
-        BaseAlt,
-        Dock,
-        DockAlt,
-        Accent,
-        AccentAlt,
-        Text,
-        TextDisabled,
-        Highlight,
-        HighlightAlt,
-        Border,
-        BorderAlt,
-        Handle,
-        Progress,
-        Button,
-        ButtonAlt,
-        Render,
-        RenderAlt
+        ColorBase,
+        ColorBaseAlt,
+        ColorDock,
+        ColorDockAlt,
+        ColorAccent,
+        ColorAccentAlt,
+        ColorText,
+        ColorTextDisabled,
+        ColorHighlight,
+        ColorHighlightAlt,
+        ColorBorder,
+        ColorBorderAlt,
+        ColorHandle,
+        ColorProgress,
+        ColorButton,
+        ColorButtonAlt,
+        ColorRender,
+        ColorRenderAlt
     };
     Q_ENUM(ColorRole)
 
     /**
-     * @brief Logical font size roles.
+     * @brief Semantic icon roles.
      */
-    enum FontRole { DefaultSize, SmallSize, LargeSize };
-    Q_ENUM(FontRole)
+    enum IconRole {
+        IconBranchOpen,
+        IconBranchClosed,
+        IconHidden,
+        IconVisible,
+        IconChecked,
+        IconDropdown,
+        IconLeft,
+        IconMaterial,
+        IconMesh,
+        IconPartiallyChecked,
+        IconPrim,
+        IconRight
+    };
+    Q_ENUM(IconRole)
 
     /**
-     * @brief Global theme modes.
+     * @brief Logical UI scale levels.
      */
-    enum Theme { Dark, Light };
-    Q_ENUM(Theme)
+    enum UIScale { UISmall, UIMedium, UILarge };
+    Q_ENUM(UIScale)
 
     /**
      * @brief Constructs a Style instance.
@@ -75,14 +94,34 @@ public:
     Theme theme() const;
 
     /**
-     * @brief Sets color for a role.
-     */
-    void setColor(ColorRole role, const QColor& color);
-
-    /**
      * @brief Returns color for a role.
      */
     QColor color(ColorRole role) const;
+
+    /**
+     * @brief Returns icon for a role and size.
+     */
+    QPixmap icon(IconRole role, UIScale scale = UIScale::UIMedium) const;
+
+    /**
+     * @brief Returns font size for a scale.
+     */
+    int fontSize(UIScale scale) const;
+
+    /**
+     * @brief Sets the font size for a scale.
+     */
+    void setFontSize(UIScale scale, int size);
+
+    /**
+     * @brief Returns icon size for a scale.
+     */
+    int iconSize(UIScale scale) const;
+
+    /**
+     * @brief Sets the icon size for a scale.
+     */
+    void setIconSize(UIScale scale, int size);
 
     ///@}
 
@@ -99,16 +138,6 @@ public:
      */
     QColorSpace colorSpace() const;
 
-    /**
-     * @brief Sets font size for a role.
-     */
-    void setFontSize(FontRole role, int size);
-
-    /**
-     * @brief Returns font size for a role.
-     */
-    int fontSize(FontRole role) const;
-
     ///@}
 
 Q_SIGNALS:
@@ -122,11 +151,6 @@ Q_SIGNALS:
      * @brief Emitted when a color role changes.
      */
     void colorChanged(ColorRole role);
-
-    /**
-     * @brief Emitted when a font role changes.
-     */
-    void fontChanged(FontRole role);
 
 private:
     Q_DISABLE_COPY_MOVE(Style)

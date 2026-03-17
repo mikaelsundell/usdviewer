@@ -26,7 +26,7 @@ public:
     void cancelProgressBlock();
     void endProgressBlock();
     bool isProgressBlockCancelled() const;
-    bool loadFromFile(const QString& filename, DataModel::load_policy loadPolicy);
+    bool loadFromFile(const QString& filename, DataModel::LoadPolicy loadPolicy);
     bool saveToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool close();
@@ -72,8 +72,8 @@ public:
 public:
     struct Data {
         UsdStageRefPtr stage;
-        DataModel::load_policy loadPolicy;
-        DataModel::stage_status stageStatus;
+        DataModel::LoadPolicy loadPolicy;
+        DataModel::StageStatus stageStatus;
         QString changeName;
         size_t changeDepth;
         size_t expectedChanges;
@@ -95,7 +95,7 @@ public:
 
 DataModelPrivate::DataModelPrivate()
 {
-    d.loadPolicy = DataModel::load_policy::load_all;
+    d.loadPolicy = DataModel::LoadPolicy::LoadAll;
     d.changeDepth = 0;
     d.expectedChanges = 0;
     d.completedChanges = 0;
@@ -110,7 +110,7 @@ DataModelPrivate::~DataModelPrivate() = default;
 void
 DataModelPrivate::initStage()
 {
-    d.stageStatus = DataModel::stage_status::stage_loaded;
+    d.stageStatus = DataModel::StageStatus::StageLoaded;
     d.bboxCache.reset();
     d.bbox = boundingBox();
     d.stageWatcher->init();
@@ -128,7 +128,7 @@ DataModelPrivate::beginProgressBlock(const QString& name, size_t count)
     if (d.changeDepth == 1) {
         d.expectedChanges = count;
         d.completedChanges = 0;
-        Q_EMIT d.dataModel->progressBlockChanged(name, DataModel::progress_mode::progress_running);
+        Q_EMIT d.dataModel->progressBlockChanged(name, DataModel::ProgressMode::ProgressRunning);
     }
 }
 
@@ -158,7 +158,7 @@ DataModelPrivate::endProgressBlock()
     bool cancelled = d.changeCancelled.load();
     d.changeCancelled.store(false);
 
-    Q_EMIT d.dataModel->progressBlockChanged(d.changeName, DataModel::progress_mode::progress_idle);
+    Q_EMIT d.dataModel->progressBlockChanged(d.changeName, DataModel::ProgressMode::ProgressIdle);
     d.changeName.clear();
 
     if (cancelled) {
@@ -192,11 +192,11 @@ DataModelPrivate::isProgressBlockCancelled() const
 }
 
 bool
-DataModelPrivate::loadFromFile(const QString& filename, DataModel::load_policy policy)
+DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy policy)
 {
     {
         QWriteLocker locker(&d.stageLock);
-        if (policy == DataModel::load_all) {
+        if (policy == DataModel::LoadAll) {
             d.stage = UsdStage::Open(QStringToString(filename), UsdStage::LoadAll);
         }
         else {
@@ -211,7 +211,7 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::load_policy p
         d.filename = filename;
     }
     else {
-        d.stageStatus = DataModel::stage_status::stage_failed;
+        d.stageStatus = DataModel::StageStatus::StageFailed;
         d.bboxCache.reset();
         return false;
     }
@@ -282,7 +282,7 @@ DataModelPrivate::close()
     {
         QWriteLocker locker(&d.stageLock);
         d.stage = nullptr;
-        d.stageStatus = DataModel::stage_status::stage_closed;
+        d.stageStatus = DataModel::StageStatus::StageClosed;
         d.bboxCache.reset();
         d.pendingPaths.clear();
         d.changeDepth = 0;
@@ -387,7 +387,7 @@ DataModel::DataModel()
     p->d.dataModel = this;
 }
 
-DataModel::DataModel(const QString& filename, DataModel::load_policy loadPolicy)
+DataModel::DataModel(const QString& filename, DataModel::LoadPolicy loadPolicy)
     : p(new DataModelPrivate())
 {
     p->d.dataModel = this;
@@ -431,7 +431,7 @@ DataModel::isProgressBlockCancelled() const
 }
 
 bool
-DataModel::loadFromFile(const QString& filename, DataModel::load_policy loadPolicy)
+DataModel::loadFromFile(const QString& filename, DataModel::LoadPolicy loadPolicy)
 {
     return p->loadFromFile(filename, loadPolicy);
 }
@@ -475,6 +475,12 @@ DataModel::isLoaded() const
     return p->isLoaded();
 }
 
+QList<SdfPath>
+DataModel::mask() const
+{
+    return p->d.mask;
+}
+
 void
 DataModel::setMask(const QList<SdfPath>& paths)
 {
@@ -493,7 +499,7 @@ DataModel::boundingBox()
     return p->boundingBox();
 }
 
-DataModel::load_policy
+DataModel::LoadPolicy
 DataModel::loadPolicy() const
 {
     return p->d.loadPolicy;

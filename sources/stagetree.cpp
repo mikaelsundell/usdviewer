@@ -93,84 +93,51 @@ public:
             model->setData(index, state, Qt::CheckStateRole);
             return true;
         }
-        QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
-        {
-            QSize size = QStyledItemDelegate::sizeHint(option, index);
-            size.setHeight(30);
-            return size;
-        }
         void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
         {
             QStyleOptionViewItem opt(option);
             initStyleOption(&opt, index);
+            opt.features &= ~QStyleOptionViewItem::HasCheckIndicator;
+            opt.backgroundBrush = Qt::NoBrush;
             painter->save();
 
             const QTreeWidget* tree = static_cast<const QTreeWidget*>(opt.widget);
             QTreeWidgetItem* item = tree ? tree->itemFromIndex(index) : nullptr;
-            std::function<bool(QTreeWidgetItem*)> hasSelectedChildren = [&](QTreeWidgetItem* parent) -> bool {
-                if (!parent)
-                    return false;
-
-                for (int i = 0; i < parent->childCount(); ++i) {
-                    QTreeWidgetItem* child = parent->child(i);
-                    if (child->isSelected() || hasSelectedChildren(child))
-                        return true;
-                }
-                return false;
-            };
             opt.state &= ~QStyle::State_HasFocus;
-            if (opt.state & QStyle::State_Selected)
-                painter->fillRect(opt.rect, style()->color(Style::Highlight));
-            if (item && hasSelectedChildren(item)) {
-                painter->fillRect(opt.rect, style()->color(Style::HighlightAlt));
-                opt.font.setBold(true);
-                opt.font.setItalic(true);
+            if (opt.state & QStyle::State_Selected) {
+                painter->fillRect(opt.rect, style()->color(Style::ColorHighlight));
             }
-
-            const int iconSize = 16;
             if (index.column() == 0 && (index.flags() & Qt::ItemIsUserCheckable)) {
-                static const QString checkedPath = ":/icons/resources/Checked.png";
-                static const QString partialPath = ":/icons/resources/PartiallyChecked.png";
-
-                static QPixmap iconChecked
-                    = QPixmap(checkedPath).scaled(iconSize, iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
-                static QPixmap iconPartial
-                    = QPixmap(partialPath).scaled(iconSize, iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
+                const int size = 16;
+                QIcon checked = style()->icon(Style::IconChecked, Style::UIMedium);
+                QIcon partiallyChecked = style()->icon(Style::IconPartiallyChecked, Style::UIMedium);
                 Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-
-                QRect iconRect(opt.rect.left() + 4, opt.rect.center().y() - iconSize / 2, iconSize, iconSize);
-
-                QColor bg = style()->color(Style::BaseAlt);
-                QColor border = style()->color(Style::BorderAlt);
-
-                painter->setPen(border);
-                painter->setBrush(bg);
+                QRect iconRect(opt.rect.left() + 12, opt.rect.center().y() - size / 2 + 2, size, size);
+                painter->setBrush(style()->color(Style::ColorBaseAlt));
+                painter->setPen(style()->color(Style::ColorBorderAlt));
                 painter->drawRect(iconRect.adjusted(0, 0, -1, -1));
-
                 if (state == Qt::Checked)
-                    painter->drawPixmap(iconRect.topLeft(), iconChecked);
-
+                    painter->drawPixmap(iconRect.topLeft(), checked.pixmap(size, size));
                 else if (state == Qt::PartiallyChecked)
-                    painter->drawPixmap(iconRect.topLeft(), iconPartial);
-                opt.rect.setLeft(iconRect.right() + 6);
+                    painter->drawPixmap(iconRect.topLeft(), partiallyChecked.pixmap(size, size));
+                opt.rect.setLeft(iconRect.right() + 4);
             }
-            painter->setPen(style()->color(Style::Text));
-            painter->setFont(opt.font);
-            painter->drawText(opt.rect.adjusted(4, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft,
-                              index.data().toString());
+            QStyle* qstyle = opt.widget ? opt.widget->style() : QApplication::style();
+            if (!opt.icon.isNull()) {
+                QRect iconRect = qstyle->subElementRect(QStyle::SE_ItemViewItemDecoration, &opt, opt.widget);
+                opt.icon.paint(painter, iconRect, Qt::AlignCenter,
+                               opt.state & QStyle::State_Enabled ? QIcon::Normal : QIcon::Disabled);
+            }
+            QRect textRect = qstyle->subElementRect(QStyle::SE_ItemViewItemText, &opt, opt.widget);
+            bool visible = index.data(PrimItem::DataVisible).toBool();
+            QColor textColor;
+            textColor = style()->color(Style::ColorText);
+            if (!visible) {
+                textColor = style()->color(Style::ColorTextDisabled);
+            }
+            painter->setPen(textColor);
+            painter->drawText(textRect, opt.displayAlignment, opt.text);
             painter->restore();
-        }
-        bool hasSelectedChildren(QTreeWidgetItem* item) const
-        {
-            for (int i = 0; i < item->childCount(); ++i) {
-                QTreeWidgetItem* child = item->child(i);
-                if (child->isSelected() || hasSelectedChildren(child)) {
-                    return true;
-                }
-            }
-            return false;
         }
     };
     struct Data {
@@ -195,6 +162,8 @@ StageTreePrivate::init()
     attach(d.tree->selectionModel());
     d.delegate = new ItemDelegate(d.tree.data());
     d.tree->setItemDelegate(d.delegate);
+    int size = style()->iconSize(Style::UISmall);
+    d.tree->setIconSize(QSize(size, size));
     connect(d.tree.data(), &StageTree::itemSelectionChanged, this, &StageTreePrivate::itemSelectionChanged);
     connect(d.tree.data(), &StageTree::itemChanged, this, [this](QTreeWidgetItem* item, int column) {
         if (column == PrimItem::Name) {
@@ -404,10 +373,10 @@ StageTreePrivate::toggleVisible(PrimItem* item)
     if (!pathString.isEmpty())
         paths.append(SdfPath(QStringToString(pathString)));
     if (item->isVisible()) {
-        CommandDispatcher::run(new Command(hide(paths, false)));
+        CommandDispatcher::run(new Command(hidePaths(paths, false)));
     }
     else {
-        CommandDispatcher::run(new Command(show(paths, false)));
+        CommandDispatcher::run(new Command(showPaths(paths, false)));
     }
 }
 
@@ -445,7 +414,7 @@ StageTreePrivate::itemSelectionChanged()
         if (!pathString.isEmpty())
             paths.append(SdfPath(QStringToString(pathString)));
     }
-    CommandDispatcher::run(new Command(select(paths)));
+    CommandDispatcher::run(new Command(selectPaths(paths)));
 }
 
 void
@@ -550,6 +519,9 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     QAction* isolateSelected = menu.addAction("Isolate");
     QAction* isolateClear = menu.addAction("Clear");
 
+    menu.addSeparator();
+    QAction* deleteSelected = menu.addAction("Delete");
+
     QAction* chosen = menu.exec(d.tree->mapToGlobal(event->pos()));
     if (!chosen)
         return;
@@ -567,17 +539,19 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         return;
     }
     if (chosen == showSelected)
-        CommandDispatcher::run(new Command(show(paths, false)));
+        CommandDispatcher::run(new Command(showPaths(paths, false)));
     else if (chosen == showRecursive)
-        CommandDispatcher::run(new Command(show(paths, true)));
+        CommandDispatcher::run(new Command(showPaths(paths, true)));
     else if (chosen == hideSelected)
-        CommandDispatcher::run(new Command(hide(paths, false)));
+        CommandDispatcher::run(new Command(hidePaths(paths, false)));
     else if (chosen == hideRecursive)
-        CommandDispatcher::run(new Command(hide(paths, true)));
+        CommandDispatcher::run(new Command(hidePaths(paths, true)));
     else if (chosen == isolateSelected)
-        CommandDispatcher::run(new Command(isolate(paths)));
+        CommandDispatcher::run(new Command(isolatePaths(paths)));
     else if (chosen == isolateClear)
-        CommandDispatcher::run(new Command(isolate(QList<SdfPath>())));
+        CommandDispatcher::run(new Command(isolatePaths(QList<SdfPath>())));
+    else if (chosen == deleteSelected)
+        CommandDispatcher::run(new Command(deletePaths(paths)));
 }
 
 void
@@ -676,7 +650,7 @@ StageTreePrivate::itemFromPath(const SdfPath& path) const
 }
 
 StageTree::StageTree(QWidget* parent)
-    : QTreeWidget(parent)
+    : TreeWidget(parent)
     , p(new StageTreePrivate())
 {
     p->d.tree = this;
@@ -806,4 +780,5 @@ StageTree::mouseMoveEvent(QMouseEvent* event)
 {
     event->accept();
 }
+
 }  // namespace usd

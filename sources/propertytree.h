@@ -6,6 +6,7 @@
 
 #include "datamodel.h"
 #include "selectionmodel.h"
+#include "treewidget.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -26,7 +27,7 @@ class PropertyTreePrivate;
  * Typically used alongside the StageTree and RenderView to inspect
  * detailed data for the currently selected prims.
  */
-class PropertyTree : public QTreeWidget {
+class PropertyTree : public TreeWidget {
     Q_OBJECT
 public:
     /**

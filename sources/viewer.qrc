@@ -3,6 +3,8 @@
     <file>../resources/App.qss</file>
   </qresource>
   <qresource prefix="icons">
+    <file>../resources/BranchOpen.png</file>
+    <file>../resources/BranchClosed.png</file>
     <file>../resources/Checked.png</file>
     <file>../resources/Clear.png</file>
     <file>../resources/ClearDisabled.png</file>
@@ -17,13 +19,18 @@
     <file>../resources/FollowDisabled.png</file>
     <file>../resources/FrameAll.png</file>
     <file>../resources/FrameAllDisabled.png</file>
+    <file>../resources/Hidden.png</file>
     <file>../resources/Image.png</file>
     <file>../resources/Left.png</file>
+    <file>../resources/Material.png</file>
+    <file>../resources/Mesh.png</file>
     <file>../resources/Open.png</file>
     <file>../resources/PartiallyChecked.png</file>
+    <file>../resources/Prim.png</file>
     <file>../resources/Right.png</file>
     <file>../resources/Shaded.png</file>
     <file>../resources/ShadedDisabled.png</file>
+    <file>../resources/Visible.png</file>
     <file>../resources/Wireframe.png</file>
     <file>../resources/WireframeDisabled.png</file>
   </qresource>

@@ -8,6 +8,9 @@
 #include <QScopedPointer>
 
 namespace usd {
+class CommandStack;
+class DataModel;
+class SelectionModel;
 class Style;
 class Settings;
 class ApplicationPrivate;
@@ -37,6 +40,21 @@ public:
 
     /** @name Subsystems */
     ///@{
+
+    /**
+     * @brief Returns the data model subsystem.
+     */
+    DataModel* dataModel() const;
+
+    /**
+     * @brief Returns the selection model subsystem.
+     */
+    SelectionModel* selectionModel() const;
+
+    /**
+     * @brief Returns the command stack subsystem.
+     */
+    CommandStack* commandStack() const;
 
     /**
      * @brief Returns the settings subsystem.
@@ -70,6 +88,36 @@ inline Application*
 app()
 {
     return Application::instance();
+}
+
+/**
+ * @brief Returns the global data model subsystem.
+ */
+inline DataModel*
+dataModel()
+{
+    auto* a = app();
+    return a ? a->dataModel() : nullptr;
+}
+
+/**
+ * @brief Returns the global selection model subsystem.
+ */
+inline SelectionModel*
+selectionModel()
+{
+    auto* a = app();
+    return a ? a->selectionModel() : nullptr;
+}
+
+/**
+ * @brief Returns the global selection model subsystem.
+ */
+inline CommandStack*
+commandStack()
+{
+    auto* a = app();
+    return a ? a->commandStack() : nullptr;
 }
 
 /**

@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "renderview.h"
+#include "application.h"
 #include "stageutils.h"
 #include <QPointer>
 
@@ -13,8 +14,6 @@ namespace usd {
 class RenderViewPrivate : public QObject {
 public:
     void init();
-    void initDataModel();
-    void initSelection();
     ImagingGLWidget* imageGLWidget();
     ViewCamera camera();
     void frameAll();
@@ -26,14 +25,12 @@ public Q_SLOTS:
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
     void renderReady(qint64 elapsed);
 
 public:
     struct Data {
         QScopedPointer<Ui_RenderView> ui;
-        QPointer<DataModel> dataModel;
-        QPointer<SelectionModel> selectionModel;
         QPointer<RenderView> view;
     };
     Data d;
@@ -44,22 +41,13 @@ RenderViewPrivate::init()
 {
     d.ui.reset(new Ui_RenderView());
     d.ui->setupUi(d.view.data());
+    // connect
     connect(imageGLWidget(), &ImagingGLWidget::renderReady, this, &RenderViewPrivate::renderReady);
-}
-
-void
-RenderViewPrivate::initDataModel()
-{
-    connect(d.dataModel.data(), &DataModel::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
-    connect(d.dataModel.data(), &DataModel::maskChanged, this, &RenderViewPrivate::maskChanged);
-    connect(d.dataModel.data(), &DataModel::primsChanged, this, &RenderViewPrivate::primsChanged);
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &RenderViewPrivate::stageChanged);
-}
-
-void
-RenderViewPrivate::initSelection()
-{
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &RenderViewPrivate::selectionChanged);
+    connect(dataModel(), &DataModel::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
+    connect(dataModel(), &DataModel::maskChanged, this, &RenderViewPrivate::maskChanged);
+    connect(dataModel(), &DataModel::primsChanged, this, &RenderViewPrivate::primsChanged);
+    connect(dataModel(), &DataModel::stageChanged, this, &RenderViewPrivate::stageChanged);
+    connect(selectionModel(), &SelectionModel::selectionChanged, this, &RenderViewPrivate::selectionChanged);
 }
 
 ImagingGLWidget*
@@ -77,23 +65,23 @@ RenderViewPrivate::camera()
 void
 RenderViewPrivate::frameAll()
 {
-    if (d.dataModel->isLoaded()) {
-        imageGLWidget()->frame(d.dataModel->boundingBox());
+    if (dataModel()->isLoaded()) {
+        imageGLWidget()->frame(dataModel()->boundingBox());
     }
 }
 
 void
 RenderViewPrivate::frameSelected()
 {
-    if (d.selectionModel->paths().size()) {
-        imageGLWidget()->frame(boundingBox(d.dataModel->stage(), d.selectionModel->paths()));
+    if (selectionModel()->paths().size()) {
+        imageGLWidget()->frame(boundingBox(dataModel()->stage(), selectionModel()->paths()));
     }
 }
 
 void
 RenderViewPrivate::resetView()
 {
-    if (d.dataModel->isLoaded()) {
+    if (dataModel()->isLoaded()) {
         imageGLWidget()->resetView();
     }
 }
@@ -123,10 +111,10 @@ RenderViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 }
 
 void
-RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
+RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
-    if (status == DataModel::stage_loaded) {
-        imageGLWidget()->updateStage(d.dataModel->stage());
+    if (status == DataModel::StageLoaded) {
+        imageGLWidget()->updateStage(dataModel()->stage());
     }
     else {
         imageGLWidget()->close();
@@ -138,9 +126,9 @@ RenderViewPrivate::renderReady(qint64 elapsed)
 {
     const qint64 thresholdMs = 500;
     if (elapsed > thresholdMs) {
-        if (d.dataModel) {
+        if (dataModel()) {
             QString msg = QStringLiteral("Warning: Render time %1 ms").arg(elapsed);
-            d.dataModel->setStatus(msg);
+            dataModel()->setStatus(msg);
         }
     }
 }
@@ -283,37 +271,5 @@ void
 RenderView::enableCameraAxis(bool enabled)
 {
     p->imageGLWidget()->enableCameraAxis(enabled);
-}
-
-DataModel*
-RenderView::dataModel() const
-{
-    return p->d.dataModel;
-}
-
-void
-RenderView::setDataModel(DataModel* dataModel)
-{
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-        p->initDataModel();
-        update();
-    }
-}
-
-SelectionModel*
-RenderView::selectionModel()
-{
-    return p->d.selectionModel;
-}
-
-void
-RenderView::setSelectionModel(SelectionModel* selectionModel)
-{
-    if (p->d.selectionModel != selectionModel) {
-        p->d.selectionModel = selectionModel;
-        p->initSelection();
-        update();
-    }
 }
 }  // namespace usd

@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "commanddispatcher.h"
+#include "application.h"
 
 namespace usd {
 CommandDispatcher::Data CommandDispatcher::d = { nullptr };
@@ -28,6 +29,6 @@ CommandDispatcher::run(Command* cmd)
 QReadWriteLock*
 CommandDispatcher::stageLock()
 {
-    return d.stack->dataModel()->stageLock();
+    return dataModel()->stageLock();
 }
 }  // namespace usd

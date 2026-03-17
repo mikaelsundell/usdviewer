@@ -109,7 +109,7 @@ unloadPayloads(const QList<SdfPath>& paths);
  * @param paths Prim paths to isolate.
  */
 Command
-isolate(const QList<SdfPath>& paths);
+isolatePaths(const QList<SdfPath>& paths);
 
 /**
  * @brief Creates a command that updates the current selection.
@@ -117,7 +117,7 @@ isolate(const QList<SdfPath>& paths);
  * @param paths Prim paths to select.
  */
 Command
-select(const QList<SdfPath>& paths);
+selectPaths(const QList<SdfPath>& paths);
 
 /**
  * @brief Creates a command that makes prims visible.
@@ -126,7 +126,7 @@ select(const QList<SdfPath>& paths);
  * @param recursive If true, apply visibility to descendant prims.
  */
 Command
-show(const QList<SdfPath>& paths, bool recursive);
+showPaths(const QList<SdfPath>& paths, bool recursive);
 
 /**
  * @brief Creates a command that hides prims.
@@ -135,7 +135,15 @@ show(const QList<SdfPath>& paths, bool recursive);
  * @param recursive If true, apply visibility to descendant prims.
  */
 Command
-hide(const QList<SdfPath>& paths, bool recursive);
+hidePaths(const QList<SdfPath>& paths, bool recursive);
+
+/**
+ * @brief Creates a command that delete the current selection.
+ *
+ * @param paths Prim paths to delete.
+ */
+Command
+deletePaths(const QList<SdfPath>& paths);
 
 ///@}
 

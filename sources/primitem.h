@@ -23,6 +23,8 @@ class PrimItemPrivate;
  */
 class PrimItem : public QTreeWidgetItem {
 public:
+    enum DataRole { DataPath = Qt::UserRole, DataVisible };
+
     /**
      * @brief Column indices used by the stage tree.
      */

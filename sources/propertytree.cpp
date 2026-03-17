@@ -164,7 +164,7 @@ PropertyTreePrivate::matrixString(const GfMatrix4d& m)
 }
 
 PropertyTree::PropertyTree(QWidget* parent)
-    : QTreeWidget(parent)
+    : TreeWidget(parent)
     , p(new PropertyTreePrivate())
 {
     p->d.tree = this;

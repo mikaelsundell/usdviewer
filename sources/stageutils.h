@@ -85,6 +85,23 @@ GfBBox3d
 boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths);
 
 /**
+ * @brief Returns the visibility state of a prim.
+ *
+ * Queries the authored visibility of the specified prim on the stage.
+ * If no visibility is authored, the prim is considered visible (inherited).
+ *
+ * This function evaluates only the prim’s own visibility attribute and
+ * does not account for inherited visibility from parent prims.
+ *
+ * @param stage USD stage containing the prim.
+ * @param path Prim path to query.
+ *
+ * @return True if the prim is visible, false if it is explicitly invisible.
+ */
+bool
+visibility(UsdStageRefPtr stage, const SdfPath& path);
+
+/**
  * @brief Sets visibility for the specified prim paths.
  *
  * Updates the visibility state of the given prims on the stage.

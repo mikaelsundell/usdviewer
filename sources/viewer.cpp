@@ -58,6 +58,9 @@ public Q_SLOTS:
     void saveCopy();
     void reload();
     void close();
+    void undo();
+    void redo();
+    void clear();
     void copyImage();
     void backgroundColor();
     void exportAll();
@@ -95,14 +98,14 @@ public Q_SLOTS:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
-    void stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status);
+    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
     void statusChanged(const QString& status);
 
 public:
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
     struct Data {
-        DataModel::load_policy loadPolicy;
+        DataModel::LoadPolicy loadPolicy;
         bool stageInit;
         QStringList arguments;
         QStringList extensions;
@@ -111,9 +114,6 @@ public:
         Qt::DockWidgetArea outlinerArea;
         Qt::DockWidgetArea progressArea;
         QScopedPointer<MouseEvent> backgroundColorFilter;
-        QScopedPointer<DataModel> dataModel;
-        QScopedPointer<SelectionModel> selectionModel;
-        QScopedPointer<CommandStack> commandStack;
         QScopedPointer<Ui_Viewer> ui;
         QPointer<Viewer> viewer;
     };
@@ -122,7 +122,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadPolicy = DataModel::load_policy::load_all;
+    d.loadPolicy = DataModel::LoadPolicy::LoadAll;
     d.stageInit = false;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
@@ -140,34 +140,20 @@ ViewerPrivate::init()
     d.ui->backgroundColor->installEventFilter(d.backgroundColorFilter.data());
     // event filter
     d.viewer->installEventFilter(this);
-    // models
-    d.dataModel.reset(new DataModel());
-    d.selectionModel.reset(new SelectionModel());
-    // command
-    d.commandStack.reset(new CommandStack());
-    d.commandStack->setDataModel(d.dataModel.data());
-    d.commandStack->setSelectionModel(d.selectionModel.data());
-    CommandDispatcher::setCommandStack(d.commandStack.data());
     // views
     d.outlinerArea = d.viewer->dockWidgetArea(d.ui->outlinerDock);
     outlinerView()->setAttribute(Qt::WA_DeleteOnClose, false);
-    outlinerView()->setDataModel(d.dataModel.data());
-    outlinerView()->setSelectionModel(d.selectionModel.data());
     d.progressArea = d.viewer->dockWidgetArea(d.ui->progressDock);
     progressView()->setAttribute(Qt::WA_DeleteOnClose, false);
-    progressView()->setDataModel(d.dataModel.data());
-    progressView()->setSelectionModel(d.selectionModel.data());
     renderView()->setBackgroundColor(d.backgroundColor);
-    renderView()->setDataModel(d.dataModel.data());
-    renderView()->setSelectionModel(d.selectionModel.data());
     // connect
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
-        d.loadPolicy = DataModel::load_all;
+        d.loadPolicy = DataModel::LoadAll;
         settings()->setValue("loadType", "all");
     });
     connect(d.ui->policyPayload, &QAction::triggered, this, [this]() {
-        d.loadPolicy = DataModel::load_payload;
+        d.loadPolicy = DataModel::LoadPayload;
         settings()->setValue("loadType", "payload");
     });
     {
@@ -188,6 +174,9 @@ ViewerPrivate::init()
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->fileSaveSettings, &QAction::triggered, this, &ViewerPrivate::saveSettings);
     connect(d.ui->fileExit, &QAction::triggered, this, &ViewerPrivate::exit);
+    connect(d.ui->editUndo, &QAction::triggered, this, &ViewerPrivate::undo);
+    connect(d.ui->editRedo, &QAction::triggered, this, &ViewerPrivate::redo);
+    connect(d.ui->editClear, &QAction::triggered, this, &ViewerPrivate::clear);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->editShowSelected, &QAction::triggered, this, &ViewerPrivate::showSelected);
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
@@ -247,10 +236,14 @@ ViewerPrivate::init()
         }
     }
     // models
-    connect(d.selectionModel.data(), &SelectionModel::selectionChanged, this, &ViewerPrivate::selectionChanged);
-    connect(d.dataModel.data(), &DataModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
-    connect(d.dataModel.data(), &DataModel::stageChanged, this, &ViewerPrivate::stageChanged);
-    connect(d.dataModel.data(), &DataModel::statusChanged, this, &ViewerPrivate::statusChanged);
+    connect(selectionModel(), &SelectionModel::selectionChanged, this, &ViewerPrivate::selectionChanged);
+    connect(dataModel(), &DataModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
+    connect(dataModel(), &DataModel::stageChanged, this, &ViewerPrivate::stageChanged);
+    connect(dataModel(), &DataModel::statusChanged, this, &ViewerPrivate::statusChanged);
+    // command stack
+    connect(commandStack(), &CommandStack::canUndoChanged, d.ui->editUndo, &QAction::setEnabled);
+    connect(commandStack(), &CommandStack::canRedoChanged, d.ui->editRedo, &QAction::setEnabled);
+    connect(commandStack(), &CommandStack::canClearChanged, d.ui->editClear, &QAction::setEnabled);
     // views
     connect(d.ui->hudSceneTree, &QAction::toggled, this, [=](bool checked) { renderView()->enableSceneTree(checked); });
     connect(d.ui->hudGpuPerformance, &QAction::toggled, this,
@@ -313,11 +306,11 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settings()->value("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadPolicy = DataModel::load_all;
+        d.loadPolicy = DataModel::LoadAll;
         d.ui->policyAll->setChecked(true);
     }
     else {
-        d.loadPolicy = DataModel::load_payload;
+        d.loadPolicy = DataModel::LoadPayload;
         d.ui->policyPayload->setChecked(true);
     }
 
@@ -357,8 +350,8 @@ ViewerPrivate::loadFile(const QString& filename)
     QElapsedTimer timer;
     timer.start();
 
-    d.dataModel->loadFromFile(filename, d.loadPolicy);
-    if (d.dataModel->isLoaded()) {
+    dataModel()->loadFromFile(filename, d.loadPolicy);
+    if (dataModel()->isLoaded()) {
         qint64 elapsedMs = timer.elapsed();
         double elapsedSec = elapsedMs / 1000.0;
 
@@ -458,12 +451,12 @@ ViewerPrivate::open()
 void
 ViewerPrivate::save()
 {
-    QString filename = d.dataModel->filename();
+    QString filename = dataModel()->filename();
     if (filename.isEmpty()) {
         saveAs();
         return;
     }
-    if (d.dataModel->saveToFile(filename)) {
+    if (dataModel()->saveToFile(filename)) {
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
     }
 }
@@ -472,7 +465,7 @@ void
 ViewerPrivate::saveAs()
 {
     QString saveDir = settings()->value("saveDir", QDir::homePath()).toString();
-    QString currentFile = d.dataModel->filename();
+    QString currentFile = dataModel()->filename();
     QString defaultName;
 
     if (!currentFile.isEmpty()) {
@@ -495,7 +488,7 @@ ViewerPrivate::saveAs()
     if (filename.isEmpty())
         return;
 
-    if (d.dataModel->saveToFile(filename)) {
+    if (dataModel()->saveToFile(filename)) {
         settings()->setValue("saveDir", QFileInfo(filename).absolutePath());
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
         updateRecentFiles(filename);
@@ -506,7 +499,7 @@ void
 ViewerPrivate::saveCopy()
 {
     QString copyDir = settings()->value("copyDir", QDir::homePath()).toString();
-    QString currentFile = d.dataModel->filename();
+    QString currentFile = dataModel()->filename();
     QString defaultName;
 
     if (!currentFile.isEmpty()) {
@@ -529,7 +522,7 @@ ViewerPrivate::saveCopy()
     if (filename.isEmpty())
         return;
 
-    if (d.dataModel->exportToFile(filename)) {
+    if (dataModel()->exportToFile(filename)) {
         settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
     }
 }
@@ -537,19 +530,39 @@ ViewerPrivate::saveCopy()
 void
 ViewerPrivate::reload()
 {
-    if (d.dataModel->isLoaded()) {
-        d.dataModel->reload();
+    if (dataModel()->isLoaded()) {
+        commandStack()->clear();
+        dataModel()->reload();
     }
 }
 
 void
 ViewerPrivate::close()
 {
-    if (d.dataModel->isLoaded()) {
-        d.dataModel->close();
+    if (dataModel()->isLoaded()) {
+        commandStack()->clear();
+        dataModel()->close();
         d.viewer->setWindowTitle(QString("%1").arg(PROJECT_NAME));
         enable(false);
     }
+}
+
+void
+ViewerPrivate::undo()
+{
+    commandStack()->undo();
+}
+
+void
+ViewerPrivate::redo()
+{
+    commandStack()->redo();
+}
+
+void
+ViewerPrivate::clear()
+{
+    commandStack()->clear();
 }
 
 void
@@ -585,7 +598,7 @@ ViewerPrivate::exportAll()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.dataModel->exportToFile(filename)) {
+        if (dataModel()->exportToFile(filename)) {
             settings()->setValue("exportDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -607,7 +620,7 @@ ViewerPrivate::exportSelected()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (d.dataModel->exportPathsToFile(d.selectionModel->paths(), filename)) {
+        if (dataModel()->exportPathsToFile(selectionModel()->paths(), filename)) {
             settings()->value("exportSelectedDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -673,36 +686,36 @@ ViewerPrivate::exit()
 void
 ViewerPrivate::showSelected()
 {
-    QList<SdfPath> paths = d.selectionModel->paths();
+    QList<SdfPath> paths = selectionModel()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(show(paths, false)));
+        CommandDispatcher::run(new Command(showPaths(paths, false)));
     }
 }
 
 void
 ViewerPrivate::showRecursive()
 {
-    QList<SdfPath> paths = d.selectionModel->paths();
+    QList<SdfPath> paths = selectionModel()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(show(paths, true)));
+        CommandDispatcher::run(new Command(showPaths(paths, true)));
     }
 }
 
 void
 ViewerPrivate::hideSelected()
 {
-    QList<SdfPath> paths = d.selectionModel->paths();
+    QList<SdfPath> paths = selectionModel()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(hide(paths, false)));
+        CommandDispatcher::run(new Command(hidePaths(paths, false)));
     }
 }
 
 void
 ViewerPrivate::hideRecursive()
 {
-    QList<SdfPath> paths = d.selectionModel->paths();
+    QList<SdfPath> paths = selectionModel()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(hide(paths, true)));
+        CommandDispatcher::run(new Command(hidePaths(paths, true)));
     }
 }
 
@@ -740,19 +753,19 @@ void
 ViewerPrivate::isolate(bool checked)
 {
     if (checked) {
-        if (d.selectionModel->paths().size()) {
-            d.dataModel->setMask(d.selectionModel->paths());
+        if (selectionModel()->paths().size()) {
+            dataModel()->setMask(selectionModel()->paths());
         }
     }
     else {
-        d.dataModel->setMask(QList<SdfPath>());
+        dataModel()->setMask(QList<SdfPath>());
     }
 }
 
 void
 ViewerPrivate::frameAll()
 {
-    if (d.dataModel->isLoaded()) {
+    if (dataModel()->isLoaded()) {
         renderView()->frameAll();
     }
 }
@@ -760,7 +773,7 @@ ViewerPrivate::frameAll()
 void
 ViewerPrivate::frameSelected()
 {
-    if (d.selectionModel->paths().size()) {
+    if (selectionModel()->paths().size()) {
         renderView()->frameSelected();
     }
 }
@@ -780,7 +793,7 @@ ViewerPrivate::collapse()
 void
 ViewerPrivate::expand()
 {
-    if (d.selectionModel->paths().size()) {
+    if (selectionModel()->paths().size()) {
         outlinerView()->expand();
     }
 }
@@ -818,14 +831,14 @@ ViewerPrivate::renderWireframe()
 void
 ViewerPrivate::light()
 {
-    style()->setTheme(Style::Light);
+    style()->setTheme(Style::ThemeLight);
     settings()->setValue("theme", "light");
 }
 
 void
 ViewerPrivate::dark()
 {
-    style()->setTheme(Style::Dark);
+    style()->setTheme(Style::ThemeDark);
     settings()->setValue("theme", "dark");
 }
 
@@ -902,7 +915,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
         }
     }
     if (!paths.isEmpty()) {
-        QMap<QString, QList<QString>> variantSets = findVariantSets(d.dataModel->stage(), paths, true);
+        QMap<QString, QList<QString>> variantSets = findVariantSets(dataModel()->stage(), paths, true);
 
         if (!variantSets.isEmpty()) {
             d.ui->editLoad->addSeparator();
@@ -921,7 +934,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
                         action->setShortcut(QKeySequence(key));
                     }
                     QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
-                        QList<SdfPath> payloadPaths = usd::payloadPaths(d.dataModel->stage(), usd::rootPaths(paths));
+                        QList<SdfPath> payloadPaths = usd::payloadPaths(dataModel()->stage(), usd::rootPaths(paths));
 
                         CommandDispatcher::run(new Command(loadPayloads(payloadPaths, setName, value)));
                     });
@@ -933,10 +946,10 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 }
 
 void
-ViewerPrivate::stageChanged(UsdStageRefPtr stage, DataModel::load_policy policy, DataModel::stage_status status)
+ViewerPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
     d.stageInit = false;
-    if (status == DataModel::stage_loaded) {
+    if (status == DataModel::StageLoaded) {
         enable(true);
     }
 }

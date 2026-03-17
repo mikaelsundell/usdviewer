@@ -3,6 +3,10 @@
 // https://github.com/mikaelsundell/flipman
 
 #include "application.h"
+#include "commanddispatcher.h"
+#include "commandstack.h"
+#include "datamodel.h"
+#include "selectionmodel.h"
 #include "settings.h"
 #include "style.h"
 #include <QApplication>
@@ -20,7 +24,12 @@ public:
     ApplicationPrivate();
     ~ApplicationPrivate();
     void init();
+
+public:
     struct Data {
+        QScopedPointer<DataModel> dataModel;
+        QScopedPointer<SelectionModel> selectionModel;
+        QScopedPointer<CommandStack> commandStack;
         QScopedPointer<Style> style;
         QScopedPointer<Settings> settings;
     };
@@ -34,6 +43,11 @@ ApplicationPrivate::~ApplicationPrivate() {}
 void
 ApplicationPrivate::init()
 {
+    d.dataModel.reset(new DataModel());
+    d.selectionModel.reset(new SelectionModel());
+    d.commandStack.reset(new CommandStack());
+    CommandDispatcher::setCommandStack(d.commandStack.data());
+    // settings
     d.settings.reset(new Settings());
     d.style.reset(new Style());
 #ifdef NDEBUG
@@ -69,6 +83,8 @@ ApplicationPrivate::init()
 #endif
 }
 
+#include "application.moc"
+
 Application::Application(int& argc, char** argv)
     : QApplication(argc, argv)
     , p(new ApplicationPrivate())
@@ -77,6 +93,24 @@ Application::Application(int& argc, char** argv)
 }
 
 Application::~Application() {}
+
+DataModel*
+Application::dataModel() const
+{
+    return p->d.dataModel.data();
+}
+
+SelectionModel*
+Application::selectionModel() const
+{
+    return p->d.selectionModel.data();
+}
+
+CommandStack*
+Application::commandStack() const
+{
+    return p->d.commandStack.data();
+}
 
 Settings*
 Application::settings() const

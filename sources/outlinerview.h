@@ -39,35 +39,6 @@ public:
      */
     virtual ~OutlinerView();
 
-    /** @name Data Models */
-    ///@{
-
-    /**
-     * @brief Returns the associated data model.
-     */
-    DataModel* dataModel() const;
-
-    /**
-     * @brief Sets the data model used by the view.
-     *
-     * @param dataModel Scene data model.
-     */
-    void setDataModel(DataModel* dataModel);
-
-    /**
-     * @brief Returns the associated selection model.
-     */
-    SelectionModel* selectionModel();
-
-    /**
-     * @brief Sets the selection model used by the view.
-     *
-     * @param selectionModel Selection model.
-     */
-    void setSelectionModel(SelectionModel* selectionModel);
-
-    ///@}
-
     /** @name Tree Control */
     ///@{
 

@@ -4,6 +4,7 @@
 
 
 #include "commandstack.h"
+#include "application.h"
 #include "command.h"
 #include <QPointer>
 #include <QVector>
@@ -11,17 +12,25 @@
 namespace usd {
 class CommandStackPrivate {
 public:
+    CommandStackPrivate();
+    ~CommandStackPrivate();
     void push(Command* command);
 
 public:
     struct Data {
         qsizetype index = -1;
         QVector<Command*> stack;
-        QPointer<DataModel> dataModel;
-        QPointer<SelectionModel> selectionModel;
     };
     Data d;
 };
+
+CommandStackPrivate::CommandStackPrivate() {}
+
+CommandStackPrivate::~CommandStackPrivate()
+{
+    for (Command* cmd : d.stack)
+        delete cmd;
+}
 
 void
 CommandStackPrivate::push(Command* command)
@@ -47,16 +56,39 @@ CommandStack::execute(Command* command)
 {
     if (!command)
         return;
-    command->execute(p->d.dataModel, p->d.selectionModel);
+
+    const bool prevCanUndo = canUndo();
+    const bool prevCanRedo = canRedo();
+    const bool prevCanClear = canClear();
+
+    qDebug() << "CommandStack::execute";
+
+    command->execute(dataModel(), selectionModel());
     p->push(command);
+
     Q_EMIT commandExecuted(command);
     Q_EMIT changed();
+
+    if (prevCanUndo != canUndo())
+        Q_EMIT canUndoChanged(canUndo());
+
+    if (prevCanRedo != canRedo())
+        Q_EMIT canRedoChanged(canRedo());
+
+    if (prevCanClear != canClear())
+        Q_EMIT canClearChanged(canClear());
 }
 
 bool
 CommandStack::canUndo() const
 {
     return p->d.index >= 0;
+}
+
+bool
+CommandStack::canClear() const
+{
+    return !p->d.stack.isEmpty();
 }
 
 bool
@@ -71,11 +103,26 @@ CommandStack::undo()
     if (!canUndo())
         return;
 
+    const bool prevCanUndo = canUndo();
+    const bool prevCanRedo = canRedo();
+    const bool prevCanClear = canClear();
+
+    qDebug() << "CommandStack::undo";
+
     Command* cmd = p->d.stack[p->d.index];
-    cmd->undo(p->d.dataModel, p->d.selectionModel);
+    cmd->undo(dataModel(), selectionModel());
     p->d.index--;
 
     Q_EMIT changed();
+
+    if (prevCanUndo != canUndo())
+        Q_EMIT canUndoChanged(canUndo());
+
+    if (prevCanRedo != canRedo())
+        Q_EMIT canRedoChanged(canRedo());
+
+    if (prevCanClear != canClear())
+        Q_EMIT canClearChanged(canClear());
 }
 
 void
@@ -84,38 +131,53 @@ CommandStack::redo()
     if (!canRedo())
         return;
 
+    const bool prevCanUndo = canUndo();
+    const bool prevCanRedo = canRedo();
+    const bool prevCanClear = canClear();
+
+    qDebug() << "CommandStack::redo";
+
     p->d.index++;
     Command* cmd = p->d.stack[p->d.index];
-    cmd->execute(p->d.dataModel, p->d.selectionModel);
+    cmd->execute(dataModel(), selectionModel());
 
     Q_EMIT changed();
-}
 
-DataModel*
-CommandStack::dataModel() const
-{
-    return p->d.dataModel;
-}
+    if (prevCanUndo != canUndo())
+        Q_EMIT canUndoChanged(canUndo());
 
-void
-CommandStack::setDataModel(DataModel* dataModel)
-{
-    if (p->d.dataModel != dataModel) {
-        p->d.dataModel = dataModel;
-    }
-}
+    if (prevCanRedo != canRedo())
+        Q_EMIT canRedoChanged(canRedo());
 
-SelectionModel*
-CommandStack::selectionModel()
-{
-    return p->d.selectionModel;
+    if (prevCanClear != canClear())
+        Q_EMIT canClearChanged(canClear());
 }
 
 void
-CommandStack::setSelectionModel(SelectionModel* selectionModel)
+CommandStack::clear()
 {
-    if (p->d.selectionModel != selectionModel) {
-        p->d.selectionModel = selectionModel;
-    }
+    const bool prevCanUndo = canUndo();
+    const bool prevCanRedo = canRedo();
+    const bool prevCanClear = canClear();
+
+    qDebug() << "CommandStack::clear";
+
+    for (Command* cmd : p->d.stack)
+        delete cmd;
+
+    p->d.stack.clear();
+    p->d.index = -1;
+
+    Q_EMIT changed();
+
+    if (prevCanUndo != canUndo())
+        Q_EMIT canUndoChanged(canUndo());
+
+    if (prevCanRedo != canRedo())
+        Q_EMIT canRedoChanged(canRedo());
+
+    if (prevCanClear != canClear())
+        Q_EMIT canClearChanged(canClear());
 }
+
 }  // namespace usd

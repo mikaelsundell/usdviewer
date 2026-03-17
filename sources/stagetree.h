@@ -6,6 +6,7 @@
 
 #include "datamodel.h"
 #include "selectionmodel.h"
+#include "treewidget.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -24,7 +25,7 @@ class StageTreePrivate;
  * with the viewer selection model and emits signals when the
  * prim selection changes.
  */
-class StageTree : public QTreeWidget {
+class StageTree : public TreeWidget {
     Q_OBJECT
 public:
     /**

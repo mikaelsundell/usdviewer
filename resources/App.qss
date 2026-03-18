@@ -89,10 +89,6 @@ QFrame {
     border: 1px solid $color.border;
 }
 
-QGLWidget {
-    border: 1px solid red;
-}
-
 QWidget[DockWidget="true"] {
     background-color: $color.dock;
 }
@@ -148,7 +144,7 @@ QMenu::separator {
 QMenu::indicator {
     width: 16px;
     height: 16px;
-    border: 1px solid red;
+    image: url("$icon.checked");
 }
 
 QMenu::right-arrow {
@@ -354,6 +350,9 @@ QTreeView QHeaderView:section
 
 QTreeView::item {
     height: 32px;
+    font-size: $font.size.medium;
+    color: $color.text;
+    selection-background-color: $color.highlight;
 }
 
 QTreeView::branch:open:has-children {

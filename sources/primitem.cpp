@@ -6,6 +6,7 @@
 #include "application.h"
 #include "commanddispatcher.h"
 #include "qtutils.h"
+#include "stageutils.h"
 #include "style.h"
 #include <QIcon>
 #include <QPixmap>
@@ -21,7 +22,6 @@ namespace usd {
 class PrimItemPrivate {
 public:
     void init();
-
     struct Data {
         UsdStageRefPtr stage;
         SdfPath path;
@@ -32,33 +32,28 @@ public:
 
 void
 PrimItemPrivate::init()
-{}
+{
+    d.item->setFlags(d.item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+    d.item->setCheckState(0, Qt::Unchecked);
+}
 
 PrimItem::PrimItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path)
-    : QTreeWidgetItem(parent)
+    : TreeItem(parent)
     , p(new PrimItemPrivate())
 {
     p->d.item = this;
     p->d.stage = stage;
     p->d.path = path;
-
-    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
-    setCheckState(0, Qt::Unchecked);
-
     p->init();
 }
 
 PrimItem::PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const SdfPath& path)
-    : QTreeWidgetItem(parent)
+    : TreeItem(parent)
     , p(new PrimItemPrivate())
 {
     p->d.item = this;
     p->d.stage = stage;
     p->d.path = path;
-
-    setFlags(flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
-    setCheckState(0, Qt::Unchecked);
-
     p->init();
 }
 
@@ -70,35 +65,39 @@ PrimItem::data(int column, int role) const
     if (!p->d.stage)
         return QVariant();
 
-    const UsdPrim prim = p->d.stage->GetPrimAtPath(p->d.path);
+    const SdfPath path = p->d.path;
+    const UsdPrim prim = p->d.stage->GetPrimAtPath(path);
     if (role == Qt::DisplayRole) {
         switch (column) {
-        case Name: return prim ? StringToQString(prim.GetName().GetString()) : StringToQString(p->d.path.GetName());
+        case Name: return prim ? StringToQString(prim.GetName().GetString()) : StringToQString(path.GetName());
         case Vis: return QString();
         default: break;
         }
     }
+
     if (role == Qt::ToolTipRole) {
         if (!prim)
             return QVariant();
 
         return QString("%1 (%2)")
-            .arg(StringToQString(prim.GetPath().GetString()))
+            .arg(StringToQString(path.GetString()))
             .arg(StringToQString(prim.GetTypeName().GetString()));
     }
-    if (role == Qt::DecorationRole && column == Name) {
-        if (prim) {
-            const QString typeName = StringToQString(prim.GetTypeName().GetString());
 
-            if (typeName == "Material" || typeName == "Shader")
-                return QIcon(style()->icon(Style::IconMaterial, Style::UIMedium));
-            else if (typeName == "Mesh")
-                return QIcon(style()->icon(Style::IconMesh, Style::UIMedium));
-            else
-                return QIcon(style()->icon(Style::IconPrim, Style::UIMedium));
-        }
+    if (role == Qt::DecorationRole && column == Name) {
+        if (!prim)
+            return QVariant();
+
+        const QString typeName = StringToQString(prim.GetTypeName().GetString());
+
+        if (typeName == "Material" || typeName == "Shader")
+            return QIcon(style()->icon(Style::IconMaterial, Style::UIMedium));
+        else if (typeName == "Mesh")
+            return QIcon(style()->icon(Style::IconMesh, Style::UIMedium));
+        else
+            return QIcon(style()->icon(Style::IconPrim, Style::UIMedium));
     }
-    
+
     if (role == Qt::DecorationRole && column == Vis) {
         if (!prim || !prim.IsActive())
             return QVariant();
@@ -106,44 +105,23 @@ PrimItem::data(int column, int role) const
         if (prim == p->d.stage->GetPseudoRoot())
             return QVariant();
 
-        UsdGeomImageable imageable(prim);
+        const UsdGeomImageable imageable(prim);
         if (!imageable)
             return QVariant();
 
-        return style()->icon(
-            isVisible() ? Style::IconVisible : Style::IconHidden,
-            Style::UIMedium
-        );
+        const bool visible = isVisible(p->d.stage, path);
+        return style()->icon(visible ? Style::IconVisible : Style::IconHidden, Style::UIMedium);
     }
 
-    if (role == PrimItem::DataPath) {
-        return StringToQString(p->d.path.GetString());
+    if (role == PrimItem::PrimPath) {
+        return StringToQString(path.GetString());
     }
-    
-    if (role == PrimItem::DataVisible) {
-        return isVisible();
+
+    if (role == TreeItem::ItemActive) {
+        return isVisible(p->d.stage, path);
     }
-    return QTreeWidgetItem::data(column, role);
-}
 
-bool
-PrimItem::isVisible() const
-{
-    if (!p->d.stage)
-        return false;
-
-    const UsdPrim prim = p->d.stage->GetPrimAtPath(p->d.path);
-    if (!prim || !prim.IsActive())
-        return false;
-
-    const UsdGeomImageable imageable(prim);
-    if (!imageable)
-        return true;
-
-    QReadLocker locker(CommandDispatcher::stageLock());
-
-    const TfToken visibility = imageable.ComputeVisibility();
-    return visibility != UsdGeomTokens->invisible;
+    return TreeItem::data(column, role);
 }
 
 }  // namespace usd

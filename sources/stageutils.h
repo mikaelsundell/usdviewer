@@ -99,7 +99,7 @@ boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths);
  * @return True if the prim is visible, false if it is explicitly invisible.
  */
 bool
-visibility(UsdStageRefPtr stage, const SdfPath& path);
+isVisible(UsdStageRefPtr stage, const SdfPath& path);
 
 /**
  * @brief Sets visibility for the specified prim paths.
@@ -114,6 +114,6 @@ visibility(UsdStageRefPtr stage, const SdfPath& path);
  * @param recursive If true, apply visibility recursively.
  */
 void
-setVisibility(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false);
+setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false);
 
 }  // namespace usd

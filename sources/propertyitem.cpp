@@ -17,17 +17,28 @@ public:
 
 void
 PropertyItemPrivate::init()
-{}
+{
+    Qt::ItemFlags itemFlags = d.item->flags();
+    itemFlags &= ~Qt::ItemIsUserCheckable;
+    itemFlags &= ~Qt::ItemIsEditable;
+    d.item->setFlags(itemFlags);
+}
 
 PropertyItem::PropertyItem(QTreeWidget* parent)
-    : QTreeWidgetItem(parent)
+    : TreeItem(parent)
     , p(new PropertyItemPrivate())
-{}
+{
+    p->d.item = this;
+    p->init();
+}
 
 PropertyItem::PropertyItem(QTreeWidgetItem* parent)
-    : QTreeWidgetItem(parent)
+    : TreeItem(parent)
     , p(new PropertyItemPrivate())
-{}
+{
+    p->d.item = this;
+    p->init();
+}
 
 PropertyItem::~PropertyItem() = default;
 }  // namespace usd

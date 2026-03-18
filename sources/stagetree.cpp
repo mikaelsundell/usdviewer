@@ -54,92 +54,7 @@ public Q_SLOTS:
 public:
     int parentDepth(const SdfPath& path) const;
     QTreeWidgetItem* itemFromPath(const SdfPath& path) const;
-    class ItemDelegate : public QStyledItemDelegate {
-    public:
-        ItemDelegate(QObject* parent = nullptr)
-            : QStyledItemDelegate(parent)
-        {}
-        QRect checkRect(const QStyleOptionViewItem& opt) const
-        {
-            const int size = 14;
-            const int margin = 6;
-            return QRect(opt.rect.left() + margin, opt.rect.center().y() - size / 2, size, size);
-        }
-        bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option,
-                         const QModelIndex& index) override
-        {
-            if (index.column() != 0)
-                return false;
-            if (!(index.flags() & Qt::ItemIsUserCheckable))
-                return false;
-            if (event->type() != QEvent::MouseButtonRelease)
-                return false;
 
-            auto* mouse = static_cast<QMouseEvent*>(event);
-            if (mouse->button() != Qt::LeftButton)
-                return false;
-
-            QRect rect = checkRect(option);
-            if (!rect.contains(mouse->pos()))
-                return false;
-
-            Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-
-            switch (state) {
-            case Qt::Unchecked: state = Qt::Checked; break;
-            case Qt::Checked: state = Qt::Unchecked; break;
-            case Qt::PartiallyChecked: state = Qt::Unchecked; break;
-            }
-            model->setData(index, state, Qt::CheckStateRole);
-            return true;
-        }
-        void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
-        {
-            QStyleOptionViewItem opt(option);
-            initStyleOption(&opt, index);
-            opt.features &= ~QStyleOptionViewItem::HasCheckIndicator;
-            opt.backgroundBrush = Qt::NoBrush;
-            painter->save();
-
-            const QTreeWidget* tree = static_cast<const QTreeWidget*>(opt.widget);
-            QTreeWidgetItem* item = tree ? tree->itemFromIndex(index) : nullptr;
-            opt.state &= ~QStyle::State_HasFocus;
-            if (opt.state & QStyle::State_Selected) {
-                painter->fillRect(opt.rect, style()->color(Style::ColorHighlight));
-            }
-            if (index.column() == 0 && (index.flags() & Qt::ItemIsUserCheckable)) {
-                const int size = 16;
-                QIcon checked = style()->icon(Style::IconChecked, Style::UIMedium);
-                QIcon partiallyChecked = style()->icon(Style::IconPartiallyChecked, Style::UIMedium);
-                Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-                QRect iconRect(opt.rect.left() + 12, opt.rect.center().y() - size / 2 + 2, size, size);
-                painter->setBrush(style()->color(Style::ColorBaseAlt));
-                painter->setPen(style()->color(Style::ColorBorderAlt));
-                painter->drawRect(iconRect.adjusted(0, 0, -1, -1));
-                if (state == Qt::Checked)
-                    painter->drawPixmap(iconRect.topLeft(), checked.pixmap(size, size));
-                else if (state == Qt::PartiallyChecked)
-                    painter->drawPixmap(iconRect.topLeft(), partiallyChecked.pixmap(size, size));
-                opt.rect.setLeft(iconRect.right() + 4);
-            }
-            QStyle* qstyle = opt.widget ? opt.widget->style() : QApplication::style();
-            if (!opt.icon.isNull()) {
-                QRect iconRect = qstyle->subElementRect(QStyle::SE_ItemViewItemDecoration, &opt, opt.widget);
-                opt.icon.paint(painter, iconRect, Qt::AlignCenter,
-                               opt.state & QStyle::State_Enabled ? QIcon::Normal : QIcon::Disabled);
-            }
-            QRect textRect = qstyle->subElementRect(QStyle::SE_ItemViewItemText, &opt, opt.widget);
-            bool visible = index.data(PrimItem::DataVisible).toBool();
-            QColor textColor;
-            textColor = style()->color(Style::ColorText);
-            if (!visible) {
-                textColor = style()->color(Style::ColorTextDisabled);
-            }
-            painter->setPen(textColor);
-            painter->drawText(textRect, opt.displayAlignment, opt.text);
-            painter->restore();
-        }
-    };
     struct Data {
         int pending;
         bool payloadEnabled;
@@ -147,7 +62,6 @@ public:
         QList<SdfPath> loadPaths;
         QList<SdfPath> unloadPaths;
         UsdStageRefPtr stage;
-        QPointer<ItemDelegate> delegate;
         QPointer<StageTree> tree;
     };
     Data d;
@@ -160,8 +74,6 @@ StageTreePrivate::init()
 {
     attach(d.tree);
     attach(d.tree->selectionModel());
-    d.delegate = new ItemDelegate(d.tree.data());
-    d.tree->setItemDelegate(d.delegate);
     int size = style()->iconSize(Style::UISmall);
     d.tree->setIconSize(QSize(size, size));
     connect(d.tree.data(), &StageTree::itemSelectionChanged, this, &StageTreePrivate::itemSelectionChanged);
@@ -305,10 +217,8 @@ StageTreePrivate::maxDepth(const SdfPath& path) const
 
     if (d.tree->topLevelItemCount() > 0)
         root = d.tree->topLevelItem(0);
-
     if (!root)
         return 0;
-
     std::function<int(QTreeWidgetItem*, int)> subtreeDepth = [&](QTreeWidgetItem* item, int d) {
         int max = d;
 
@@ -368,15 +278,12 @@ StageTreePrivate::addChildren(PrimItem* parent, const SdfPath& path)
 void
 StageTreePrivate::toggleVisible(PrimItem* item)
 {
-    QList<SdfPath> paths;
-    QString pathString = item->data(0, Qt::UserRole).toString();
-    if (!pathString.isEmpty())
-        paths.append(SdfPath(QStringToString(pathString)));
-    if (item->isVisible()) {
-        CommandDispatcher::run(new Command(hidePaths(paths, false)));
+    const SdfPath path(QStringToString(item->data(0, PrimItem::PrimPath).toString()));
+    if (isVisible(d.stage, path)) {
+        CommandDispatcher::run(new Command(hidePaths(QList<SdfPath> { path }, false)));
     }
     else {
-        CommandDispatcher::run(new Command(showPaths(paths, false)));
+        CommandDispatcher::run(new Command(showPaths(QList<SdfPath> { path }, false)));
     }
 }
 
@@ -602,15 +509,16 @@ void
 StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
     SignalGuard::Scope guard(this);
-    QSet<SdfPath> selectedSet = QSet<SdfPath>(paths.begin(), paths.end());
-    std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* item) {
-        QString itemData = item->data(0, Qt::UserRole).toString();
-        if (!itemData.isEmpty()) {
-            SdfPath itemPath(QStringToString(itemData));
-            bool isSelected = false;
-            if (selectedSet.contains(itemPath))
-                isSelected = true;
-            else if (d.payloadEnabled && !item->childCount()) {
+    const QSet<SdfPath> selectedSet(paths.begin(), paths.end());
+    std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* baseItem) {
+        auto* item = static_cast<PrimItem*>(baseItem);
+        if (!item)
+            return;
+        const QString pathStr = item->data(0, PrimItem::PrimPath).toString();
+        if (!pathStr.isEmpty()) {
+            const SdfPath itemPath(QStringToString(pathStr));
+            bool isSelected = selectedSet.contains(itemPath);
+            if (!isSelected && d.payloadEnabled && item->childCount() == 0) {
                 for (const SdfPath& path : selectedSet) {
                     if (path.HasPrefix(itemPath) && path != itemPath) {
                         isSelected = true;
@@ -625,6 +533,7 @@ StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
     };
     for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
         selectItems(d.tree->topLevelItem(i));
+
     d.tree->update();
 }
 

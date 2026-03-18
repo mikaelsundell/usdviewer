@@ -76,7 +76,6 @@ PropertyTreePrivate::updateStage(UsdStageRefPtr stage)
         PropertyItem* item = new PropertyItem(stageItem);
         item->setText(PropertyItem::Name, name);
         item->setText(PropertyItem::Value, value);
-        item->setFlags(item->flags() & ~Qt::ItemIsEditable);
     };
     addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stage)));
     addChild("upAxis", StringToQString(UsdGeomGetStageUpAxis(stage).GetString()));
@@ -126,7 +125,6 @@ PropertyTreePrivate::updateSelection(const QList<SdfPath>& paths)
             PropertyItem* item = new PropertyItem(primItem);
             item->setText(PropertyItem::Name, name);
             item->setText(PropertyItem::Value, value);
-            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
         };
         for (const UsdAttribute& attr : prim.GetAttributes()) {
             std::string name = attr.GetName().GetString();

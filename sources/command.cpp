@@ -239,10 +239,10 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                     QWriteLocker lock(dm->stageLock());
                     previous->clear();
                     for (const SdfPath& path : paths) {
-                        bool visible = visibility(dm->stage(), path);
+                        bool visible = isVisible(dm->stage(), path);
                         previous->insert(path, visible);
                     }
-                    setVisibility(dm->stage(), paths, true, recursive);
+                    setVisible(dm->stage(), paths, true, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,
@@ -260,7 +260,7 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                 {
                     QWriteLocker lock(dm->stageLock());
                     for (auto it = previous->cbegin(); it != previous->cend(); ++it) {
-                        setVisibility(dm->stage(), { it.key() }, it.value(), recursive);
+                        setVisible(dm->stage(), { it.key() }, it.value(), recursive);
                     }
                 }
                 QMetaObject::invokeMethod(
@@ -284,7 +284,7 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
             QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
                 {
                     QWriteLocker lock(dm->stageLock());
-                    setVisibility(dm->stage(), paths, false, recursive);
+                    setVisible(dm->stage(), paths, false, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,
@@ -301,7 +301,7 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
             QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
                 {
                     QWriteLocker lock(dm->stageLock());
-                    setVisibility(dm->stage(), paths, true, recursive);
+                    setVisible(dm->stage(), paths, true, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,

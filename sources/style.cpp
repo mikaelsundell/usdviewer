@@ -326,12 +326,7 @@ Style::icon(IconRole role, UIScale scale) const
         it = p->d.pixmaps.insert(roleKey, loaded);
     }
     const QPixmap& base = it.value();
-    QPixmap result = base.scaled(
-        physicalSize,
-        physicalSize,
-        Qt::KeepAspectRatio,
-        Qt::SmoothTransformation
-    );
+    QPixmap result = base.scaled(physicalSize, physicalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
     result.setDevicePixelRatio(dpr);
     return result;

@@ -138,7 +138,7 @@ boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths)
 }
 
 bool
-visibility(UsdStageRefPtr stage, const SdfPath& path)
+isVisible(UsdStageRefPtr stage, const SdfPath& path)
 {
     UsdPrim prim = stage->GetPrimAtPath(path);
     if (!prim)
@@ -155,7 +155,7 @@ visibility(UsdStageRefPtr stage, const SdfPath& path)
 }
 
 void
-setVisibility(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive)
+setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive)
 {
     QList<SdfPath> affected;
     for (const SdfPath& path : paths) {

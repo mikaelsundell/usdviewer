@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <QTreeWidgetItem>
+#include "treeitem.h"
 #include <pxr/usd/usd/stage.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -21,9 +21,9 @@ class PrimItemPrivate;
  * Each item corresponds to a prim path and displays information
  * such as the prim name, type, and visibility state.
  */
-class PrimItem : public QTreeWidgetItem {
+class PrimItem : public TreeItem {
 public:
-    enum DataRole { DataPath = Qt::UserRole, DataVisible };
+    enum PrimRole { PrimPath = TreeItem::ItemActive + 1 };
 
     /**
      * @brief Column indices used by the stage tree.
@@ -62,11 +62,6 @@ public:
      * Provides display and decoration data used by the tree view.
      */
     QVariant data(int column, int role) const override;
-
-    /**
-     * @brief Returns whether the represented prim is visible.
-     */
-    bool isVisible() const;
 
 private:
     QScopedPointer<PrimItemPrivate> p;

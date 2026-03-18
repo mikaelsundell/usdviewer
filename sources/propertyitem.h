@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <QTreeWidgetItem>
+#include "treeitem.h"
 
 namespace usd {
 
@@ -19,7 +19,7 @@ class PropertyItemPrivate;
  * a row in the property tree and typically represents
  * attributes, relationships, or metadata of a USD prim.
  */
-class PropertyItem : public QTreeWidgetItem {
+class PropertyItem : public TreeItem {
 public:
     /**
      * @brief Column indices used by the property tree.

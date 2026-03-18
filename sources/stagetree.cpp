@@ -316,8 +316,9 @@ void
 StageTreePrivate::itemSelectionChanged()
 {
     QList<SdfPath> paths;
-    for (QTreeWidgetItem* item : d.tree->selectedItems()) {
-        QString pathString = item->data(0, Qt::UserRole).toString();
+    for (QTreeWidgetItem* baseItem : d.tree->selectedItems()) {
+        PrimItem* item = static_cast<PrimItem*>(baseItem);
+        const QString pathString = item->data(0, PrimItem::PrimPath).toString();
         if (!pathString.isEmpty())
             paths.append(SdfPath(QStringToString(pathString)));
     }
@@ -327,7 +328,8 @@ StageTreePrivate::itemSelectionChanged()
 void
 StageTreePrivate::checkStateChanged(PrimItem* item)
 {
-    QString pathString = item->data(0, Qt::UserRole).toString();
+    PrimItem* primItem = static_cast<PrimItem*>(item);
+    const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
     if (pathString.isEmpty())
         return;
 
@@ -368,9 +370,10 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 {
     QList<SdfPath> paths;
     for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
-        const QString path = selected->data(0, Qt::UserRole).toString();
-        if (!path.isEmpty())
-            paths.append(SdfPath(qt::QStringToString(path)));
+        PrimItem* primItem = static_cast<PrimItem*>(selected);
+        const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+        if (!pathString.isEmpty())
+            paths.append(SdfPath(qt::QStringToString(pathString)));
     }
     if (paths.isEmpty())
         return;
@@ -416,11 +419,11 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     menu.addSeparator();
     QMenu* showMenu = menu.addMenu("Show");
     QAction* showSelected = showMenu->addAction("Selected");
-    QAction* showRecursive = showMenu->addAction("Recursively");
+    QAction* showRecursive = showMenu->addAction("Recursive");
 
     QMenu* hideMenu = menu.addMenu("Hide");
     QAction* hideSelected = hideMenu->addAction("Selected");
-    QAction* hideRecursive = hideMenu->addAction("Recursively");
+    QAction* hideRecursive = hideMenu->addAction("Recursive");
 
     menu.addSeparator();
     QAction* isolateSelected = menu.addAction("Isolate");
@@ -481,22 +484,23 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
 {
     beginGuard();
     {
-        std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* item) {
-            QString itemPath = item->data(0, Qt::UserRole).toString();
-            if (!itemPath.isEmpty()) {
+        std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* baseItem) {
+            PrimItem* primItem = static_cast<PrimItem*>(baseItem);
+            const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+            if (!pathString.isEmpty()) {
                 for (const SdfPath& changed : paths) {
-                    if (itemPath == StringToQString(changed.GetString())) {
+                    if (pathString == StringToQString(changed.GetString())) {
                         UsdPrim prim = d.stage->GetPrimAtPath(changed);
                         if (prim && prim.HasPayload()) {
                             Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
-                            if (item->checkState(0) != want)
-                                item->setCheckState(0, want);
+                            if (primItem->checkState(0) != want)
+                                primItem->setCheckState(0, want);
                         }
                     }
                 }
             }
-            for (int i = 0; i < item->childCount(); ++i)
-                updateItem(item->child(i));
+            for (int i = 0; i < primItem->childCount(); ++i)
+                updateItem(primItem->child(i));
         };
         for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
             updateItem(d.tree->topLevelItem(i));
@@ -511,14 +515,12 @@ StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
     SignalGuard::Scope guard(this);
     const QSet<SdfPath> selectedSet(paths.begin(), paths.end());
     std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* baseItem) {
-        auto* item = static_cast<PrimItem*>(baseItem);
-        if (!item)
-            return;
-        const QString pathStr = item->data(0, PrimItem::PrimPath).toString();
-        if (!pathStr.isEmpty()) {
-            const SdfPath itemPath(QStringToString(pathStr));
+        PrimItem* primItem = static_cast<PrimItem*>(baseItem);
+        const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+        if (!pathString.isEmpty()) {
+            const SdfPath itemPath(QStringToString(pathString));
             bool isSelected = selectedSet.contains(itemPath);
-            if (!isSelected && d.payloadEnabled && item->childCount() == 0) {
+            if (!isSelected && d.payloadEnabled && primItem->childCount() == 0) {
                 for (const SdfPath& path : selectedSet) {
                     if (path.HasPrefix(itemPath) && path != itemPath) {
                         isSelected = true;
@@ -526,10 +528,10 @@ StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
                     }
                 }
             }
-            item->setSelected(isSelected);
+            primItem->setSelected(isSelected);
         }
-        for (int i = 0; i < item->childCount(); ++i)
-            selectItems(item->child(i));
+        for (int i = 0; i < primItem->childCount(); ++i)
+            selectItems(primItem->child(i));
     };
     for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
         selectItems(d.tree->topLevelItem(i));
@@ -540,13 +542,14 @@ StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
 QTreeWidgetItem*
 StageTreePrivate::itemFromPath(const SdfPath& path) const
 {
-    QString target = StringToQString(path.GetString());
-    std::function<QTreeWidgetItem*(QTreeWidgetItem*)> find = [&](QTreeWidgetItem* item) -> QTreeWidgetItem* {
-        QString data = item->data(0, Qt::UserRole).toString();
-        if (!data.isEmpty() && data == target)
-            return item;
-        for (int i = 0; i < item->childCount(); ++i) {
-            if (QTreeWidgetItem* found = find(item->child(i)))
+    QString target = qt::StringToQString(path.GetString());
+    std::function<QTreeWidgetItem*(QTreeWidgetItem*)> find = [&](QTreeWidgetItem* baseItem) -> QTreeWidgetItem* {
+        PrimItem* primItem = static_cast<PrimItem*>(baseItem);
+        const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+        if (!pathString.isEmpty() && pathString == target)
+            return primItem;
+        for (int i = 0; i < primItem->childCount(); ++i) {
+            if (QTreeWidgetItem* found = find(primItem->child(i)))
                 return found;
         }
         return nullptr;

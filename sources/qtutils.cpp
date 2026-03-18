@@ -44,8 +44,6 @@ namespace qt {
 }  // namespace qt
 }  // namespace usdviewer
 
-using namespace usdviewer::qt;
-
 void
 CheckOpenGLError(const char* function, const char* file, int line)
 {

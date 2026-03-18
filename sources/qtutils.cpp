@@ -9,57 +9,42 @@
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
 
-namespace usd {
-std::string
-QStringToString(const QString& str)
-{
-    return str.toUtf8().constData();
-}
+namespace usdviewer {
+namespace qt {
+    std::string QStringToString(const QString& str) { return str.toUtf8().constData(); }
 
-QString
-StringToQString(const std::string& str)
-{
-    return QString::fromUtf8(str.c_str());
-}
+    QString StringToQString(const std::string& str) { return QString::fromUtf8(str.c_str()); }
 
-TfToken
-QStringToTfToken(const QString& str)
-{
-    return TfToken(QStringToString(str));
-}
+    TfToken QStringToTfToken(const QString& str) { return TfToken(QStringToString(str)); }
 
-QString
-TfTokenToQString(const TfToken& token)
-{
-    return StringToQString(token.GetString());
-}
+    QString TfTokenToQString(const TfToken& token) { return StringToQString(token.GetString()); }
 
-QList<QString>
-TfTokenVectorToQList(const TfTokenVector& tokens)
-{
-    QList<QString> list;
-    list.reserve(tokens.size());
-    for (const auto& token : tokens) {
-        list.append(StringToQString(token.GetString()));
+    QList<QString> TfTokenVectorToQList(const TfTokenVector& tokens)
+    {
+        QList<QString> list;
+        list.reserve(tokens.size());
+        for (const auto& token : tokens) {
+            list.append(StringToQString(token.GetString()));
+        }
+        return list;
     }
-    return list;
-}
-SdfPathVector
-QListToSdfPathVector(const QList<SdfPath>& paths)
-{
-    SdfPathVector vec;
-    vec.reserve(paths.size());
-    for (const SdfPath& p : paths) {
-        vec.push_back(p);
+    SdfPathVector QListToSdfPathVector(const QList<SdfPath>& paths)
+    {
+        SdfPathVector vec;
+        vec.reserve(paths.size());
+        for (const SdfPath& p : paths) {
+            vec.push_back(p);
+        }
+        return vec;
     }
-    return vec;
-}
-GfVec4f
-QColorToGfVec4f(const QColor& color)
-{
-    return GfVec4f(color.redF(), color.greenF(), color.blueF(), color.alphaF());
-}
-}  // namespace usd
+    GfVec4f QColorToGfVec4f(const QColor& color)
+    {
+        return GfVec4f(color.redF(), color.greenF(), color.blueF(), color.alphaF());
+    }
+}  // namespace qt
+}  // namespace usdviewer
+
+using namespace usdviewer::qt;
 
 void
 CheckOpenGLError(const char* function, const char* file, int line)
@@ -291,7 +276,7 @@ QDebug
 operator<<(QDebug debug, const SdfPath& path)
 {
     QDebugStateSaver saver(debug);
-    debug.nospace() << "SdfPath(\"" << usd::StringToQString(path.GetString()) << "\")";
+    debug.nospace() << "SdfPath(\"" << usdviewer::qt::StringToQString(path.GetString()) << "\")";
     return debug;
 }
 
@@ -343,7 +328,7 @@ operator<<(QDebug debug, const VtValue& value)
         debug << value.UncheckedGet<double>();
     }
     else if (value.IsHolding<std::string>()) {
-        debug << "\"" << usd::StringToQString(value.UncheckedGet<std::string>()) << "\"";
+        debug << "\"" << StringToQString(value.UncheckedGet<std::string>()) << "\"";
     }
     else if (value.IsHolding<VtDictionary>()) {
         debug << value.UncheckedGet<VtDictionary>();
@@ -389,16 +374,16 @@ operator<<(QDebug debug, const VtValue& value)
                 if (!first)
                     debug << ", ";
                 first = false;
-                debug << "\"" << usd::StringToQString(item) << "\"";
+                debug << "\"" << StringToQString(item) << "\"";
             }
         }
         else {
-            debug << "<unsupported array type: " << usd::StringToQString(array.GetTypeName()) << ">";
+            debug << "<unsupported array type: " << StringToQString(array.GetTypeName()) << ">";
         }
         debug << "]";
     }
     else {
-        debug << "<unsupported type: " << usd::StringToQString(value.GetTypeName()) << ">";
+        debug << "<unsupported type: " << StringToQString(value.GetTypeName()) << ">";
     }
     return debug;
 }
@@ -415,7 +400,7 @@ operator<<(QDebug debug, const VtDictionary& dict)
         first = false;
         const std::string& key = pair.first;
         const VtValue& value = pair.second;
-        debug << "\"" << usd::StringToQString(key) << "\": ";
+        debug << "\"" << StringToQString(key) << "\": ";
         debug << value;
     }
 

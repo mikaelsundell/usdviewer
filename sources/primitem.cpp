@@ -17,7 +17,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class PrimItemPrivate {
 public:
@@ -109,7 +109,7 @@ PrimItem::data(int column, int role) const
         if (!imageable)
             return QVariant();
 
-        const bool visible = isVisible(p->d.stage, path);
+        const bool visible = stage::isVisible(p->d.stage, path);
         return style()->icon(visible ? Style::IconVisible : Style::IconHidden, Style::UIMedium);
     }
 
@@ -118,10 +118,10 @@ PrimItem::data(int column, int role) const
     }
 
     if (role == TreeItem::ItemActive) {
-        return isVisible(p->d.stage, path);
+        return stage::isVisible(p->d.stage, path);
     }
 
     return TreeItem::data(column, role);
 }
 
-}  // namespace usd
+}  // namespace usdviewer

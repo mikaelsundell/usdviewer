@@ -6,7 +6,7 @@
 #include <QPointer>
 #include <QSettings>
 
-namespace usd {
+namespace usdviewer {
 class SettingsPrivate {
 public:
     SettingsPrivate();
@@ -41,4 +41,4 @@ Settings::setValue(const QString& key, const QVariant& value)
     settings.setValue(key, value);
 }
 
-}  // namespace usd
+}  // namespace usdviewer

@@ -9,7 +9,7 @@
 #include <pxr/base/gf/rotation.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 
-namespace usd {
+namespace usdviewer {
 class ViewCameraPrivate : public QSharedData {
 public:
     void init();
@@ -380,4 +380,4 @@ ViewCamera::operator=(const ViewCamera& other)
     }
     return *this;
 }
-}  // namespace usd
+}  // namespace usdviewer

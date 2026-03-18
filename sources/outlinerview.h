@@ -11,7 +11,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class OutlinerViewPrivate;
 
@@ -70,4 +70,4 @@ private:
     QScopedPointer<OutlinerViewPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

@@ -15,7 +15,7 @@
 // generated files
 #include "ui_progressview.h"
 
-namespace usd {
+namespace usdviewer {
 class ProgressViewPrivate : public QObject {
 public:
     void init();
@@ -199,4 +199,4 @@ ProgressView::ProgressView(QWidget* parent)
 
 ProgressView::~ProgressView() = default;
 
-}  // namespace usd
+}  // namespace usdviewer

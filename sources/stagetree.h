@@ -12,7 +12,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class StageTreePrivate;
 
@@ -185,4 +185,4 @@ private:
     QScopedPointer<StageTreePrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

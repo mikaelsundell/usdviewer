@@ -6,7 +6,7 @@
 
 #include <QTreeWidget>
 
-namespace usd {
+namespace usdviewer {
 
 class TreeWidgetPrivate;
 
@@ -49,4 +49,4 @@ private:
     QScopedPointer<TreeWidgetPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

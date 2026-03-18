@@ -15,7 +15,7 @@
 #include <pxr/usd/usdGeom/metrics.h>
 #include <stack>
 
-namespace usd {
+namespace usdviewer {
 class DataModelPrivate : public QSharedData {
 public:
     DataModelPrivate();
@@ -338,7 +338,7 @@ DataModelPrivate::boundingBox()
         return d.bboxCache->ComputeWorldBound(d.stage->GetPseudoRoot());
     }
     else {
-        return usd::boundingBox(d.stage, d.mask);
+        return stage::boundingBox(d.stage, d.mask);
     }
 }
 
@@ -524,4 +524,4 @@ DataModel::stageLock() const
     return &p->d.stageLock;
 }
 
-}  // namespace usd
+}  // namespace usdviewer

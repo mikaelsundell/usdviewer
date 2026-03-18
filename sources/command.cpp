@@ -14,7 +14,7 @@
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
 
-namespace usd {
+namespace usdviewer {
 Command
 loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
 {
@@ -239,10 +239,10 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                     QWriteLocker lock(dm->stageLock());
                     previous->clear();
                     for (const SdfPath& path : paths) {
-                        bool visible = isVisible(dm->stage(), path);
+                        bool visible = stage::isVisible(dm->stage(), path);
                         previous->insert(path, visible);
                     }
-                    setVisible(dm->stage(), paths, true, recursive);
+                    stage::setVisible(dm->stage(), paths, true, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,
@@ -260,7 +260,7 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                 {
                     QWriteLocker lock(dm->stageLock());
                     for (auto it = previous->cbegin(); it != previous->cend(); ++it) {
-                        setVisible(dm->stage(), { it.key() }, it.value(), recursive);
+                        stage::setVisible(dm->stage(), { it.key() }, it.value(), recursive);
                     }
                 }
                 QMetaObject::invokeMethod(
@@ -284,7 +284,7 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
             QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
                 {
                     QWriteLocker lock(dm->stageLock());
-                    setVisible(dm->stage(), paths, false, recursive);
+                    stage::setVisible(dm->stage(), paths, false, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,
@@ -301,7 +301,7 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
             QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
                 {
                     QWriteLocker lock(dm->stageLock());
-                    setVisible(dm->stage(), paths, true, recursive);
+                    stage::setVisible(dm->stage(), paths, true, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,
@@ -483,4 +483,4 @@ deletePaths(const QList<SdfPath>& inPaths)
             });
         });
 }
-}  // namespace usd
+}  // namespace usdviewer

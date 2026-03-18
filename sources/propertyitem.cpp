@@ -5,7 +5,7 @@
 #include "propertyitem.h"
 #include <QPointer>
 
-namespace usd {
+namespace usdviewer {
 class PropertyItemPrivate {
 public:
     void init();
@@ -41,4 +41,4 @@ PropertyItem::PropertyItem(QTreeWidgetItem* parent)
 }
 
 PropertyItem::~PropertyItem() = default;
-}  // namespace usd
+}  // namespace usdviewer

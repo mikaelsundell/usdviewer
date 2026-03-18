@@ -4,7 +4,7 @@
 
 #include "treeitem.h"
 
-namespace usd {
+namespace usdviewer {
 
 class TreeItemPrivate {
 public:
@@ -33,4 +33,4 @@ TreeItem::data(int column, int role) const
     return QTreeWidgetItem::data(column, role);
 }
 
-}  // namespace usd
+}  // namespace usdviewer

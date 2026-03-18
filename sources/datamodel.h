@@ -14,7 +14,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class DataModelPrivate;
 
@@ -272,4 +272,4 @@ private:
     QExplicitlySharedDataPointer<DataModelPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

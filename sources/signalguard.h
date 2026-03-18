@@ -7,7 +7,7 @@
 #include <QObject>
 #include <QScopedPointer>
 
-namespace usd {
+namespace usdviewer {
 
 class SignalGuardPrivate;
 
@@ -107,4 +107,4 @@ private:
     QScopedPointer<SignalGuardPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

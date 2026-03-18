@@ -5,7 +5,7 @@
 #include "signalguard.h"
 #include <QVector>
 
-namespace usd {
+namespace usdviewer {
 
 class SignalGuardPrivate : public QObject {
 public:
@@ -82,4 +82,4 @@ SignalGuard::Scope::~Scope()
         m_guard->endGuard();
 }
 
-}  // namespace usd
+}  // namespace usdviewer

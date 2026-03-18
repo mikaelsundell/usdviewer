@@ -10,7 +10,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 /**
  * @class Command
@@ -147,4 +147,4 @@ deletePaths(const QList<SdfPath>& paths);
 
 ///@}
 
-}  // namespace usd
+}  // namespace usdviewer

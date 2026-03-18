@@ -5,7 +5,7 @@
 #include "progressitem.h"
 #include <QPointer>
 
-namespace usd {
+namespace usdviewer {
 class ProgressItemPrivate {
 public:
     void init();
@@ -31,4 +31,4 @@ ProgressItem::ProgressItem(QTreeWidgetItem* parent)
 
 ProgressItem::~ProgressItem() = default;
 
-}  // namespace usd
+}  // namespace usdviewer

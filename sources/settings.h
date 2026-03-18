@@ -8,7 +8,7 @@
 #include <QScopedPointer>
 #include <QVariant>
 
-namespace usd {
+namespace usdviewer {
 
 class SettingsPrivate;
 
@@ -50,4 +50,4 @@ private:
     QScopedPointer<SettingsPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

@@ -10,7 +10,7 @@
 // generated files
 #include "ui_renderview.h"
 
-namespace usd {
+namespace usdviewer {
 class RenderViewPrivate : public QObject {
 public:
     void init();
@@ -74,7 +74,7 @@ void
 RenderViewPrivate::frameSelected()
 {
     if (selectionModel()->paths().size()) {
-        imageGLWidget()->frame(boundingBox(dataModel()->stage(), selectionModel()->paths()));
+        imageGLWidget()->frame(stage::boundingBox(dataModel()->stage(), selectionModel()->paths()));
     }
 }
 
@@ -272,4 +272,4 @@ RenderView::enableCameraAxis(bool enabled)
 {
     p->imageGLWidget()->enableCameraAxis(enabled);
 }
-}  // namespace usd
+}  // namespace usdviewer

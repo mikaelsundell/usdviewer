@@ -5,7 +5,7 @@
 #include "commanddispatcher.h"
 #include "application.h"
 
-namespace usd {
+namespace usdviewer {
 CommandDispatcher::Data CommandDispatcher::d = { nullptr };
 
 CommandStack*
@@ -31,4 +31,4 @@ CommandDispatcher::stageLock()
 {
     return dataModel()->stageLock();
 }
-}  // namespace usd
+}  // namespace usdviewer

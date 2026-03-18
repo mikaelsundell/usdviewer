@@ -175,7 +175,7 @@
            <number>0</number>
           </property>
           <item>
-           <widget class="usd::StageTree" name="stageTree">
+           <widget class="usdviewer::StageTree" name="stageTree">
             <property name="alternatingRowColors">
              <bool>false</bool>
             </property>
@@ -211,7 +211,7 @@
               <number>2</number>
              </property>
              <item>
-              <widget class="usd::Slider" name="depth">
+              <widget class="usdviewer::Slider" name="depth">
                <property name="maximum">
                 <number>10</number>
                </property>
@@ -234,7 +234,7 @@
           </item>
          </layout>
         </widget>
-        <widget class="usd::PropertyTree" name="propertyTree">
+        <widget class="usdviewer::PropertyTree" name="propertyTree">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
            <horstretch>0</horstretch>
@@ -270,17 +270,17 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>usd::StageTree</class>
+   <class>usdviewer::StageTree</class>
    <extends>QTreeWidget</extends>
    <header>../../../sources/stagetree.h</header>
   </customwidget>
   <customwidget>
-   <class>usd::PropertyTree</class>
+   <class>usdviewer::PropertyTree</class>
    <extends>QTreeWidget</extends>
    <header>../../../sources/propertytree.h</header>
   </customwidget>
   <customwidget>
-   <class>usd::Slider</class>
+   <class>usdviewer::Slider</class>
    <extends>QSlider</extends>
    <header>../../../sources/slider.h</header>
   </customwidget>

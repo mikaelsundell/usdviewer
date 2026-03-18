@@ -6,7 +6,7 @@
 
 #include <QDockWidget>
 
-namespace usd {
+namespace usdviewer {
 
 class DockWidgetPrivate;
 
@@ -54,4 +54,4 @@ private:
     QScopedPointer<DockWidgetPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

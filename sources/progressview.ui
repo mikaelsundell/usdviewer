@@ -71,7 +71,7 @@
        </widget>
       </item>
       <item>
-       <widget class="usd::TreeWidget" name="progressTree">
+       <widget class="usdviewer::TreeWidget" name="progressTree">
         <property name="alternatingRowColors">
          <bool>false</bool>
         </property>
@@ -128,7 +128,7 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>usd::TreeWidget</class>
+   <class>usdviewer::TreeWidget</class>
    <extends>QTreeWidget</extends>
    <header>../../../sources/treewidget.h</header>
   </customwidget>

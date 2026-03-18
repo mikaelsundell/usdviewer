@@ -16,7 +16,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 // generated files
 #include "ui_outlinerview.h"
 
-namespace usd {
+namespace usdviewer {
 class OutlinerViewPrivate : public QObject, public SignalGuard {
 public:
     OutlinerViewPrivate();
@@ -266,4 +266,4 @@ OutlinerView::enableFollow(bool enable)
     p->follow(enable);
 }
 
-}  // namespace usd
+}  // namespace usdviewer

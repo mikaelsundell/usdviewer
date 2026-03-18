@@ -7,7 +7,7 @@
 #include <QApplication>
 #include <QScopedPointer>
 
-namespace usd {
+namespace usdviewer {
 class CommandStack;
 class DataModel;
 class SelectionModel;
@@ -72,7 +72,7 @@ public:
      * @brief Returns the global Application instance.
      *
      * Asserts if the active QCoreApplication is not an
-     * usd::Application instance.
+     * usdviewer::Application instance.
      */
     static Application* instance();
 
@@ -140,4 +140,4 @@ settings()
     return a ? a->settings() : nullptr;
 }
 
-}  // namespace usd
+}  // namespace usdviewer

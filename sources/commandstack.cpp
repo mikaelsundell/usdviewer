@@ -9,7 +9,7 @@
 #include <QPointer>
 #include <QVector>
 
-namespace usd {
+namespace usdviewer {
 class CommandStackPrivate {
 public:
     CommandStackPrivate();
@@ -180,4 +180,4 @@ CommandStack::clear()
         Q_EMIT canClearChanged(canClear());
 }
 
-}  // namespace usd
+}  // namespace usdviewer

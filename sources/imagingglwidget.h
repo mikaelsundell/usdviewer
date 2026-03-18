@@ -10,7 +10,7 @@
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
 
-namespace usd {
+namespace usdviewer {
 
 class ImagingGLWidgetPrivate;
 
@@ -327,4 +327,4 @@ private:
     QScopedPointer<ImagingGLWidgetPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

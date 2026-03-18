@@ -18,7 +18,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 class ApplicationPrivate {
 public:
     ApplicationPrivate();
@@ -52,11 +52,11 @@ ApplicationPrivate::init()
     d.style.reset(new Style());
 #ifdef NDEBUG
     QStringList plugindirs;
-    QString pluginusddir = platform::getApplicationPath() + "/plugin/usd";
+    QString pluginusddir = os::getApplicationPath() + "/plugin/usd";
     if (QDir(pluginusddir).exists()) {
         plugindirs << pluginusddir;
     }
-    QString usddir = platform::getApplicationPath() + "/usd";
+    QString usddir = os::getApplicationPath() + "/usd";
     if (QDir(usddir).exists()) {
         plugindirs << usddir;
     }
@@ -64,7 +64,7 @@ ApplicationPrivate::init()
         TfSetenv("PXR_DISABLE_STANDARD_PLUG_SEARCH_PATH", "1");
         std::vector<std::string> pluginPaths;
         for (const QString& dir : plugindirs) {
-            pluginPaths.push_back(usd::QStringToString(dir));
+            pluginPaths.push_back(qt::QStringToString(dir));
         }
         PlugRegistry& registry = PlugRegistry::GetInstance();
         registry.RegisterPlugins(pluginPaths);
@@ -75,7 +75,7 @@ ApplicationPrivate::init()
 #if defined(_DEBUG)
     platform::console("plugins");
     for (const auto& plugin : plugins) {
-        platform::console(usd::StringToQString(plugin->GetPath()));
+        platform::console(qt::StringToQString(plugin->GetPath()));
     }
     if (0) {
         test();
@@ -131,8 +131,8 @@ Application::instance()
     if (!app) {
         qFatal("Fatal Error in [Application::instance()]:\n"
                "The global application instance is missing or is not a core::Application. "
-               "Ensure you have instantiated usd::Application in your main() function.");
+               "Ensure you have instantiated usdviewer::Application in your main() function.");
     }
     return app;
 }
-}  // namespace usd
+}  // namespace usdviewer

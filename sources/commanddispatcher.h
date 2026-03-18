@@ -7,7 +7,7 @@
 #include "commandstack.h"
 #include <QReadWriteLock>
 
-namespace usd {
+namespace usdviewer {
 
 /**
  * @class CommandDispatcher
@@ -82,4 +82,4 @@ private:
     static Data d;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

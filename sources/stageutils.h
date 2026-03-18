@@ -10,9 +10,9 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
-
-/**
+namespace usdviewer {
+namespace stage {
+    /**
  * @brief Finds variant sets for the specified prim paths.
  *
  * Traverses the provided paths and collects variant sets available
@@ -28,10 +28,10 @@ namespace usd {
  *
  * @return Map of prim path strings to variant set names.
  */
-QMap<QString, QList<QString>>
-findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = false);
+    QMap<QString, QList<QString>> findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths,
+                                                  bool recursive = false);
 
-/**
+    /**
  * @brief Collects payload prim paths under the specified prim paths.
  *
  * Traverses the given prim paths and collects all prims that contain
@@ -44,10 +44,9 @@ findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursiv
  *
  * @return List of payload prim paths.
  */
-QList<SdfPath>
-payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = true);
+    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = true);
 
-/**
+    /**
  * @brief Filters a list of prim paths to only top-most paths.
  *
  * Removes paths that are descendants of other paths in the list.
@@ -66,10 +65,9 @@ payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive =
  *
  * @return List of top-most prim paths.
  */
-QList<SdfPath>
-rootPaths(const QList<SdfPath>& paths);
+    QList<SdfPath> rootPaths(const QList<SdfPath>& paths);
 
-/**
+    /**
  * @brief Computes the bounding box for the specified prim paths.
  *
  * Evaluates the world-space bounding box of the given prims
@@ -81,10 +79,9 @@ rootPaths(const QList<SdfPath>& paths);
  *
  * @return Combined bounding box of the prims.
  */
-GfBBox3d
-boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths);
+    GfBBox3d boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths);
 
-/**
+    /**
  * @brief Returns the visibility state of a prim.
  *
  * Queries the authored visibility of the specified prim on the stage.
@@ -98,10 +95,9 @@ boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths);
  *
  * @return True if the prim is visible, false if it is explicitly invisible.
  */
-bool
-isVisible(UsdStageRefPtr stage, const SdfPath& path);
+    bool isVisible(UsdStageRefPtr stage, const SdfPath& path);
 
-/**
+    /**
  * @brief Sets visibility for the specified prim paths.
  *
  * Updates the visibility state of the given prims on the stage.
@@ -113,7 +109,7 @@ isVisible(UsdStageRefPtr stage, const SdfPath& path);
  * @param visible Visibility state to apply.
  * @param recursive If true, apply visibility recursively.
  */
-void
-setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false);
+    void setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false);
 
-}  // namespace usd
+}  // namespace stage
+}  // namespace usdviewer

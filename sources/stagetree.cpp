@@ -24,7 +24,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 class StageTreePrivate : public QObject, public SignalGuard {
 public:
     StageTreePrivate();
@@ -279,7 +279,7 @@ void
 StageTreePrivate::toggleVisible(PrimItem* item)
 {
     const SdfPath path(QStringToString(item->data(0, PrimItem::PrimPath).toString()));
-    if (isVisible(d.stage, path)) {
+    if (stage::isVisible(d.stage, path)) {
         CommandDispatcher::run(new Command(hidePaths(QList<SdfPath> { path }, false)));
     }
     else {
@@ -370,14 +370,14 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
         const QString path = selected->data(0, Qt::UserRole).toString();
         if (!path.isEmpty())
-            paths.append(SdfPath(usd::QStringToString(path)));
+            paths.append(SdfPath(qt::QStringToString(path)));
     }
     if (paths.isEmpty())
         return;
 
-    const QList<SdfPath> rootPaths = usd::rootPaths(paths);
-    const QList<SdfPath> payloadPaths = usd::payloadPaths(d.stage, rootPaths);
-    const QMap<QString, QList<QString>> variantSets = findVariantSets(d.stage, paths, true);
+    const QList<SdfPath> rootPaths = stage::rootPaths(paths);
+    const QList<SdfPath> payloadPaths = stage::payloadPaths(d.stage, rootPaths);
+    const QMap<QString, QList<QString>> variantSets = stage::findVariantSets(d.stage, paths, true);
 
     QMenu menu(d.tree.data());
     struct VariantSelection {
@@ -690,4 +690,4 @@ StageTree::mouseMoveEvent(QMouseEvent* event)
     event->accept();
 }
 
-}  // namespace usd
+}  // namespace usdviewer

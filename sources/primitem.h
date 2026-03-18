@@ -9,7 +9,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class PrimItemPrivate;
 
@@ -67,4 +67,4 @@ private:
     QScopedPointer<PrimItemPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

@@ -13,7 +13,7 @@
 #include <QScopedPointer>
 #include <QSurfaceFormat>
 
-namespace usd {
+namespace usdviewer {
 
 class StylePrivate {
 public:
@@ -380,4 +380,4 @@ Style::colorSpace() const
     return p->colorSpace();
 }
 
-}  // namespace usd
+}  // namespace usdviewer

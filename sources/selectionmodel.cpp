@@ -6,7 +6,7 @@
 #include "qtutils.h"
 #include <QList>
 
-namespace usd {
+namespace usdviewer {
 class SelectionModelPrivate {
 public:
     SelectionModelPrivate();
@@ -113,4 +113,4 @@ SelectionModel::isValid() const
 {
     return true;
 }
-}  // namespace usd
+}  // namespace usdviewer

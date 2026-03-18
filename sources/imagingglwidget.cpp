@@ -40,7 +40,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 class ImagingGLWidgetPrivate : public QObject, public SignalGuard {
 public:
     void init();
@@ -1242,4 +1242,4 @@ ImagingGLWidget::wheelEvent(QWheelEvent* event)
 {
     p->wheelEvent(event);
 }
-}  // namespace usd
+}  // namespace usdviewer

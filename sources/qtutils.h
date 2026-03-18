@@ -20,60 +20,57 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
+namespace qt {
 
-/** @name Qt / USD Conversions */
-///@{
+    /** @name Qt / USD Conversions */
+    ///@{
 
-/**
- * @brief Converts a QString to std::string.
- */
-std::string
-QStringToString(const QString& str);
+    /**
+     * @brief Converts a QString to std::string.
+     */
+    std::string QStringToString(const QString& str);
 
-/**
- * @brief Converts a std::string to QString.
- */
-QString
-StringToQString(const std::string& str);
+    /**
+     * @brief Converts a std::string to QString.
+     */
+    QString StringToQString(const std::string& str);
 
-/**
- * @brief Converts a QString to a USD TfToken.
- */
-TfToken
-QStringToTfToken(const QString& str);
+    /**
+     * @brief Converts a QString to a USD TfToken.
+     */
+    TfToken QStringToTfToken(const QString& str);
 
-/**
- * @brief Converts a USD TfToken to QString.
- */
-QString
-TfTokenToQString(const TfToken& token);
+    /**
+     * @brief Converts a USD TfToken to QString.
+     */
+    QString TfTokenToQString(const TfToken& token);
 
-/**
- * @brief Converts a TfTokenVector to a QList of QString.
- */
-QList<QString>
-TfTokenVectorToQList(const TfTokenVector& tokens);
+    /**
+     * @brief Converts a TfTokenVector to a QList of QString.
+     */
+    QList<QString> TfTokenVectorToQList(const TfTokenVector& tokens);
 
-/**
- * @brief Converts a QList of SdfPath to an SdfPathVector.
- */
-SdfPathVector
-QListToSdfPathVector(const QList<SdfPath>& paths);
+    /**
+     * @brief Converts a QList of SdfPath to an SdfPathVector.
+     */
+    SdfPathVector QListToSdfPathVector(const QList<SdfPath>& paths);
 
-/**
- * @brief Converts a QColor to a USD GfVec4f.
- *
- * The resulting vector stores normalized RGBA components.
- */
-GfVec4f
-QColorToGfVec4f(const QColor& color);
+    /**
+     * @brief Converts a QColor to a USD GfVec4f.
+     *
+     * The resulting vector stores normalized RGBA components.
+     */
+    GfVec4f QColorToGfVec4f(const QColor& color);
 
-///@}
+    ///@}
 
-}  // namespace usd
+}  // namespace qt
+}  // namespace usdviewer
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+using namespace usdviewer::qt;
 
 /**
  * @brief Qt hash function for SdfPath.
@@ -84,7 +81,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 inline size_t
 qHash(const SdfPath& path, size_t seed = 0)
 {
-    return ::qHash(usd::StringToQString(path.GetString()), seed);
+    return ::qHash(StringToQString(path.GetString()), seed);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

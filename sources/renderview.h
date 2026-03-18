@@ -11,7 +11,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class RenderViewPrivate;
 
@@ -198,4 +198,4 @@ private:
     QScopedPointer<RenderViewPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

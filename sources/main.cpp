@@ -8,8 +8,8 @@
 int
 main(int argc, char* argv[])
 {
-    usd::Application app(argc, argv);
-    usd::Viewer viewer;
+    usdviewer::Application app(argc, argv);
+    usdviewer::Viewer viewer;
     viewer.setArguments(QCoreApplication::arguments());
     viewer.show();
     return app.exec();

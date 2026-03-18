@@ -6,7 +6,7 @@
 
 #include <QTreeWidgetItem>
 
-namespace usd {
+namespace usdviewer {
 
 class ProgressItemPrivate;
 
@@ -51,4 +51,4 @@ private:
     QScopedPointer<ProgressItemPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

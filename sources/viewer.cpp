@@ -35,7 +35,7 @@
 // generated files
 #include "ui_viewer.h"
 
-namespace usd {
+namespace usdviewer {
 class ViewerPrivate : public QObject {
     Q_OBJECT
 public:
@@ -916,7 +916,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
         }
     }
     if (!paths.isEmpty()) {
-        QMap<QString, QList<QString>> variantSets = findVariantSets(dataModel()->stage(), paths, true);
+        QMap<QString, QList<QString>> variantSets = stage::findVariantSets(dataModel()->stage(), paths, true);
 
         if (!variantSets.isEmpty()) {
             d.ui->editLoad->addSeparator();
@@ -935,7 +935,8 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
                         action->setShortcut(QKeySequence(key));
                     }
                     QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
-                        QList<SdfPath> payloadPaths = usd::payloadPaths(dataModel()->stage(), usd::rootPaths(paths));
+                        QList<SdfPath> payloadPaths = stage::payloadPaths(dataModel()->stage(),
+                                                                          stage::rootPaths(paths));
 
                         CommandDispatcher::run(new Command(loadPayloads(payloadPaths, setName, value)));
                     });
@@ -1050,4 +1051,4 @@ Viewer::dropEvent(QDropEvent* event)
         p->loadFile(filename);
     }
 }
-}  // namespace usd
+}  // namespace usdviewer

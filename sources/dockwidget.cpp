@@ -6,7 +6,7 @@
 #include <QMouseEvent>
 #include <QPointer>
 
-namespace usd {
+namespace usdviewer {
 class DockWidgetPrivate : public QObject {
 public:
     void init();
@@ -65,4 +65,4 @@ DockWidget::mouseMoveEvent(QMouseEvent* event)
     }
     move(event->globalPosition().toPoint() - p->d.dragStart);
 }
-}  // namespace usd
+}  // namespace usdviewer

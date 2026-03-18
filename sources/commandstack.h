@@ -8,7 +8,7 @@
 #include "datamodel.h"
 #include "selectionmodel.h"
 
-namespace usd {
+namespace usdviewer {
 
 class CommandStackPrivate;
 
@@ -117,4 +117,4 @@ private:
     QScopedPointer<CommandStackPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

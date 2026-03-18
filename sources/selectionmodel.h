@@ -12,7 +12,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class SelectionModelPrivate;
 
@@ -123,4 +123,4 @@ private:
     QScopedPointer<SelectionModelPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

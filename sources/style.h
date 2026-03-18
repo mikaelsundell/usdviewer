@@ -9,7 +9,7 @@
 #include <QObject>
 #include <QScopedPointer>
 
-namespace usd {
+namespace usdviewer {
 class StylePrivate;
 class Style : public QObject {
     Q_OBJECT
@@ -157,4 +157,4 @@ private:
     QScopedPointer<StylePrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

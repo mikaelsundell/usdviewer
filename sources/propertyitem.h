@@ -6,7 +6,7 @@
 
 #include "treeitem.h"
 
-namespace usd {
+namespace usdviewer {
 
 class PropertyItemPrivate;
 
@@ -52,4 +52,4 @@ private:
     QScopedPointer<PropertyItemPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

@@ -11,7 +11,7 @@
 #include <QPointer>
 #include <QStyledItemDelegate>
 
-namespace usd {
+namespace usdviewer {
 class TreeWidgetPrivate {
 public:
     TreeWidgetPrivate();
@@ -75,7 +75,7 @@ public:
             opt.backgroundBrush = Qt::NoBrush;
             opt.state &= ~QStyle::State_HasFocus;
             painter->save();
-            
+
             if (opt.state & QStyle::State_Selected)
                 painter->fillRect(opt.rect, style()->color(Style::ColorHighlight));
 
@@ -216,4 +216,4 @@ TreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const
     QTreeWidget::drawRow(painter, opt, index);
 }
 
-}  // namespace usd
+}  // namespace usdviewer

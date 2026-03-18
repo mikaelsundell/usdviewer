@@ -7,7 +7,7 @@
 #include <QScopedPointer>
 #include <QSlider>
 
-namespace usd {
+namespace usdviewer {
 
 class SliderPrivate;
 
@@ -44,4 +44,4 @@ private:
     QScopedPointer<SliderPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

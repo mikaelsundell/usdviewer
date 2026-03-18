@@ -11,7 +11,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class ProgressViewPrivate;
 
@@ -42,4 +42,4 @@ private:
     QScopedPointer<ProgressViewPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

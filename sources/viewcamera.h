@@ -10,7 +10,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 
 class ViewCameraPrivate;
 
@@ -251,4 +251,4 @@ private:
     QExplicitlySharedDataPointer<ViewCameraPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

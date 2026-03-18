@@ -7,7 +7,7 @@
 #include <QMainWindow>
 #include <QScopedPointer>
 
-namespace usd {
+namespace usdviewer {
 
 class ViewerPrivate;
 
@@ -81,4 +81,4 @@ private:
     QScopedPointer<ViewerPrivate> p;
 };
 
-}  // namespace usd
+}  // namespace usdviewer

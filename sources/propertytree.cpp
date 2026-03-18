@@ -29,7 +29,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace usd {
+namespace usdviewer {
 class PropertyTreePrivate : public QObject, public SignalGuard {
 public:
     void init();
@@ -194,4 +194,4 @@ PropertyTree::updateSelection(const QList<SdfPath>& paths)
 {
     p->updateSelection(paths);
 }
-}  // namespace usd
+}  // namespace usdviewer

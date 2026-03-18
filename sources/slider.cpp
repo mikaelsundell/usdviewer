@@ -9,7 +9,7 @@
 #include <QStyle>
 #include <QStyleOptionSlider>
 
-namespace usd {
+namespace usdviewer {
 class SliderPrivate {
 public:
     SliderPrivate();
@@ -71,4 +71,4 @@ Slider::paintEvent(QPaintEvent* event)
     style()->drawComplexControl(QStyle::CC_Slider, &opt, &painter, this);
 }
 
-}  // namespace usd
+}  // namespace usdviewer

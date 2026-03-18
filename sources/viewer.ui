@@ -266,7 +266,7 @@
           <number>4</number>
          </property>
          <item>
-          <widget class="usd::RenderView" name="renderView" native="true">
+          <widget class="usdviewer::RenderView" name="renderView" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
              <horstretch>0</horstretch>
@@ -289,7 +289,7 @@
     </font>
    </property>
   </widget>
-  <widget class="usd::DockWidget" name="outlinerDock">
+  <widget class="usdviewer::DockWidget" name="outlinerDock">
    <property name="minimumSize">
     <size>
      <width>400</width>
@@ -329,7 +329,7 @@
       <number>0</number>
      </property>
      <item>
-      <widget class="usd::OutlinerView" name="outlinerView" native="true"/>
+      <widget class="usdviewer::OutlinerView" name="outlinerView" native="true"/>
      </item>
     </layout>
    </widget>
@@ -497,7 +497,7 @@
    <addaction name="menuView"/>
    <addaction name="menuHelp"/>
   </widget>
-  <widget class="usd::DockWidget" name="progressDock">
+  <widget class="usdviewer::DockWidget" name="progressDock">
    <property name="minimumSize">
     <size>
      <width>400</width>
@@ -531,7 +531,7 @@
       <number>0</number>
      </property>
      <item>
-      <widget class="usd::ProgressView" name="progressView" native="true"/>
+      <widget class="usdviewer::ProgressView" name="progressView" native="true"/>
      </item>
     </layout>
    </widget>
@@ -1108,25 +1108,25 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>usd::DockWidget</class>
+   <class>usdviewer::DockWidget</class>
    <extends>QDockWidget</extends>
    <header>../../../sources/dockwidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>usd::OutlinerView</class>
+   <class>usdviewer::OutlinerView</class>
    <extends>QWidget</extends>
    <header>../../../sources/outlinerview.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>usd::ProgressView</class>
+   <class>usdviewer::ProgressView</class>
    <extends>QWidget</extends>
    <header>../../../sources/progressview.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>usd::RenderView</class>
+   <class>usdviewer::RenderView</class>
    <extends>QWidget</extends>
    <header>../../../sources/renderview.h</header>
   </customwidget>

@@ -98,20 +98,28 @@ PrimItem::data(int column, int role) const
                 return QIcon(style()->icon(Style::IconPrim, Style::UIMedium));
         }
     }
+    
     if (role == Qt::DecorationRole && column == Vis) {
         if (!prim || !prim.IsActive())
             return QVariant();
+
         if (prim == p->d.stage->GetPseudoRoot())
             return QVariant();
+
         UsdGeomImageable imageable(prim);
         if (!imageable)
             return QVariant();
-        return style()->icon(isVisible() ? Style::IconVisible : Style::IconHidden,
-                             Style::UISmall);
+
+        return style()->icon(
+            isVisible() ? Style::IconVisible : Style::IconHidden,
+            Style::UIMedium
+        );
     }
+
     if (role == PrimItem::DataPath) {
         return StringToQString(p->d.path.GetString());
     }
+    
     if (role == PrimItem::DataVisible) {
         return isVisible();
     }

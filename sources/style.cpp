@@ -305,12 +305,16 @@ Style::color(ColorRole role) const
 QPixmap
 Style::icon(IconRole role, UIScale scale) const
 {
-    const int size = iconSize(scale);
-    if (size <= 0)
+    const qreal dpr = qApp->devicePixelRatio();
+    const int logicalSize = iconSize(scale);
+    const int physicalSize = int(logicalSize * dpr);
+
+    if (logicalSize <= 0)
         return QPixmap();
 
     const int roleKey = int(role);
     auto it = p->d.pixmaps.constFind(roleKey);
+
     if (it == p->d.pixmaps.constEnd()) {
         const QString path = p->iconPath(role);
         if (path.isEmpty())
@@ -319,11 +323,18 @@ Style::icon(IconRole role, UIScale scale) const
         QPixmap loaded(path);
         if (loaded.isNull())
             return QPixmap();
-
         it = p->d.pixmaps.insert(roleKey, loaded);
     }
+    const QPixmap& base = it.value();
+    QPixmap result = base.scaled(
+        physicalSize,
+        physicalSize,
+        Qt::KeepAspectRatio,
+        Qt::SmoothTransformation
+    );
 
-    return it.value().scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    result.setDevicePixelRatio(dpr);
+    return result;
 }
 
 int

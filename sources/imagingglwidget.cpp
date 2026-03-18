@@ -741,79 +741,137 @@ ImagingGLWidgetPrivate::drawAxis(QPainter& painter)
 void
 ImagingGLWidgetPrivate::updateSceneTree()
 {
-    size_t prims = 0;
-    size_t meshes = 0;
-    size_t xforms = 0;
-    size_t payloads = 0;
-    size_t instances = 0;
-    size_t vertices = 0;
-    size_t normals = 0;
-    size_t faces = 0;
+    struct SceneStats {
+        size_t prims = 0;
+        size_t meshes = 0;
+        size_t xforms = 0;
+        size_t payloads = 0;
+        size_t instances = 0;
+        size_t vertices = 0;
+        size_t normals = 0;
+        size_t faces = 0;
+    };
+
+    auto accumulate = [&](const UsdPrim& prim, SceneStats& s) {
+        if (!prim.IsActive() || !prim.IsLoaded())
+            return;
+
+        s.prims++;
+
+        if (prim.IsA<UsdGeomXform>())
+            s.xforms++;
+
+        if (prim.IsA<UsdGeomMesh>()) {
+            s.meshes++;
+            UsdGeomMesh mesh(prim);
+
+            VtArray<GfVec3f> points;
+            mesh.GetPointsAttr().Get(&points);
+            s.vertices += points.size();
+
+            VtArray<int> faceCounts;
+            mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
+            s.faces += faceCounts.size();
+
+            VtArray<GfVec3f> meshNormals;
+            UsdGeomPrimvarsAPI pvAPI(prim);
+            UsdGeomPrimvar normalsPv = pvAPI.GetPrimvar(TfToken("normals"));
+
+            bool hasNormals = false;
+            if (normalsPv && normalsPv.HasValue()) {
+                normalsPv.Get(&meshNormals);
+                hasNormals = true;
+            }
+            if (!hasNormals) {
+                mesh.GetNormalsAttr().Get(&meshNormals);
+            }
+
+            s.normals += meshNormals.size();
+        }
+
+        if (prim.HasPayload())
+            s.payloads++;
+
+        if (prim.IsInstanceable())
+            s.instances++;
+    };
+
+    auto filterRootPaths = [](const QList<SdfPath>& paths) {
+        QList<SdfPath> result;
+        for (const SdfPath& p : paths) {
+            bool isChild = false;
+            for (const SdfPath& other : paths) {
+                if (p == other)
+                    continue;
+                if (p.HasPrefix(other)) {
+                    isChild = true;
+                    break;
+                }
+            }
+            if (!isChild)
+                result.append(p);
+        }
+        return result;
+    };
+
+    SceneStats total;
+    SceneStats selected;
     if (d.stage) {
         QReadLocker locker(CommandDispatcher::stageLock());
         for (const UsdPrim& prim : d.stage->Traverse()) {
-            if (!prim.IsActive() || !prim.IsLoaded())
-                continue;
+            accumulate(prim, total);
+        }
+        if (!d.selection.isEmpty()) {
+            const QList<SdfPath> roots = filterRootPaths(d.selection);
 
-            prims++;
-            if (prim.IsA<UsdGeomXform>())
-                xforms++;
+            for (const SdfPath& path : roots) {
+                UsdPrim root = d.stage->GetPrimAtPath(path);
+                if (!root)
+                    continue;
 
-            if (prim.IsA<UsdGeomMesh>()) {
-                meshes++;
-                UsdGeomMesh mesh(prim);
-
-                VtArray<GfVec3f> points;
-                mesh.GetPointsAttr().Get(&points);
-                vertices += points.size();
-
-                VtArray<int> faceCounts;
-                mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
-                faces += faceCounts.size();
-
-                VtArray<GfVec3f> meshNormals;
-                UsdGeomPrimvarsAPI pvAPI(prim);
-                UsdGeomPrimvar normalsPv = pvAPI.GetPrimvar(TfToken("normals"));
-
-                bool hasNormals = false;
-                if (normalsPv && normalsPv.HasValue()) {
-                    normalsPv.Get(&meshNormals);
-                    hasNormals = true;
-                }
-                if (!hasNormals) {
-                    mesh.GetNormalsAttr().Get(&meshNormals);
+                for (const UsdPrim& prim : UsdPrimRange(root)) {
+                    accumulate(prim, selected);
                 }
             }
-            if (prim.HasPayload())
-                payloads++;
-
-            if (prim.IsInstanceable())
-                instances++;
         }
     }
 
-    double dpr = d.glwidget->devicePixelRatioF();
-    QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::UISmall));
-    font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
-
     QLocale locale = QLocale::system();
     auto fmt = [&](size_t v) { return locale.toString((qlonglong)v); };
+
+    const bool hasSelection = !d.selection.isEmpty();
+    auto fmtPair = [&](size_t totalValue, size_t selectedValue) {
+        if (hasSelection && selectedValue > 0)
+            return QString("%1 (%2)").arg(fmt(totalValue), fmt(selectedValue));
+        return fmt(totalValue);
+    };
 
     struct Row {
         QString label;
         QString value;
     };
 
-    QVector<Row> rows { { "Prims", fmt(prims) },       { "Meshes", fmt(meshes) },       { "Xforms", fmt(xforms) },
-                        { "Payloads", fmt(payloads) }, { "Instances", fmt(instances) }, { "Vertices", fmt(vertices) },
-                        { "Normals", fmt(normals) },   { "Faces", fmt(faces) } };
+    QVector<Row> rows { { "Prims", fmtPair(total.prims, selected.prims) },
+                        { "Meshes", fmtPair(total.meshes, selected.meshes) },
+                        { "Xforms", fmtPair(total.xforms, selected.xforms) },
+                        { "Payloads", fmtPair(total.payloads, selected.payloads) },
+                        { "Instances", fmtPair(total.instances, selected.instances) },
+                        { "Vertices", fmtPair(total.vertices, selected.vertices) },
+                        { "Normals", fmtPair(total.normals, selected.normals) },
+                        { "Faces", fmtPair(total.faces, selected.faces) } };
+
+    double dpr = d.glwidget->devicePixelRatioF();
+
+    QFont font = app()->font();
+    font.setPointSize(style()->fontSize(Style::UISmall));
+    font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
 
     QFontMetrics fm(font);
     int rowHeight = fm.lineSpacing() + 2;
     int marginLeft = 18;
     int marginTop = 16;
     int columnSpacing = 20;
+
     int labelWidth = 0;
     int valueWidth = 0;
 
@@ -824,26 +882,27 @@ ImagingGLWidgetPrivate::updateSceneTree()
 
     qsizetype width = labelWidth + columnSpacing + valueWidth + marginLeft;
     qsizetype height = rows.size() * rowHeight + marginTop;
+
     d.sceneTree = QImage(width * dpr, height * dpr, QImage::Format_ARGB32_Premultiplied);
     d.sceneTree.setDevicePixelRatio(dpr);
     d.sceneTree.fill(Qt::transparent);
 
     QPainter p(&d.sceneTree);
-    p.setPen(style()->color(Style::ColorText));
     p.setRenderHint(QPainter::TextAntialiasing);
     p.setFont(font);
 
     int y = marginTop + fm.ascent();
-
     for (const auto& r : rows) {
         int labelX = marginLeft;
         int valueX = marginLeft + labelWidth + columnSpacing;
         p.setPen(QColor(0, 0, 0, 180));
         p.drawText(labelX + 1, y + 1, r.label);
         p.drawText(valueX + 1, y + 1, r.value);
+
         p.setPen(Qt::white);
         p.drawText(labelX, y, r.label);
         p.drawText(valueX, y, r.value);
+
         y += rowHeight;
     }
 }

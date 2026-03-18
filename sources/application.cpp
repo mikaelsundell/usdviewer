@@ -6,6 +6,8 @@
 #include "commanddispatcher.h"
 #include "commandstack.h"
 #include "datamodel.h"
+#include "os.h"
+#include "qtutils.h"
 #include "selectionmodel.h"
 #include "settings.h"
 #include "style.h"
@@ -73,17 +75,12 @@ ApplicationPrivate::init()
     PlugRegistry& instance = PlugRegistry::GetInstance();
     PlugPluginPtrVector plugins = instance.GetAllPlugins();
 #if defined(_DEBUG)
-    platform::console("plugins");
+    os::console("plugins");
     for (const auto& plugin : plugins) {
-        platform::console(qt::StringToQString(plugin->GetPath()));
-    }
-    if (0) {
-        test();
+        os::console(qt::StringToQString(plugin->GetPath()));
     }
 #endif
 }
-
-#include "application.moc"
 
 Application::Application(int& argc, char** argv)
     : QApplication(argc, argv)

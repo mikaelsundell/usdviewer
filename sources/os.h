@@ -6,6 +6,7 @@
 #include <QProcess>
 #include <QWidget>
 
+namespace usdviewer {
 namespace os {
 
 /** @name Application Appearance */
@@ -76,3 +77,4 @@ console(const QString& message);
 ///@}
 
 }  // namespace os
+}  // namespace usdviewer

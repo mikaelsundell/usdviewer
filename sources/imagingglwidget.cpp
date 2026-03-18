@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QColorSpace>
+#include <QElapsedTimer>
 #include <QFontDatabase>
 #include <QLocale>
 #include <QMouseEvent>

@@ -22,6 +22,7 @@
 #include <QColorDialog>
 #include <QDesktopServices>
 #include <QDragEnterEvent>
+#include <QElapsedTimer>
 #include <QFileDialog>
 #include <QImageWriter>
 #include <QMimeData>

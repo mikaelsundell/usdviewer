@@ -6,6 +6,7 @@
 #include "application.h"
 #include "qtutils.h"
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QPointer>
 #include <pxr/usd/ar/resolver.h>

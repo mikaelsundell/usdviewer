@@ -72,7 +72,7 @@ if (APPLE)
         OUTPUT_NAME ${project_name}
     )
     target_link_libraries (${project_name} 
-        Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
+        Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python
         OpenUSD::OpenUSD
         Python3::Python
@@ -90,7 +90,7 @@ elseif (WIN32)
     )
     target_include_directories (${project_name} PRIVATE ${LCMS2_INCLUDE_DIR})
     target_link_libraries (${project_name} 
-        Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::GuiPrivate Qt6::OpenGLWidgets Qt6::Widgets
+        Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python
         OpenGL::GL
         OpenUSD::OpenUSD

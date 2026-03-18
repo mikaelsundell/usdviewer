@@ -148,9 +148,6 @@ StylePrivate::updateStylesheet()
         lastIndex = match.capturedEnd();
     }
     result.append(styleSheet.mid(lastIndex));
-
-    qDebug().noquote() << result;
-
     qApp->setStyleSheet(result);
 }
 

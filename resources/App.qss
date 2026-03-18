@@ -176,7 +176,7 @@ QPushButton
     color: $color.text;
     font-size: $font.size.medium;
     background-color: 
-    QLinearGradient( 
+    qlineargradient( 
         x1: 0, y1: 0, x2: 0, y2: 1, 
         stop: 0 $color.button,
         stop: 1.0 $color.buttonalt
@@ -306,6 +306,43 @@ QTextBrowser
     alternate-background-color: $color.base;
 }
 
+QToolButton
+{
+    color: $color.text;
+    font-size: $font.size.medium;
+    background-color: 
+    qlineargradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 $color.button,
+        stop: 1.0 $color.buttonalt
+    );
+    border: 1px solid $color.borderalt;
+    border-radius: 0px;        
+    padding: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+QToolButton:default
+{
+    font-weight: bold;
+}
+
+QToolButton:disabled
+{
+    color: $color.textdisabled;
+}
+
+QToolButton:pressed
+{
+    background-color: 
+    qlineargradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 $color.button.lightness(120),
+        stop: 1.0 $color.buttonalt.lightness(120)
+    );
+}
+
 QSlider {
     background: transparent;
 }
@@ -343,7 +380,7 @@ QTreeView QHeaderView:section
 {
     font-size: $font.size.medium;
     color: $color.text;
-    background-color: transparent;
+    background-color: $color.base;
     border: none;
     padding: 4px 6px;
 }

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+﻿// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
@@ -185,9 +185,19 @@ TreeWidget::~TreeWidget() = default;
 void
 TreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const
 {
-    QRect tighterRect = rect;
-    tighterRect.translate(4, 0);
-    QTreeWidget::drawBranches(painter, tighterRect, index);
+    bool alternatingRow = p->visualRowIndex(index) % 2 == 1;
+    QColor bg = alternatingRow ? app()->style()->color(Style::ColorBaseAlt) : app()->style()->color(Style::ColorBase);
+    if (selectionModel() && selectionModel()->isSelected(index)) {
+        bg = app()->style()->color(Style::ColorHighlight);
+    }
+    else {
+        QTreeWidgetItem* item = itemFromIndex(index);
+        if (item && p->hasSelectedChildren(item)) {
+            bg = app()->style()->color(Style::ColorHighlightAlt);
+        }
+    }
+    painter->fillRect(rect, bg);
+    QTreeWidget::drawBranches(painter, rect, index);
 }
 
 void

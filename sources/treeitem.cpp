@@ -47,4 +47,12 @@ TreeItem::data(int column, int role) const
     return QTreeWidgetItem::data(column, role);
 }
 
+Qt::ItemFlags
+TreeItem::flags() const
+{
+    Qt::ItemFlags f = QTreeWidgetItem::flags();
+    f &= ~Qt::ItemIsUserCheckable;
+    return f;
+}
+
 }  // namespace usdviewer

@@ -68,16 +68,20 @@ public:
      * operations such as stage loading or export tasks.
      */
     struct Notify {
-        QString message;       ///< Notification message.
-        QList<SdfPath> paths;  ///< Associated prim paths.
-        QVariantMap details;   ///< Additional metadata.
+        enum class Status { Info, Progress, Warning, Error };
+
+        QString message;               ///< Notification message.
+        QList<SdfPath> paths;          ///< Associated prim paths.
+        QVariantMap details;           ///< Additional metadata.
+        Status status = Status::Info;  ///< Notification severity.
 
         Notify() = default;
 
-        Notify(const QString& n, const QList<SdfPath>& p, const QVariantMap& d = {})
-            : message(n)
+        Notify(const QString& msg, const QList<SdfPath>& p = {}, Status s = Status::Info, const QVariantMap& d = {})
+            : message(msg)
             , paths(p)
             , details(d)
+            , status(s)
         {}
     };
 

@@ -43,7 +43,7 @@ public:
     class StageWatcher : public TfWeakBase {
     public:
         StageWatcher(DataModelPrivate* parent)
-            : d { TfNotice::Key(), parent }
+            : d { false, TfNotice::Key(), parent }
         {}
         void init()
         {
@@ -52,6 +52,8 @@ public:
         }
         void objectsChanged(const UsdNotice::ObjectsChanged& notice, const UsdStageWeakPtr& sender)
         {
+            if (d.suppress.load())
+                return;
             QList<SdfPath> updated;
             for (const auto& p : notice.GetResyncedPaths())
                 updated.append(p);
@@ -62,11 +64,31 @@ public:
             QMetaObject::invokeMethod(
                 d.parent->d.dataModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::DirectConnection);
         }
+        void blockSignals(bool block) { d.suppress.store(block); }
+        bool signalsBlocked() const { return d.suppress.load(); }
         struct Data {
+            std::atomic<bool> suppress { false };
             TfNotice::Key key;
             DataModelPrivate* parent;
         };
         Data d;
+    };
+    class StageBlocker {
+    public:
+        explicit StageBlocker(StageWatcher* w)
+            : watcher(w)
+        {
+            if (watcher)
+                watcher->blockSignals(true);
+        }
+        ~StageBlocker()
+        {
+            if (watcher)
+                watcher->blockSignals(false);
+        }
+
+    private:
+        StageWatcher* watcher = nullptr;
     };
 
 public:
@@ -196,15 +218,18 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy po
 {
     {
         QWriteLocker locker(&d.stageLock);
-        if (policy == DataModel::LoadPolicy::All) {
-            d.stage = UsdStage::Open(QStringToString(filename), UsdStage::LoadAll);
+        StageBlocker blocker(d.stageWatcher.data());
+        {
+            if (policy == DataModel::LoadPolicy::All) {
+                d.stage = UsdStage::Open(QStringToString(filename), UsdStage::LoadAll);
+            }
+            else {
+                d.stage = UsdStage::Open(QStringToString(filename),
+                                         UsdStage::LoadNone);  // load stage without loading payloads
+            }
+            d.loadPolicy = policy;
+            d.mask = QList<SdfPath>();
         }
-        else {
-            d.stage = UsdStage::Open(QStringToString(filename),
-                                     UsdStage::LoadNone);  // load stage without loading payloads
-        }
-        d.loadPolicy = policy;
-        d.mask = QList<SdfPath>();
     }
     if (d.stage) {
         initStage();
@@ -281,11 +306,14 @@ DataModelPrivate::close()
 {
     {
         QWriteLocker locker(&d.stageLock);
-        d.stage = nullptr;
-        d.stageStatus = DataModel::StageStatus::Closed;
-        d.bboxCache.reset();
-        d.pendingPaths.clear();
-        d.changeDepth = 0;
+        StageBlocker blocker(d.stageWatcher.data());
+        {
+            d.stage = nullptr;
+            d.stageStatus = DataModel::StageStatus::Closed;
+            d.bboxCache.reset();
+            d.pendingPaths.clear();
+            d.changeDepth = 0;
+        }
     }
     QMetaObject::invokeMethod(
         d.dataModel, [this]() { updateStage(); }, Qt::QueuedConnection);
@@ -298,8 +326,11 @@ DataModelPrivate::reload()
     {
         QWriteLocker locker(&d.stageLock);
         if (d.stage) {
-            d.stage->Reload();
-            d.bboxCache.reset();
+            StageBlocker blocker(d.stageWatcher.data());
+            {
+                d.stage->Reload();
+                d.bboxCache.reset();
+            }
         }
     }
     d.bbox = boundingBox();

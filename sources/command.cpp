@@ -86,8 +86,6 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             QMetaObject::invokeMethod(
                                 dm,
                                 [dm, path, completed]() {
-                                    qDebug() << "sending payload loaded";
-
                                     dm->updateProgressNotify(DataModel::Notify("payload loaded", { path }),
                                                              completed + 1);
                                 },
@@ -176,7 +174,7 @@ isolatePaths(const QList<SdfPath>& paths)
     return Command(
         // redo
         [paths, previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("redo isolate", 1);
+            dm->beginProgressBlock("Isolate", 1);
 
             QFuture<void> future = QtConcurrent::run([dm, paths, previous]() {
                 {
@@ -186,7 +184,7 @@ isolatePaths(const QList<SdfPath>& paths)
                 QMetaObject::invokeMethod(
                     dm,
                     [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Isolate set", paths), 1);
+                        dm->updateProgressNotify(DataModel::Notify("Isolate", paths), 1);
                         dm->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -194,13 +192,11 @@ isolatePaths(const QList<SdfPath>& paths)
         },
         // undo
         [previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("undo isolate", 1);
-
+            dm->beginProgressBlock("Isolate restored", 1);
             QFuture<void> future = QtConcurrent::run([dm, previous]() {
                 {
                     dm->setMask(*previous);
                 }
-
                 QMetaObject::invokeMethod(
                     dm,
                     [dm, previous]() {
@@ -218,12 +214,43 @@ selectPaths(const QList<SdfPath>& paths)
     auto previous = std::make_shared<QList<SdfPath>>();
     return Command(
         // redo
-        [paths, previous](DataModel*, SelectionModel* sel) {
-            *previous = sel->paths();
-            sel->updatePaths(paths);
+        [paths, previous](DataModel* dm, SelectionModel* sel) {
+            dm->beginProgressBlock("Select", 1);
+            QFuture<void> future = QtConcurrent::run([dm, sel, paths, previous]() {
+                {
+                    *previous = sel->paths();
+                    sel->updatePaths(paths);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, paths]() {
+                        using Status = DataModel::Notify::Status;
+                        DataModel::Notify notify("Select", paths, Status::Info);
+
+                        dm->updateProgressNotify(notify, 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
         },
         // undo
-        [previous](DataModel*, SelectionModel* sel) { sel->updatePaths(*previous); });
+        [previous](DataModel* dm, SelectionModel* sel) {
+            dm->beginProgressBlock("Select restored", 1);
+            QFuture<void> future = QtConcurrent::run([dm, sel, previous]() {
+                {
+                    sel->updatePaths(*previous);
+                }
+                QMetaObject::invokeMethod(
+                    dm,
+                    [dm, previous]() {
+                        using Status = DataModel::Notify::Status;
+                        DataModel::Notify notify("Select restored", *previous, Status::Info);
+                        dm->updateProgressNotify(notify, 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        });
 }
 
 Command
@@ -233,21 +260,22 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
     return Command(
         // redo
         [paths, recursive, previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("redo show", 1);
+            dm->beginProgressBlock("Show", 1);
             QFuture<void> future = QtConcurrent::run([dm, paths, recursive, previous]() {
                 {
                     QWriteLocker lock(dm->stageLock());
                     previous->clear();
                     for (const SdfPath& path : paths) {
-                        bool visible = stage::isVisible(dm->stage(), path);
-                        previous->insert(path, visible);
+                        previous->insert(path, stage::isVisible(dm->stage(), path));
                     }
                     stage::setVisible(dm->stage(), paths, true, recursive);
                 }
                 QMetaObject::invokeMethod(
                     dm,
                     [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Shown", paths), 1);
+                        using Status = DataModel::Notify::Status;
+                        DataModel::Notify notify("Show", paths, Status::Info);
+                        dm->updateProgressNotify(notify, 1);
                         dm->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -255,7 +283,7 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
         },
         // undo
         [previous, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("undo show", 1);
+            dm->beginProgressBlock("Show restored", 1);
             QFuture<void> future = QtConcurrent::run([dm, previous, recursive]() {
                 {
                     QWriteLocker lock(dm->stageLock());
@@ -266,7 +294,9 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                 QMetaObject::invokeMethod(
                     dm,
                     [dm, previous]() {
-                        dm->updateProgressNotify(DataModel::Notify("Visibility restored", previous->keys()), 1);
+                        using Status = DataModel::Notify::Status;
+                        DataModel::Notify notify("Show restored", previous->keys(), Status::Info);
+                        dm->updateProgressNotify(notify, 1);
                         dm->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -277,36 +307,51 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
 Command
 hidePaths(const QList<SdfPath>& paths, bool recursive)
 {
+    auto previous = std::make_shared<QHash<SdfPath, bool>>();
     return Command(
         // redo
-        [paths, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("redo hide", 1);
-            QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
+        [paths, recursive, previous](DataModel* dm, SelectionModel*) {
+            dm->beginProgressBlock("Hide", 1);
+            QFuture<void> future = QtConcurrent::run([dm, paths, recursive, previous]() {
                 {
                     QWriteLocker lock(dm->stageLock());
+                    previous->clear();
+                    for (const SdfPath& path : paths) {
+                        previous->insert(path, stage::isVisible(dm->stage(), path));
+                    }
                     stage::setVisible(dm->stage(), paths, false, recursive);
                 }
+
                 QMetaObject::invokeMethod(
                     dm,
                     [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Hidden", paths), 1);
+                        using Status = DataModel::Notify::Status;
+                        DataModel::Notify notify("Hide", paths, Status::Info);
+
+                        dm->updateProgressNotify(notify, 1);
                         dm->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [paths, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("undo hide", 1);
-            QFuture<void> future = QtConcurrent::run([dm, paths, recursive]() {
+        [previous, recursive](DataModel* dm, SelectionModel*) {
+            dm->beginProgressBlock("Hide restored", 1);
+            QFuture<void> future = QtConcurrent::run([dm, previous, recursive]() {
                 {
                     QWriteLocker lock(dm->stageLock());
-                    stage::setVisible(dm->stage(), paths, true, recursive);
+
+                    for (auto it = previous->cbegin(); it != previous->cend(); ++it) {
+                        stage::setVisible(dm->stage(), { it.key() }, it.value(), recursive);
+                    }
                 }
                 QMetaObject::invokeMethod(
                     dm,
-                    [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Shown", paths), 1);
+                    [dm, previous]() {
+                        using Status = DataModel::Notify::Status;
+                        DataModel::Notify notify("Hide restored", previous->keys(), Status::Info);
+
+                        dm->updateProgressNotify(notify, 1);
                         dm->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -345,7 +390,6 @@ namespace utils {
         }
         return result;
     }
-
 
     inline QList<SdfPath> minimalRootPaths(QList<SdfPath> paths)
     {
@@ -435,7 +479,7 @@ deletePaths(const QList<SdfPath>& inPaths)
     return Command(
         // redo
         [inPaths, snapshots](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("delete prims", 1);
+            dm->beginProgressBlock("Delete", 1);
             QFuture<void> future = QtConcurrent::run([dm, inPaths, snapshots]() {
                 QWriteLocker lock(dm->stageLock());
                 UsdStageRefPtr stage = dm->stage();
@@ -453,7 +497,7 @@ deletePaths(const QList<SdfPath>& inPaths)
                 QMetaObject::invokeMethod(
                     dm,
                     [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Deleted", paths), 1);
+                        dm->updateProgressNotify(DataModel::Notify("Delete", paths), 1);
                         dm->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -461,7 +505,7 @@ deletePaths(const QList<SdfPath>& inPaths)
         },
         // undo
         [snapshots](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("undo delete", 1);
+            dm->beginProgressBlock("Delete restored", 1);
             QFuture<void> future = QtConcurrent::run([dm, snapshots]() {
                 QWriteLocker lock(dm->stageLock());
                 UsdStageRefPtr stage = dm->stage();
@@ -483,4 +527,248 @@ deletePaths(const QList<SdfPath>& inPaths)
             });
         });
 }
+
+inline std::string
+makeUsdSafeName(const std::string& input)
+{
+    if (input.empty())
+        return "Prim";
+
+    std::string result;
+    result.reserve(input.size());
+
+    for (char c : input) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+            result.push_back(c);
+        }
+        else {
+            result.push_back('_');
+        }
+    }
+    if (!result.empty() && (result[0] >= '0' && result[0] <= '9')) {
+        result[0] = '_';
+    }
+    bool allUnderscore = true;
+    for (char c : result) {
+        if (c != '_') {
+            allUnderscore = false;
+            break;
+        }
+    }
+
+    if (allUnderscore)
+        return "Prim";
+
+    if (!SdfPath::IsValidIdentifier(result))
+        return "Prim";
+
+    return result;
+}
+
+static UsdStageLoadRules
+remapLoadRules(const UsdStageLoadRules& rules, const SdfPath& oldPath, const SdfPath& newPath)
+{
+    UsdStageLoadRules out;
+
+    for (const auto& r : rules.GetRules()) {
+        const SdfPath& p = r.first;
+        const auto& policy = r.second;
+
+        if (p.HasPrefix(oldPath)) {
+            SdfPath rel = p.MakeRelativePath(oldPath);
+            SdfPath mapped = newPath.AppendPath(rel);
+            out.AddRule(mapped, policy);
+        }
+        else {
+            out.AddRule(p, policy);
+        }
+    }
+    return out;
+}
+
+Command
+renamePath(const SdfPath& path, const SdfPath& newPathInput)
+{
+    auto buildNewPath = [](const SdfPath& path, const SdfPath& input) {
+        std::string name = makeUsdSafeName(input.GetName());
+        if (!SdfPath::IsValidIdentifier(name))
+            return SdfPath();
+
+        return path.GetParentPath().AppendChild(TfToken(name));
+    };
+
+    auto applyRename = [](UsdStageRefPtr stage, const SdfPath& from, const SdfPath& to, QString& error) -> bool {
+        UsdPrim prim = stage->GetPrimAtPath(from);
+        if (!prim) {
+            error = "Invalid prim";
+            return false;
+        }
+
+        auto stack = prim.GetPrimStack();
+        if (stack.empty() || !stack.front()) {
+            error = "No spec";
+            return false;
+        }
+
+        SdfLayerHandle layer = stack.front()->GetLayer();
+        if (!layer) {
+            error = "No layer";
+            return false;
+        }
+
+        if (stage->GetPrimAtPath(to)) {
+            error = "Target exists";
+            return false;
+        }
+
+        SdfBatchNamespaceEdit edits;
+        edits.Add(SdfNamespaceEdit(from, to));
+
+        if (!layer->CanApply(edits)) {
+            error = "CanApply failed";
+            return false;
+        }
+
+        layer->Apply(edits);
+        return true;
+    };
+
+    return Command(
+        [path, newPathInput, buildNewPath, applyRename](DataModel* dm, SelectionModel* sel) {
+            dm->beginProgressBlock("rename prim", 1);
+
+            QtConcurrent::run([=]() {
+                QWriteLocker lock(dm->stageLock());
+                UsdStageRefPtr stage = dm->stage();
+
+                if (!stage) {
+                    QMetaObject::invokeMethod(
+                        dm,
+                        [=]() {
+                            dm->updateProgressNotify({ "Rename failed (no stage)", {} }, 1);
+                            dm->endProgressBlock();
+                        },
+                        Qt::QueuedConnection);
+                    return;
+                }
+
+                SdfPath newPath = buildNewPath(path, newPathInput);
+                if (newPath.IsEmpty() || newPath == path) {
+                    QMetaObject::invokeMethod(
+                        dm,
+                        [=]() {
+                            dm->updateProgressNotify({ "Rename noop", {} }, 1);
+                            dm->endProgressBlock();
+                        },
+                        Qt::QueuedConnection);
+                    return;
+                }
+                UsdStageLoadRules rules = stage->GetLoadRules();
+
+                QString error;
+                if (!applyRename(stage, path, newPath, error)) {
+                    QMetaObject::invokeMethod(
+                        dm,
+                        [=]() {
+                            dm->updateProgressNotify({ "Rename failed (" + error + ")", {} }, 1);
+                            dm->endProgressBlock();
+                        },
+                        Qt::QueuedConnection);
+                    return;
+                }
+                stage->SetLoadRules(remapLoadRules(rules, path, newPath));
+                QMetaObject::invokeMethod(
+                    dm,
+                    [=]() {
+                        if (sel) {
+                            QList<SdfPath> updated;
+                            for (const auto& p : sel->paths()) {
+                                if (p.HasPrefix(path)) {
+                                    updated.append(newPath.AppendPath(p.MakeRelativePath(path)));
+                                }
+                                else {
+                                    updated.append(p);
+                                }
+                            }
+                            sel->updatePaths(updated);
+                        }
+
+                        dm->updateProgressNotify({ "Renamed", { path, newPath } }, 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        },
+
+        // =========================
+        // UNDO
+        // =========================
+        [path, newPathInput, buildNewPath, applyRename](DataModel* dm, SelectionModel* sel) {
+            dm->beginProgressBlock("undo rename", 1);
+
+            QtConcurrent::run([=]() {
+                QWriteLocker lock(dm->stageLock());
+                UsdStageRefPtr stage = dm->stage();
+
+                if (!stage) {
+                    QMetaObject::invokeMethod(
+                        dm,
+                        [=]() {
+                            dm->updateProgressNotify({ "Undo failed (no stage)", {} }, 1);
+                            dm->endProgressBlock();
+                        },
+                        Qt::QueuedConnection);
+                    return;
+                }
+
+                SdfPath newPath = buildNewPath(path, newPathInput);
+                if (newPath.IsEmpty()) {
+                    QMetaObject::invokeMethod(
+                        dm,
+                        [=]() {
+                            dm->updateProgressNotify({ "Undo failed (invalid path)", {} }, 1);
+                            dm->endProgressBlock();
+                        },
+                        Qt::QueuedConnection);
+                    return;
+                }
+
+                UsdStageLoadRules rules = stage->GetLoadRules();
+                QString error;
+                if (!applyRename(stage, newPath, path, error)) {
+                    QMetaObject::invokeMethod(
+                        dm,
+                        [=]() {
+                            dm->updateProgressNotify({ "Undo failed (" + error + ")", {} }, 1);
+                            dm->endProgressBlock();
+                        },
+                        Qt::QueuedConnection);
+                    return;
+                }
+                stage->SetLoadRules(remapLoadRules(rules, newPath, path));
+                
+                QMetaObject::invokeMethod(
+                    dm,
+                    [=]() {
+                        if (sel) {
+                            QList<SdfPath> updated;
+                            for (const auto& p : sel->paths()) {
+                                if (p.HasPrefix(newPath)) {
+                                    updated.append(path.AppendPath(p.MakeRelativePath(newPath)));
+                                }
+                                else {
+                                    updated.append(p);
+                                }
+                            }
+                            sel->updatePaths(updated);
+                        }
+
+                        dm->updateProgressNotify({ "Rename restored", { path } }, 1);
+                        dm->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        });
+}
+
 }  // namespace usdviewer

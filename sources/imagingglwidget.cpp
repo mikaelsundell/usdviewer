@@ -143,7 +143,6 @@ ImagingGLWidgetPrivate::initGL()
 {
     if (!d.glEngine) {
         UsdImagingGLEngine::Parameters params;
-        params.allowAsynchronousSceneProcessing = true;
         params.displayUnloadedPrimsWithBounds = true;
         d.glEngine.reset(new UsdImagingGLEngine(params));
         Hgi* hgi = d.glEngine->GetHgi();
@@ -266,7 +265,6 @@ ImagingGLWidgetPrivate::paintGL()
                 d.params.drawMode = mode;
             }
             d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
-            d.params.forceRefresh = true;
             d.params.enableLighting = true;
             // defaults
             {
@@ -921,13 +919,8 @@ ImagingGLWidgetPrivate::updateGpuPerformance()
         QString value;
     };
 
-    double fps = 0.0;
-    if (d.gpuPerformanceMs > 0.0)
-        fps = 1000.0 / d.gpuPerformanceMs;
-
     QVector<Row> rows;
     rows.append({ "GPU time", QString::number(d.gpuPerformanceMs, 'f', 2) + " ms" });
-    rows.append({ "GPU fps", QString::number(fps, 'f', 1) });
     if (stats.count("gpuMemoryUsed"))
         rows.append({ "GPU mem", fmtMB(VtDictionaryGet<unsigned long>(stats, "gpuMemoryUsed")) });
     if (stats.count("primvar"))
@@ -1184,6 +1177,7 @@ ImagingGLWidget::updateMask(const QList<SdfPath>& paths)
 void
 ImagingGLWidget::updatePrims(const QList<SdfPath>& paths)
 {
+    qDebug() << "updatePrims in glwidget";
     p->updatePrims(paths);
 }
 

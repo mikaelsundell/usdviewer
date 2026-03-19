@@ -47,6 +47,8 @@ public:
     void updatePrims(const QList<SdfPath>& paths);
     void updateSelection(const QList<SdfPath>& paths);
 
+
+
 public Q_SLOTS:
     void itemSelectionChanged();
     void checkStateChanged(PrimItem* item);
@@ -91,8 +93,8 @@ StageTreePrivate::itemCheckState(QTreeWidgetItem* item, bool checkable, bool rec
     Qt::ItemFlags f = item->flags();
     if (checkable) {
         f |= Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
-        if (item->childCount() > 0)
-            f |= Qt::ItemIsAutoTristate;
+        //if (item->childCount() > 0)
+        f |= Qt::ItemIsAutoTristate;
         item->setFlags(f);
         if (item->data(0, Qt::CheckStateRole).isNull())
             item->setCheckState(0, Qt::Unchecked);
@@ -262,8 +264,13 @@ void
 StageTreePrivate::addItem(PrimItem* parent, const SdfPath& path)
 {
     PrimItem* item = new PrimItem(parent, d.stage, path);
-    itemCheckState(item, false);
+    item->invalidate();
+    itemCheckState(item, d.payloadEnabled);
     parent->addChild(item);
+    if (d.payloadEnabled && stage::isPayload(d.stage, path)) {
+        item->setCheckState(0, d.stage->GetPrimAtPath(path).IsLoaded() ? Qt::Checked : Qt::Unchecked);
+        return;
+    }
     addChildren(item, path);
 }
 
@@ -472,7 +479,7 @@ StageTreePrivate::updateStage(UsdStageRefPtr stage)
     d.stage = stage;
     UsdPrim prim = stage->GetPseudoRoot();
     PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
-    itemCheckState(rootItem, false, true);
+    itemCheckState(rootItem, d.payloadEnabled, true);
     addChildren(rootItem, prim.GetPath());
     initTree();
     if (d.payloadEnabled)
@@ -482,31 +489,71 @@ StageTreePrivate::updateStage(UsdStageRefPtr stage)
 void
 StageTreePrivate::updatePrims(const QList<SdfPath>& paths)
 {
-    beginGuard();
-    {
-        std::function<void(QTreeWidgetItem*)> updateItem = [&](QTreeWidgetItem* baseItem) {
-            PrimItem* primItem = static_cast<PrimItem*>(baseItem);
-            const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
-            if (!pathString.isEmpty()) {
-                for (const SdfPath& changed : paths) {
-                    if (pathString == StringToQString(changed.GetString())) {
-                        UsdPrim prim = d.stage->GetPrimAtPath(changed);
-                        if (prim && prim.HasPayload()) {
-                            Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
-                            if (primItem->checkState(0) != want)
-                                primItem->setCheckState(0, want);
-                        }
-                    }
-                }
+    SignalGuard::Scope guard(this);
+    for (const SdfPath& xpath : paths) {
+        const SdfPath path = xpath.IsPropertyPath() ? xpath.GetPrimPath() : xpath;
+
+        UsdPrim prim = d.stage->GetPrimAtPath(path);
+        QTreeWidgetItem* item = itemFromPath(path);
+        if (!prim) {
+            if (item)
+                delete item;
+            continue;
+        }
+        if (!item) {
+            QTreeWidgetItem* parentItem = itemFromPath(path.GetParentPath());
+            if (parentItem)
+                addItem(static_cast<PrimItem*>(parentItem), path);
+            continue;
+        }
+        PrimItem* primItem = static_cast<PrimItem*>(item);
+        primItem->invalidate();
+        itemCheckState(primItem, d.payloadEnabled, false);
+        if (d.payloadEnabled && stage::isPayload(d.stage, path)) {
+            const Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
+
+            if (primItem->checkState(0) != want)
+                primItem->setCheckState(0, want);
+            while (primItem->childCount() > 0)
+                delete primItem->child(0);
+
+            continue;
+        }
+        QHash<QString, QTreeWidgetItem*> existing;
+        for (int i = 0; i < primItem->childCount(); ++i) {
+            QTreeWidgetItem* child = primItem->child(i);
+            existing.insert(child->data(0, PrimItem::PrimPath).toString(), child);
+        }
+        QList<QString> ordered;
+        QSet<QString> stageSet;
+        for (const UsdPrim& childPrim : prim.GetAllChildren()) {
+            const QString childPath = StringToQString(childPrim.GetPath().GetString());
+            ordered.append(childPath);
+            stageSet.insert(childPath);
+            if (!existing.contains(childPath))
+                addItem(primItem, childPrim.GetPath());
+        }
+        for (auto it = existing.begin(); it != existing.end(); ++it) {
+            if (!stageSet.contains(it.key()))
+                delete it.value();
+        }
+        int index = 0;
+        for (const QString& childPath : ordered) {
+            QTreeWidgetItem* childItem = existing.contains(childPath)
+                                             ? existing.value(childPath)
+                                             : itemFromPath(SdfPath(QStringToString(childPath)));
+
+            if (!childItem)
+                continue;
+
+            if (primItem->child(index) != childItem) {
+                primItem->removeChild(childItem);
+                primItem->insertChild(index, childItem);
             }
-            for (int i = 0; i < primItem->childCount(); ++i)
-                updateItem(primItem->child(i));
-        };
-        for (int i = 0; i < d.tree->topLevelItemCount(); ++i)
-            updateItem(d.tree->topLevelItem(i));
-        d.tree->update();
+            ++index;
+        }
     }
-    endGuard();
+    d.tree->update();
 }
 
 void

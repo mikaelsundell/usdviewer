@@ -40,7 +40,9 @@ public:
         Button,
         ButtonAlt,
         Render,
-        RenderAlt
+        RenderAlt,
+        Warning,
+        Error
     };
     Q_ENUM(ColorRole)
 

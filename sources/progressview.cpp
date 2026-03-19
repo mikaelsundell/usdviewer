@@ -5,6 +5,7 @@
 #include "progressview.h"
 #include "application.h"
 #include "qtutils.h"
+#include "style.h"
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
@@ -51,8 +52,9 @@ ProgressViewPrivate::init()
     // event filter
     progressTree()->installEventFilter(this);
     // payload tree
-    progressTree()->setHeaderLabels(QStringList() << "Name"
-                                                  << "Paths");
+    progressTree()->setHeaderLabels(QStringList() << "Command"
+                                                  << "Status");
+    progressTree()->setIndentation(0);
     // connect
     connect(d.ui->clear, &QPushButton::clicked, this, &ProgressViewPrivate::clear);
     connect(dataModel(), &DataModel::progressBlockChanged, this, &ProgressViewPrivate::progressBlockChanged);
@@ -97,8 +99,6 @@ void
 ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::ProgressMode mode)
 {
     if (mode == DataModel::ProgressMode::Running) {
-        qDebug() << "RUNNING:" << name;
-
         clear();
         d.ui->progress->setValue(0);
         d.timer.restart();
@@ -106,8 +106,6 @@ ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::Progre
         d.ui->status->setText(QString("Running: %1").arg(name));
     }
     else {
-        qDebug() << "IDLE:" << name;
-
         d.running = false;
         qint64 ms = d.timer.elapsed();
         QString timeStr = QTime(0, 0).addMSecs(static_cast<int>(ms)).toString("hh:mm:ss");
@@ -119,53 +117,50 @@ void
 ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size_t completed, size_t expected)
 {
     QTreeWidget* tree = progressTree();
+
     if (d.expectedCount == 0)
         d.expectedCount = int(expected);
 
-    int index = int(completed) - 1;
+    const int index = int(completed) - 1;
     if (index < 0)
         return;
 
+    // Ensure enough rows
     while (tree->topLevelItemCount() <= index) {
         auto* newItem = new QTreeWidgetItem(tree);
-        newItem->setText(0, "Pending ...");
+        newItem->setText(0, "Pending...");
         newItem->setText(1, "");
     }
 
     QTreeWidgetItem* item = tree->topLevelItem(index);
-    if (item) {
-        qDebug() << "notify.message: " << notify.message;
+    if (!item)
+        return;
 
-        item->setText(0, notify.message);
-        QString col1;
-        if (!notify.paths.isEmpty()) {
-            QString first = StringToQString(notify.paths.first().GetName());
-            qsizetype count = notify.paths.size();
-            col1 = QString("%1 (%2)").arg(first).arg(count);
-        }
-        else {
-            col1 = QString();
-        }
-        item->setText(1, col1);
-
-        QString msg = notify.message.toLower();
-        if (msg.contains("failed")) {
-            item->setForeground(0, QBrush(Qt::red));
-        }
-        else if (msg.contains("loaded") || msg.contains("done") || msg.contains("complete")) {
-            item->setForeground(0, QBrush(Qt::green));
-        }
-        else if (msg.contains("loading") || msg.contains("working") || msg.contains("processing")) {
-            item->setForeground(0, QBrush(Qt::yellow));
-        }
-        else {
-            item->setForeground(0, QBrush(Qt::transparent));
-        }
+    item->setText(0, notify.message);
+    if (!notify.paths.isEmpty()) {
+        const QString first = StringToQString(notify.paths.first().GetName());
+        const qsizetype count = notify.paths.size();
+        item->setText(1, QString("%1 (%2)").arg(first).arg(count));
     }
+    else {
+        item->setText(1, QString());
+    }
+    item->setForeground(0, QBrush());
+    item->setForeground(1, QBrush());
+    item->setIcon(0, QIcon());
 
-    int pct = int((double(completed) / std::max<size_t>(1, expected)) * 100.0);
+    switch (notify.status) {
+    case DataModel::Notify::Status::Error: item->setForeground(0, style()->color(Style::ColorRole::Error)); break;
+
+    case DataModel::Notify::Status::Warning: item->setForeground(0, style()->color(Style::ColorRole::Warning)); break;
+
+    case DataModel::Notify::Status::Progress: item->setForeground(0, style()->color(Style::ColorRole::Progress)); break;
+
+    case DataModel::Notify::Status::Info:
+    default: break;
+    }
+    const int pct = int((double(completed) / std::max<size_t>(1, expected)) * 100.0);
     d.ui->progress->setValue(pct);
-
     d.ui->status->setText(updateStatus(completed, expected));
     tree->expandAll();
 }

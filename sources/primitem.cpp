@@ -4,6 +4,7 @@
 
 #include "primitem.h"
 #include "application.h"
+#include "command.h"
 #include "commanddispatcher.h"
 #include "qtutils.h"
 #include "stageutils.h"
@@ -22,10 +23,20 @@ namespace usdviewer {
 class PrimItemPrivate {
 public:
     void init();
+    void updateCache();
+
     struct Data {
         UsdStageRefPtr stage;
         SdfPath path;
         PrimItem* item = nullptr;
+        bool dirty = true;
+        bool visible = true;
+        bool active = true;
+        bool hasPayload = false;
+        bool isEditTarget = true;
+        bool isRoot = false;
+        QString name;
+        QString typeName;
     };
     Data d;
 };
@@ -33,8 +44,44 @@ public:
 void
 PrimItemPrivate::init()
 {
-    d.item->setFlags(d.item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+    d.item->setFlags(d.item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable
+                     | Qt::ItemIsEditable);
     d.item->setCheckState(0, Qt::Unchecked);
+}
+
+void
+PrimItemPrivate::updateCache()
+{
+    if (!d.dirty)
+        return;
+    d.visible = true;
+    d.active = false;
+    d.hasPayload = false;
+    d.isEditTarget = true;
+    d.name.clear();
+    d.typeName.clear();
+
+    if (!d.stage) {
+        d.dirty = false;
+        return;
+    }
+    UsdPrim prim = d.stage->GetPrimAtPath(d.path);
+    d.isRoot = prim == d.stage->GetPseudoRoot();
+
+    if (prim) {
+        d.active = prim.IsActive();
+        d.hasPayload = prim.HasPayload();
+        d.name = StringToQString(prim.GetName().GetString());
+        d.typeName = StringToQString(prim.GetTypeName().GetString());
+        d.isEditTarget = stage::isEditTarget(d.stage, d.path);
+        if (d.active && prim != d.stage->GetPseudoRoot()) {
+            d.visible = stage::isVisible(d.stage, d.path);
+        }
+    }
+    else {
+        d.name = StringToQString(d.path.GetName());
+    }
+    d.dirty = false;
 }
 
 PrimItem::PrimItem(QTreeWidget* parent, const UsdStageRefPtr& stage, const SdfPath& path)
@@ -59,84 +106,94 @@ PrimItem::PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const S
 
 PrimItem::~PrimItem() = default;
 
+void
+PrimItem::invalidate()
+{
+    p->d.dirty = true;
+}
+
 QVariant
 PrimItem::data(int column, int role) const
 {
-    if (!p->d.stage)
-        return QVariant();
+    p->updateCache();
     const SdfPath path = p->d.path;
-    const UsdPrim prim = p->d.stage->GetPrimAtPath(path);
-    if (role == Qt::DisplayRole) {
+    if (role == Qt::DisplayRole || role == Qt::EditRole) {
         switch (column) {
-        case Name: return prim ? StringToQString(prim.GetName().GetString()) : StringToQString(path.GetName());
+        case Name: return p->d.name;
         case Vis: return QString();
         default: break;
         }
     }
     if (role == Qt::ToolTipRole) {
-        if (!prim)
+        if (p->d.name.isEmpty())
             return QVariant();
 
-        return QString("%1 (%2)")
-            .arg(StringToQString(path.GetString()))
-            .arg(StringToQString(prim.GetTypeName().GetString()));
+        return QString("%1 (%2)").arg(StringToQString(path.GetString())).arg(p->d.typeName);
     }
     if (role == Qt::DecorationRole && column == Name) {
-        if (!prim)
-            return {};
-        const QString typeName = StringToQString(prim.GetTypeName().GetString());
-
         Style::IconRole iconRole = Style::IconRole::Prim;
-        if (typeName == "Material" || typeName == "Shader")
+
+        if (p->d.typeName == "Material" || p->d.typeName == "Shader")
             iconRole = Style::IconRole::Material;
-        else if (typeName == "Mesh")
+        else if (p->d.typeName == "Mesh")
             iconRole = Style::IconRole::Mesh;
 
-        if (stage::isPayload(p->d.stage, path))
+        if (p->d.hasPayload)
             iconRole = Style::IconRole::Payload;
 
         return QIcon(style()->icon(iconRole, Style::UIScale::Medium));
     }
     if (role == Qt::DecorationRole && column == Vis) {
-        if (!prim || !prim.IsActive())
+        if (!p->d.active || p->d.isRoot)
             return QVariant();
-
-        if (prim == p->d.stage->GetPseudoRoot())
-            return QVariant();
-
-        const UsdGeomImageable imageable(prim);
-        if (!imageable)
-            return QVariant();
-
-        const bool visible = stage::isVisible(p->d.stage, path);
-        return style()->icon(visible ? Style::IconRole::Visible : Style::IconRole::Hidden, Style::UIScale::Medium);
+        return style()->icon(p->d.visible ? Style::IconRole::Visible : Style::IconRole::Hidden, Style::UIScale::Medium);
     }
     if (role == PrimItem::PrimPath) {
         return StringToQString(path.GetString());
     }
+
     return TreeItem::data(column, role);
+}
+
+void
+PrimItem::setData(int column, int role, const QVariant& value)
+{
+    if (column == Name && role == Qt::EditRole) {
+        const QString newName = value.toString().trimmed();
+        if (newName.isEmpty())
+            return;
+        p->updateCache();
+
+        const QString oldName = p->d.name;
+        if (newName == oldName)
+            return;
+
+        const SdfPath oldPath = p->d.path;
+        const SdfPath parentPath = oldPath.GetParentPath();
+        const SdfPath newPath = parentPath.AppendChild(TfToken(qt::QStringToString(newName)));
+        CommandDispatcher::run(new Command(renamePath(oldPath, newPath)));
+        return;
+    }
+
+    TreeItem::setData(column, role, value);
 }
 
 TreeItem::ItemStates
 PrimItem::itemStates() const
 {
+    p->updateCache();
+
     ItemStates states = None;
 
-    if (!p->d.stage)
+    if (!p->d.active)
         return states;
 
-    const SdfPath& path = p->d.path;
-    const UsdPrim prim = p->d.stage->GetPrimAtPath(path);
-
-    if (!prim || !prim.IsActive())
-        return states;
-
-    if (stage::isVisible(p->d.stage, path)) {
+    if (p->d.visible)
         states |= Visible;
-    }
-    if (!stage::isEditTarget(p->d.stage, path)) {
+
+    if (!p->d.isEditTarget)
         states |= ReadOnly;
-    }
+
     return states;
 }
 

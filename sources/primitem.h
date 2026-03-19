@@ -57,11 +57,27 @@ public:
     virtual ~PrimItem();
 
     /**
-     * @brief Returns item data for the specified column and role.
+     * @brief Returns item data for a column and role.
      *
-     * Provides display and decoration data used by the tree view.
+     * Provides text, icons, and state used by the view.
      */
     QVariant data(int column, int role) const override;
+
+    /**
+     * @brief Sets item data for a column and role.
+     *
+     * Handles user edits or state changes (e.g. checkboxes) and may
+     * propagate updates to the underlying model.
+     */
+    void setData(int column, int role, const QVariant& value) override;
+
+    /**
+      * @brief Marks the item's cached data as invalid.
+      *
+      * Forces the item to refresh its cached state (e.g. visibility, payload)
+      * on the next access or update.
+      */
+    void invalidate();
 
     /**
      * @brief Returns semantic state flags for the item.

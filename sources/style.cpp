@@ -214,6 +214,8 @@ StylePrivate::updateTheme(Style::Theme theme)
         map(Style::ColorRole::ButtonAlt, QColor::fromHsl(220, 6, 54));
         map(Style::ColorRole::Render, QColor::fromHsl(220, 6, 25));
         map(Style::ColorRole::RenderAlt, QColor::fromHsl(220, 6, 40));
+        map(Style::ColorRole::Warning, QColor(220, 170, 40));
+        map(Style::ColorRole::Error, QColor(200, 50, 50));
     }
     else {
         map(Style::ColorRole::Base, QColor::fromHsl(0, 0, 210));
@@ -233,6 +235,8 @@ StylePrivate::updateTheme(Style::Theme theme)
         map(Style::ColorRole::ButtonAlt, QColor::fromHsl(0, 0, 160));
         map(Style::ColorRole::Render, QColor::fromHsl(220, 6, 25));
         map(Style::ColorRole::RenderAlt, QColor::fromHsl(220, 6, 40));
+        map(Style::ColorRole::Warning, QColor(180, 130, 30));
+        map(Style::ColorRole::Error, QColor(180, 40, 40));
     }
     d.icons[roleName(Style::IconRole::BranchOpen)] = ":/icons/resources/BranchOpen.png";
     d.icons[roleName(Style::IconRole::BranchClosed)] = ":/icons/resources/BranchClosed.png";
@@ -259,7 +263,7 @@ StylePrivate::updateTheme(Style::Theme theme)
     d.icons[roleName(Style::IconRole::Shaded)] = ":/icons/resources/Shaded.png";
 
     d.fontSizes[roleName(Style::UIScale::Small)] = 10;
-    d.fontSizes[roleName(Style::UIScale::Medium)] = 12;
+    d.fontSizes[roleName(Style::UIScale::Medium)] = 11;
     d.fontSizes[roleName(Style::UIScale::Large)] = 14;
 
     d.iconSizes[roleName(Style::UIScale::Small)] = 16;

@@ -105,6 +105,7 @@ QLineEdit
     color: $color.text;
     font-size: $font.size.medium;
     background-color: $color.base;
+    selection-background-color: $color.highlight;
     height: 20px;  
     min-width: 50px;      
     border: 1px solid $color.borderalt;

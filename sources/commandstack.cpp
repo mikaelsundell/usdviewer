@@ -60,9 +60,7 @@ CommandStack::execute(Command* command)
     const bool prevCanUndo = canUndo();
     const bool prevCanRedo = canRedo();
     const bool prevCanClear = canClear();
-
-    qDebug() << "CommandStack::execute";
-
+    
     command->execute(dataModel(), selectionModel());
     p->push(command);
 

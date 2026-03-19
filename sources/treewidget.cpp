@@ -22,9 +22,9 @@ public:
     {
         const int indent = d.tree->indentation();
         const int depth = indexDepth(index);
-        const int size = style()->iconSize(Style::UIScale::Small);
+        const int size = style()->iconSize(Style::UIScale::Medium) - 4;
         int x = 6;
-        int y = (rect.center().y() - size / 2) + 2;
+        int y = (rect.center().y() - size / 2) + 1;
         return QRect(x, y, size, size);
     }
     int indexDepth(const QModelIndex& index) const
@@ -58,32 +58,62 @@ public:
         bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option,
                          const QModelIndex& index) override
         {
-            if (index.column() != 0)
-                return false;
-            if (!(index.flags() & Qt::ItemIsUserCheckable))
-                return false;
-            if (!index.data(Qt::CheckStateRole).isValid())
-                return false;
-            if (event->type() != QEvent::MouseButtonRelease)
-                return false;
+            // --- HANDLE CHECKBOX (existing behavior) ---
+            if (index.column() == 0 && (index.flags() & Qt::ItemIsUserCheckable)
+                && index.data(Qt::CheckStateRole).isValid()) {
+                if (event->type() == QEvent::MouseButtonRelease) {
+                    auto* mouse = static_cast<QMouseEvent*>(event);
 
-            auto* mouse = static_cast<QMouseEvent*>(event);
-            if (mouse->button() != Qt::LeftButton)
-                return false;
+                    if (mouse->button() == Qt::LeftButton && checkRect(option).contains(mouse->pos())) {
+                        Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
 
-            if (!checkRect(option).contains(mouse->pos()))
-                return false;
+                        switch (state) {
+                        case Qt::Unchecked: state = Qt::Checked; break;
+                        case Qt::Checked:
+                        case Qt::PartiallyChecked: state = Qt::Unchecked; break;
+                        }
 
-            Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
-
-            switch (state) {
-            case Qt::Unchecked: state = Qt::Checked; break;
-            case Qt::Checked:
-            case Qt::PartiallyChecked: state = Qt::Unchecked; break;
+                        model->setData(index, state, Qt::CheckStateRole);
+                        return true;
+                    }
+                }
             }
+            if (index.column() == 0 && event->type() == QEvent::MouseButtonDblClick) {
+                auto* mouse = static_cast<QMouseEvent*>(event);
 
-            model->setData(index, state, Qt::CheckStateRole);
-            return true;
+                QStyleOptionViewItem opt(option);
+                initStyleOption(&opt, index);
+
+                const int leftMargin = 8;
+                const int rightMargin = 8;
+                const int iconSpacing = 6;
+                const int textSpacing = 8;
+                const int iconSize = style()->iconSize(Style::UIScale::Small);
+                const int xOffset = 10;
+
+                QRect contentRect = opt.rect.adjusted(leftMargin, 0, -rightMargin, 0);
+                int x = contentRect.left() + xOffset;
+
+                const bool isCheckable = (index.flags() & Qt::ItemIsUserCheckable)
+                                         && index.data(Qt::CheckStateRole).isValid();
+
+                if (isCheckable) {
+                    QRect cb(x, contentRect.center().y() - iconSize / 2, iconSize, iconSize);
+                    x = cb.right() + 1 + iconSpacing;
+                }
+
+                if (!opt.icon.isNull()) {
+                    QRect iconRect(x, contentRect.center().y() - iconSize / 2, iconSize, iconSize);
+                    x = iconRect.right() + 1 + textSpacing;
+                }
+
+                QRect textRect = contentRect;
+                textRect.setLeft(x);
+                if (!textRect.contains(mouse->pos())) {
+                    return true;  // swallow → no edit
+                }
+            }
+            return QStyledItemDelegate::editorEvent(event, model, option, index);
         }
 
         void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
@@ -100,7 +130,7 @@ public:
             const int iconSpacing = 6;
             const int textSpacing = 8;
             const int iconSize = style()->iconSize(Style::UIScale::Small);
-            const int xOffset = 8;
+            const int xOffset = 10;
             const int yOffset = 2;
 
             QRect contentRect = opt.rect.adjusted(leftMargin, 0, -rightMargin, 0);
@@ -197,24 +227,36 @@ TreeWidget::~TreeWidget() = default;
 bool
 TreeWidget::viewportEvent(QEvent* event)
 {
-    if (event->type() == QEvent::MouseButtonPress) {
+    if (event->type() == QEvent::MouseButtonRelease) {
         auto* mouse = static_cast<QMouseEvent*>(event);
 
-        QModelIndex index = indexAt(mouse->pos());
-        if (index.isValid()) {
-            QRect vr = visualRect(index);
-            QRect br = p->branchRect(vr, index);
+        if (mouse->button() != Qt::LeftButton)
+            return QTreeWidget::viewportEvent(event);
 
-            if (br.contains(mouse->pos())) {
-                if (isExpanded(index))
+        const QModelIndex index = indexAt(mouse->pos());
+        if (!index.isValid())
+            return QTreeWidget::viewportEvent(event);
+
+        if (index.column() != 0)
+            return QTreeWidget::viewportEvent(event);
+
+        const QRect vr = visualRect(index);
+        const QRect br = p->branchRect(vr, index);
+
+        // 🔒 Strict hit test: branch ONLY
+        if (br.contains(mouse->pos())) {
+            // Avoid redundant work
+            if (model()->hasChildren(index)) {
+                const bool expanded = isExpanded(index);
+                if (expanded)
                     collapse(index);
                 else
                     expand(index);
-                return true;
             }
+            event->accept();
+            return true;
         }
     }
-
     return QTreeWidget::viewportEvent(event);
 }
 

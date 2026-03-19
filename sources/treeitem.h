@@ -71,6 +71,13 @@ public:
      */
     virtual ItemStates itemStates() const;
 
+    /**
+     * @brief Returns Qt item flags.
+     *
+     * Defines interaction (selectable, editable, checkable, etc.).
+     */
+    Qt::ItemFlags flags() const;
+
 private:
     QScopedPointer<TreeItemPrivate> p;
 };

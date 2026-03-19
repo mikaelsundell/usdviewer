@@ -17,7 +17,12 @@ public:
 
 void
 ProgressItemPrivate::init()
-{}
+{
+    Qt::ItemFlags itemFlags = d.item->flags();
+    itemFlags &= ~Qt::ItemIsUserCheckable;
+    itemFlags &= ~Qt::ItemIsEditable;
+    d.item->setFlags(itemFlags);
+}
 
 ProgressItem::ProgressItem(QTreeWidget* parent)
     : QTreeWidgetItem(parent)

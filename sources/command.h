@@ -145,6 +145,10 @@ hidePaths(const QList<SdfPath>& paths, bool recursive);
 Command
 deletePaths(const QList<SdfPath>& paths);
 
+
+Command
+renamePath(const SdfPath& path, const SdfPath& newpath);
+
 ///@}
 
 }  // namespace usdviewer

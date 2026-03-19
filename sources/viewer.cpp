@@ -78,6 +78,7 @@ public Q_SLOTS:
     void loadVariant(int variant);
     void unloadSelected();
     void unloadRecursive();
+    void deleteSelected();
     void isolate(bool checked);
     void frameAll();
     void frameSelected();
@@ -192,6 +193,7 @@ ViewerPrivate::init()
     connect(d.ui->editHideRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
     connect(d.ui->editLoadSelected, &QAction::triggered, this, &ViewerPrivate::loadSelected);
     connect(d.ui->editLoadRecursive, &QAction::triggered, this, &ViewerPrivate::loadRecursive);
+    connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
     connect(d.ui->editLoadVariant1, &QAction::triggered, this, [=]() { loadVariant(0); });
     connect(d.ui->editLoadVariant2, &QAction::triggered, this, [=]() { loadVariant(1); });
     connect(d.ui->editLoadVariant3, &QAction::triggered, this, [=]() { loadVariant(2); });
@@ -430,7 +432,7 @@ ViewerPrivate::enable(bool enable)
     QList<QAction*> actions = { d.ui->fileReload,           d.ui->fileClose,        d.ui->fileSave,
                                 d.ui->fileSaveAs,           d.ui->fileSaveCopy,     d.ui->fileExportAll,
                                 d.ui->fileExportSelected,   d.ui->fileExportImage,  d.ui->editCopyImage,
-                                d.ui->editDelete,           d.ui->displayIsolate,   d.ui->displayFrameAll,
+                                d.ui->editDeleteSelected,   d.ui->displayIsolate,   d.ui->displayFrameAll,
                                 d.ui->displayFrameSelected, d.ui->displayResetView, d.ui->displayExpand,
                                 d.ui->displayCollapse,      d.ui->renderShaded,     d.ui->renderWireframe };
     for (QAction* action : actions) {
@@ -740,6 +742,8 @@ ViewerPrivate::loadRecursive()
     qDebug() << "loadRecursive";
 }
 
+
+
 void
 ViewerPrivate::loadVariant(int variant)
 {
@@ -759,16 +763,17 @@ ViewerPrivate::unloadRecursive()
 }
 
 void
+ViewerPrivate::deleteSelected()
+{
+    CommandDispatcher::run(new Command(deletePaths(selectionModel()->paths())));
+}
+
+void
 ViewerPrivate::isolate(bool checked)
 {
-    if (checked) {
-        if (selectionModel()->paths().size()) {
-            dataModel()->setMask(selectionModel()->paths());
-        }
-    }
-    else {
-        dataModel()->setMask(QList<SdfPath>());
-    }
+    const QList<SdfPath> paths = (checked && !selectionModel()->paths().isEmpty()) ? selectionModel()->paths()
+                                                                                   : QList<SdfPath>();
+    CommandDispatcher::run(new Command(isolatePaths(paths)));
 }
 
 void

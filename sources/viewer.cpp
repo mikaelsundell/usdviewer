@@ -123,7 +123,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadPolicy = DataModel::LoadPolicy::LoadAll;
+    d.loadPolicy = DataModel::LoadPolicy::All;
     d.stageInit = false;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
@@ -147,14 +147,21 @@ ViewerPrivate::init()
     d.progressArea = d.viewer->dockWidgetArea(d.ui->progressDock);
     progressView()->setAttribute(Qt::WA_DeleteOnClose, false);
     renderView()->setBackgroundColor(d.backgroundColor);
+    // actions
+    d.ui->fileOpen->setIcon(style()->icon(Style::IconRole::Open));
+    d.ui->fileExportAll->setIcon(style()->icon(Style::IconRole::Export));
+    d.ui->fileExportImage->setIcon(style()->icon(Style::IconRole::ExportImage));
+    d.ui->displayFrameAll->setIcon(style()->icon(Style::IconRole::FrameAll));
+    d.ui->renderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
+    d.ui->renderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
     // connect
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
-        d.loadPolicy = DataModel::LoadAll;
+        d.loadPolicy = DataModel::LoadPolicy::All;
         settings()->setValue("loadType", "all");
     });
     connect(d.ui->policyPayload, &QAction::triggered, this, [this]() {
-        d.loadPolicy = DataModel::LoadPayload;
+        d.loadPolicy = DataModel::LoadPolicy::Payload;
         settings()->setValue("loadType", "payload");
     });
     {
@@ -219,6 +226,7 @@ ViewerPrivate::init()
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
     connect(d.ui->open, &QToolButton::clicked, this, &ViewerPrivate::open);
     {
+        d.ui->open->setDefaultAction(d.ui->fileOpen);
         d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
         d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
         d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
@@ -307,11 +315,11 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settings()->value("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadPolicy = DataModel::LoadAll;
+        d.loadPolicy = DataModel::LoadPolicy::All;
         d.ui->policyAll->setChecked(true);
     }
     else {
-        d.loadPolicy = DataModel::LoadPayload;
+        d.loadPolicy = DataModel::LoadPolicy::Payload;
         d.ui->policyPayload->setChecked(true);
     }
 
@@ -820,26 +828,26 @@ ViewerPrivate::sceneShaders(bool checked)
 void
 ViewerPrivate::renderShaded()
 {
-    renderView()->setDrawMode(RenderView::render_mode::render_shaded);
+    renderView()->setRenderMode(RenderView::RenderMode::Shaded);
 }
 
 void
 ViewerPrivate::renderWireframe()
 {
-    renderView()->setDrawMode(RenderView::render_mode::render_wireframe);
+    renderView()->setRenderMode(RenderView::RenderMode::Wireframe);
 }
 
 void
 ViewerPrivate::light()
 {
-    style()->setTheme(Style::ThemeLight);
+    style()->setTheme(Style::Theme::Light);
     settings()->setValue("theme", "light");
 }
 
 void
 ViewerPrivate::dark()
 {
-    style()->setTheme(Style::ThemeDark);
+    style()->setTheme(Style::Theme::Dark);
     settings()->setValue("theme", "dark");
 }
 
@@ -951,7 +959,7 @@ void
 ViewerPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
     d.stageInit = false;
-    if (status == DataModel::StageLoaded) {
+    if (status == DataModel::StageStatus::Loaded) {
         enable(true);
     }
 }

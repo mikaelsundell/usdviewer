@@ -91,11 +91,11 @@ PrimItem::data(int column, int role) const
         const QString typeName = StringToQString(prim.GetTypeName().GetString());
 
         if (typeName == "Material" || typeName == "Shader")
-            return QIcon(style()->icon(Style::IconMaterial, Style::UIMedium));
+            return QIcon(style()->icon(Style::IconRole::Material, Style::UIScale::Medium));
         else if (typeName == "Mesh")
-            return QIcon(style()->icon(Style::IconMesh, Style::UIMedium));
+            return QIcon(style()->icon(Style::IconRole::Mesh, Style::UIScale::Medium));
         else
-            return QIcon(style()->icon(Style::IconPrim, Style::UIMedium));
+            return QIcon(style()->icon(Style::IconRole::Prim, Style::UIScale::Medium));
     }
 
     if (role == Qt::DecorationRole && column == Vis) {
@@ -110,7 +110,7 @@ PrimItem::data(int column, int role) const
             return QVariant();
 
         const bool visible = stage::isVisible(p->d.stage, path);
-        return style()->icon(visible ? Style::IconVisible : Style::IconHidden, Style::UIMedium);
+        return style()->icon(visible ? Style::IconRole::Visible : Style::IconRole::Hidden, Style::UIScale::Medium);
     }
 
     if (role == PrimItem::PrimPath) {

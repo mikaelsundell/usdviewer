@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
@@ -77,13 +77,13 @@ public:
             painter->save();
 
             if (opt.state & QStyle::State_Selected)
-                painter->fillRect(opt.rect, style()->color(Style::ColorHighlight));
+                painter->fillRect(opt.rect, style()->color(Style::ColorRole::Highlight));
 
             const int leftMargin = 8;
             const int rightMargin = 8;
             const int iconSpacing = 6;
             const int textSpacing = 8;
-            const int iconSize = style()->iconSize(Style::UISmall);
+            const int iconSize = style()->iconSize(Style::UIScale::Small);
             const int y = 2;
 
             QRect contentRect = opt.rect.adjusted(leftMargin, 0, -rightMargin, 0);
@@ -92,17 +92,17 @@ public:
                                      && index.data(Qt::CheckStateRole).isValid();
             if (isCheckable) {
                 const QRect cbRect(x, contentRect.center().y() - iconSize / 2 + y, iconSize, iconSize);
-                painter->setBrush(style()->color(Style::ColorBaseAlt));
-                painter->setPen(style()->color(Style::ColorBorderAlt));
+                painter->setBrush(style()->color(Style::ColorRole::BaseAlt));
+                painter->setPen(style()->color(Style::ColorRole::BorderAlt));
                 painter->drawRect(cbRect.adjusted(0, 0, -1, -1));
 
                 const Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
                 if (state == Qt::Checked) {
-                    const QIcon checked = style()->icon(Style::IconChecked, Style::UISmall);
+                    const QIcon checked = style()->icon(Style::IconRole::Checked, Style::UIScale::Small);
                     painter->drawPixmap(cbRect.topLeft(), checked.pixmap(iconSize, iconSize));
                 }
                 else if (state == Qt::PartiallyChecked) {
-                    const QIcon partial = style()->icon(Style::IconPartiallyChecked, Style::UISmall);
+                    const QIcon partial = style()->icon(Style::IconRole::PartiallyChecked, Style::UIScale::Small);
                     painter->drawPixmap(cbRect.topLeft(), partial.pixmap(iconSize, iconSize));
                 }
                 x = cbRect.right() + 1 + iconSpacing;
@@ -119,9 +119,9 @@ public:
             textRect.setLeft(x);
 
             const bool active = index.data(TreeItem::ItemActive).toBool();
-            QColor textColor = style()->color(Style::ColorText);
+            QColor textColor = style()->color(Style::ColorRole::Text);
             if (!active)
-                textColor = style()->color(Style::ColorTextDisabled);
+                textColor = style()->color(Style::ColorRole::Text, Style::UIState::Disabled);
 
             painter->setPen(textColor);
             painter->drawText(textRect, opt.displayAlignment | Qt::AlignVCenter,
@@ -178,6 +178,11 @@ TreeWidget::TreeWidget(QWidget* parent)
 {
     p->d.tree = this;
     p->init();
+
+
+
+    setIndentation(14);
+    setIconSize(QSize(32, 32));
 }
 
 TreeWidget::~TreeWidget() = default;
@@ -186,14 +191,15 @@ void
 TreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const
 {
     bool alternatingRow = p->visualRowIndex(index) % 2 == 1;
-    QColor bg = alternatingRow ? app()->style()->color(Style::ColorBaseAlt) : app()->style()->color(Style::ColorBase);
+    QColor bg = alternatingRow ? app()->style()->color(Style::ColorRole::BaseAlt)
+                               : app()->style()->color(Style::ColorRole::Base);
     if (selectionModel() && selectionModel()->isSelected(index)) {
-        bg = app()->style()->color(Style::ColorHighlight);
+        bg = app()->style()->color(Style::ColorRole::Highlight);
     }
     else {
         QTreeWidgetItem* item = itemFromIndex(index);
         if (item && p->hasSelectedChildren(item)) {
-            bg = app()->style()->color(Style::ColorHighlightAlt);
+            bg = app()->style()->color(Style::ColorRole::HighlightAlt);
         }
     }
     painter->fillRect(rect, bg);
@@ -212,16 +218,17 @@ TreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const
     rowRect.setRight(viewport()->width());
 
     bool alternatingRow = p->visualRowIndex(index) % 2 == 1;
-    QColor bg = alternatingRow ? app()->style()->color(Style::ColorBaseAlt) : app()->style()->color(Style::ColorBase);
+    QColor bg = alternatingRow ? app()->style()->color(Style::ColorRole::BaseAlt)
+                               : app()->style()->color(Style::ColorRole::Base);
 
     painter->fillRect(rowRect, bg);
 
     if (opt.state & QStyle::State_Selected) {
-        painter->fillRect(rowRect, app()->style()->color(Style::ColorHighlight));
+        painter->fillRect(rowRect, app()->style()->color(Style::ColorRole::Highlight));
     }
     QTreeWidgetItem* item = itemFromIndex(index);
     if (item && p->hasSelectedChildren(item) && !(opt.state & QStyle::State_Selected)) {
-        painter->fillRect(rowRect, app()->style()->color(Style::ColorHighlightAlt));
+        painter->fillRect(rowRect, app()->style()->color(Style::ColorRole::HighlightAlt));
     }
     QTreeWidget::drawRow(painter, opt, index);
 }

@@ -33,9 +33,9 @@ public:
     /**
      * @brief Rendering modes supported by the viewport.
      */
-    enum render_mode {
-        render_shaded,
-        render_wireframe,
+    enum RenderMode {
+        Shaded,
+        Wireframe,
     };
 
 public:
@@ -183,14 +183,14 @@ public:
     /**
      * @brief Returns the current render mode.
      */
-    render_mode renderMode() const;
+    RenderMode renderMode() const;
 
     /**
      * @brief Sets the render mode.
      *
      * @param renderMode Rendering mode.
      */
-    void setDrawMode(render_mode renderMode);
+    void setRenderMode(RenderMode renderMode);
 
     ///@}
 

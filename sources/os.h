@@ -9,30 +9,28 @@
 namespace usdviewer {
 namespace os {
 
-/** @name Application Appearance */
-///@{
+    /** @name Application Appearance */
+    ///@{
 
-/**
+    /**
  * @brief Applies a dark theme to the application.
  *
  * Typically adjusts platform-level UI settings or palette
  * configuration to use a dark appearance.
  */
-void
-setDarkTheme();
+    void setDarkTheme();
 
-///@}
+    ///@}
 
-/** @name Application Paths */
-///@{
+    /** @name Application Paths */
+    ///@{
 
-/**
+    /**
  * @brief Returns the absolute path to the running application.
  */
-QString
-getApplicationPath();
+    QString getApplicationPath();
 
-/**
+    /**
  * @brief Restores access to a previously persisted scoped path.
  *
  * Used on platforms that require security-scoped bookmarks
@@ -42,10 +40,9 @@ getApplicationPath();
  *
  * @return Resolved filesystem path.
  */
-QString
-restoreScopedPath(const QString& bookmark);
+    QString restoreScopedPath(const QString& bookmark);
 
-/**
+    /**
  * @brief Persists a scoped filesystem path.
  *
  * Converts a path into a platform-specific bookmark or
@@ -55,15 +52,14 @@ restoreScopedPath(const QString& bookmark);
  *
  * @return Serialized bookmark representation.
  */
-QString
-persistScopedPath(const QString& bookmark);
+    QString persistScopedPath(const QString& bookmark);
 
-///@}
+    ///@}
 
-/** @name Platform Utilities */
-///@{
+    /** @name Platform Utilities */
+    ///@{
 
-/**
+    /**
  * @brief Writes a message to the platform console.
  *
  * Useful for debugging or forwarding messages to
@@ -71,10 +67,9 @@ persistScopedPath(const QString& bookmark);
  *
  * @param message Message to output.
  */
-void
-console(const QString& message);
+    void console(const QString& message);
 
-///@}
+    ///@}
 
 }  // namespace os
 }  // namespace usdviewer

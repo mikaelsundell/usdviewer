@@ -38,25 +38,25 @@ public:
      * @brief Stage loading policy.
      */
     enum LoadPolicy {
-        LoadAll,     ///< Load the entire stage.
-        LoadPayload  ///< Load stage with payloads deferred.
+        All,     ///< Load the entire stage.
+        Payload  ///< Load stage with payloads deferred.
     };
 
     /**
      * @brief Progress block state.
      */
     enum ProgressMode {
-        ProgressIdle,    ///< No progress operation running.
-        ProgressRunning  ///< Progress operation active.
+        Idle,    ///< No progress operation running.
+        Running  ///< Progress operation active.
     };
 
     /**
      * @brief Stage loading status.
      */
     enum StageStatus {
-        StageLoaded,  ///< Stage successfully loaded.
-        StageFailed,  ///< Stage loading failed.
-        StageClosed   ///< Stage has been closed.
+        Loaded,  ///< Stage successfully loaded.
+        Failed,  ///< Stage loading failed.
+        Closed   ///< Stage has been closed.
     };
 
 public:
@@ -93,7 +93,7 @@ public:
      * @param filename USD file to load.
      * @param policy Stage loading policy.
      */
-    DataModel(const QString& filename, LoadPolicy policy = LoadAll);
+    DataModel(const QString& filename, LoadPolicy policy = LoadPolicy::All);
 
     /**
      * @brief Copy constructor.
@@ -152,7 +152,7 @@ public:
      *
      * @return True if loading succeeded.
      */
-    bool loadFromFile(const QString& filename, LoadPolicy policy = LoadAll);
+    bool loadFromFile(const QString& filename, LoadPolicy policy = LoadPolicy::All);
 
     /**
      * @brief Saves the current stage to file.

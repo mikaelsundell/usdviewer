@@ -101,10 +101,6 @@
             <property name="text">
              <string>...</string>
             </property>
-            <property name="icon">
-             <iconset resource="viewer.qrc">
-              <normaloff>:/icons/resources/Open.png</normaloff>:/icons/resources/Open.png</iconset>
-            </property>
             <property name="iconSize">
              <size>
               <width>24</width>
@@ -118,10 +114,6 @@
             <property name="text">
              <string>...</string>
             </property>
-            <property name="icon">
-             <iconset resource="viewer.qrc">
-              <normaloff>:/icons/resources/Export.png</normaloff>:/icons/resources/Export.png</iconset>
-            </property>
             <property name="iconSize">
              <size>
               <width>24</width>
@@ -134,10 +126,6 @@
            <widget class="QToolButton" name="exportImage">
             <property name="text">
              <string>...</string>
-            </property>
-            <property name="icon">
-             <iconset resource="viewer.qrc">
-              <normaloff>:/icons/resources/Image.png</normaloff>:/icons/resources/Image.png</iconset>
             </property>
             <property name="iconSize">
              <size>
@@ -165,10 +153,6 @@
             <property name="text">
              <string>...</string>
             </property>
-            <property name="icon">
-             <iconset resource="viewer.qrc">
-              <normaloff>:/icons/resources/FrameAll.png</normaloff>:/icons/resources/FrameAll.png</iconset>
-            </property>
             <property name="iconSize">
              <size>
               <width>24</width>
@@ -181,10 +165,6 @@
            <widget class="QToolButton" name="shaded">
             <property name="text">
              <string>...</string>
-            </property>
-            <property name="icon">
-             <iconset resource="viewer.qrc">
-              <normaloff>:/icons/resources/Shaded.png</normaloff>:/icons/resources/Shaded.png</iconset>
             </property>
             <property name="iconSize">
              <size>
@@ -204,10 +184,6 @@
            <widget class="QToolButton" name="wireframe">
             <property name="text">
              <string>...</string>
-            </property>
-            <property name="icon">
-             <iconset resource="viewer.qrc">
-              <normaloff>:/icons/resources/Wireframe.png</normaloff>:/icons/resources/Wireframe.png</iconset>
             </property>
             <property name="iconSize">
              <size>
@@ -340,7 +316,7 @@
      <x>0</x>
      <y>0</y>
      <width>1576</width>
-     <height>24</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuDisplay">
@@ -537,11 +513,6 @@
    </widget>
   </widget>
   <action name="displayFrameAll">
-   <property name="icon">
-    <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/FrameAll.png</normaloff>
-     <disabledoff>:/icons/resources/FrameAllDisabled.png</disabledoff>:/icons/resources/FrameAll.png</iconset>
-   </property>
    <property name="text">
     <string>Frame all</string>
    </property>
@@ -582,10 +553,6 @@
    </property>
   </action>
   <action name="fileExportImage">
-   <property name="icon">
-    <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/Image.png</normaloff>:/icons/resources/Image.png</iconset>
-   </property>
    <property name="text">
     <string>Export image ...</string>
    </property>
@@ -620,11 +587,6 @@
    </property>
   </action>
   <action name="fileExportAll">
-   <property name="icon">
-    <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/Export.png</normaloff>
-     <disabledoff>:/icons/resources/ExportDisabled.png</disabledoff>:/icons/resources/Export.png</iconset>
-   </property>
    <property name="text">
     <string>Export ...</string>
    </property>
@@ -1017,11 +979,6 @@
    <property name="checked">
     <bool>true</bool>
    </property>
-   <property name="icon">
-    <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/Shaded.png</normaloff>
-     <disabledoff>:/icons/resources/ShadedDisabled.png</disabledoff>:/icons/resources/Shaded.png</iconset>
-   </property>
    <property name="text">
     <string>Shaded</string>
    </property>
@@ -1032,11 +989,6 @@
   <action name="renderWireframe">
    <property name="checkable">
     <bool>true</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="viewer.qrc">
-     <normaloff>:/icons/resources/Wireframe.png</normaloff>
-     <disabledoff>:/icons/resources/WireframeDisabled.png</disabledoff>:/icons/resources/Wireframe.png</iconset>
    </property>
    <property name="text">
     <string>Wireframe</string>

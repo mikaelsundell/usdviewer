@@ -74,7 +74,7 @@ StageTreePrivate::init()
 {
     attach(d.tree);
     attach(d.tree->selectionModel());
-    int size = style()->iconSize(Style::UISmall);
+    int size = style()->iconSize(Style::UIScale::Small);
     d.tree->setIconSize(QSize(size, size));
     connect(d.tree.data(), &StageTree::itemSelectionChanged, this, &StageTreePrivate::itemSelectionChanged);
     connect(d.tree.data(), &StageTree::itemChanged, this, [this](QTreeWidgetItem* item, int column) {

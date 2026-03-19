@@ -96,7 +96,7 @@ ProgressViewPrivate::clear()
 void
 ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::ProgressMode mode)
 {
-    if (mode == DataModel::ProgressMode::ProgressRunning) {
+    if (mode == DataModel::ProgressMode::Running) {
         qDebug() << "RUNNING:" << name;
 
         clear();

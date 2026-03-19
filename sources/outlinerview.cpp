@@ -7,6 +7,7 @@
 #include "propertytree.h"
 #include "signalguard.h"
 #include "stagetree.h"
+#include "style.h"
 #include <QPointer>
 #include <QTimer>
 #include <pxr/usd/usd/prim.h>
@@ -61,6 +62,11 @@ OutlinerViewPrivate::init()
     // event filter
     stageTree()->installEventFilter(this);
     propertyTree()->installEventFilter(this);
+    // actions
+    d.ui->clear->setIcon(style()->icon(Style::IconRole::Clear));
+    d.ui->collapse->setIcon(style()->icon(Style::IconRole::Collapse));
+    d.ui->expand->setIcon(style()->icon(Style::IconRole::Expand));
+    d.ui->follow->setIcon(style()->icon(Style::IconRole::Follow));
     // connect
     connect(d.ui->filter, &QLineEdit::textChanged, this, &OutlinerViewPrivate::filterChanged);
     connect(d.ui->clear, &QToolButton::clicked, this, &OutlinerViewPrivate::clearFilter);
@@ -185,8 +191,8 @@ OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 void
 OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
-    if (status == DataModel::StageLoaded) {
-        if (policy == DataModel::LoadPayload) {
+    if (status == DataModel::StageStatus::Loaded) {
+        if (policy == DataModel::LoadPolicy::Payload) {
             stageTree()->setPayloadEnabled(true);
         }
         else {

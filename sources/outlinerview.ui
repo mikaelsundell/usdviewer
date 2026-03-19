@@ -64,11 +64,6 @@
         <property name="text">
          <string>...</string>
         </property>
-        <property name="icon">
-         <iconset resource="viewer.qrc">
-          <normaloff>:/icons/resources/Clear.png</normaloff>
-          <disabledoff>:/icons/resources/ClearDisabled.png</disabledoff>:/icons/resources/Clear.png</iconset>
-        </property>
        </widget>
       </item>
       <item>
@@ -78,11 +73,6 @@
         </property>
         <property name="text">
          <string>...</string>
-        </property>
-        <property name="icon">
-         <iconset resource="viewer.qrc">
-          <normaloff>:/icons/resources/Collapse.png</normaloff>
-          <disabledoff>:/icons/resources/CollapseDisabled.png</disabledoff>:/icons/resources/Collapse.png</iconset>
         </property>
         <property name="shortcut">
          <string/>
@@ -97,11 +87,6 @@
         <property name="text">
          <string>...</string>
         </property>
-        <property name="icon">
-         <iconset resource="viewer.qrc">
-          <normaloff>:/icons/resources/Expand.png</normaloff>
-          <disabledoff>:/icons/resources/ExpandDisabled.png</disabledoff>:/icons/resources/Expand.png</iconset>
-        </property>
         <property name="shortcut">
          <string/>
         </property>
@@ -114,11 +99,6 @@
         </property>
         <property name="text">
          <string>...</string>
-        </property>
-        <property name="icon">
-         <iconset resource="viewer.qrc">
-          <normaloff>:/icons/resources/Follow.png</normaloff>
-          <disabledoff>:/icons/resources/FollowDisabled.png</disabledoff>:/icons/resources/Follow.png</iconset>
         </property>
         <property name="checkable">
          <bool>true</bool>

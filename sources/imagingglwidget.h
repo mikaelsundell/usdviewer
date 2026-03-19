@@ -32,21 +32,12 @@ public:
     /**
      * @brief Rendering complexity levels.
      */
-    enum complexity_level { complexity_low, complexity_medium, complexity_high, complexity_veryhigh };
+    enum ComplexityLevel { ComplexityLow, ComplexityMedium, ComplexityHigh, ComplexityVeryHigh };
 
     /**
      * @brief Supported rendering draw modes.
      */
-    enum draw_mode {
-        draw_points,
-        draw_wireframe,
-        draw_wireframeonsurface,
-        draw_shadedflat,
-        draw_shadedsmooth,
-        draw_geomonly,
-        draw_geomflat,
-        draw_geomsmooth
-    };
+    enum DrawMode { Points, Wireframe, WireframeOnSurface, ShadedFlat, ShadedSmooth, GeomOnly, GeomFlat, GeomSmooth };
 
 public:
     /**
@@ -111,14 +102,14 @@ public:
     /**
      * @brief Returns the current draw mode.
      */
-    draw_mode drawMode() const;
+    DrawMode drawMode() const;
 
     /**
      * @brief Sets the draw mode.
      *
      * @param drawMode Rendering mode.
      */
-    void setDrawMode(draw_mode drawMode);
+    void setDrawMode(DrawMode drawMode);
 
     /**
      * @brief Returns the viewport clear color.

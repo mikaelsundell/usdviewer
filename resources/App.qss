@@ -53,7 +53,7 @@ QComboBox {
 }
 
 QComboBox:disabled {
-    color: $color.textdisabled;
+    color: $color.text.disabled;
 }
 
 QComboBox::down-arrow {
@@ -128,7 +128,7 @@ QMenu::item {
 }
 
 QMenu::item:disabled {
-    color: $color.textdisabled;
+    color: $color.text.disabled;
 }
 
 QMenu::item:selected {
@@ -197,7 +197,7 @@ QPushButton:default
 
 QPushButton:disabled
 {
-    color: $color.textdisabled;
+    color: $color.text.disabled;
 }
 
 QPushButton:pressed
@@ -330,7 +330,17 @@ QToolButton:default
 
 QToolButton:disabled
 {
-    color: $color.textdisabled;
+    color: $color.text.disabled;
+}
+
+QToolButton:checked
+{
+    background-color: 
+    qlineargradient( 
+        x1: 0, y1: 0, x2: 0, y2: 1, 
+        stop: 0 $color.button.lightness(160),
+        stop: 1.0 $color.buttonalt.lightness(160)
+    );
 }
 
 QToolButton:pressed
@@ -338,8 +348,8 @@ QToolButton:pressed
     background-color: 
     qlineargradient( 
         x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $color.button.lightness(120),
-        stop: 1.0 $color.buttonalt.lightness(120)
+        stop: 0 $color.button.lightness(160),
+        stop: 1.0 $color.buttonalt.lightness(160)
     );
 }
 

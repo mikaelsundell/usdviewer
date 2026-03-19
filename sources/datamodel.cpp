@@ -95,7 +95,7 @@ public:
 
 DataModelPrivate::DataModelPrivate()
 {
-    d.loadPolicy = DataModel::LoadPolicy::LoadAll;
+    d.loadPolicy = DataModel::LoadPolicy::All;
     d.changeDepth = 0;
     d.expectedChanges = 0;
     d.completedChanges = 0;
@@ -110,7 +110,7 @@ DataModelPrivate::~DataModelPrivate() = default;
 void
 DataModelPrivate::initStage()
 {
-    d.stageStatus = DataModel::StageStatus::StageLoaded;
+    d.stageStatus = DataModel::StageStatus::Loaded;
     d.bboxCache.reset();
     d.bbox = boundingBox();
     d.stageWatcher->init();
@@ -128,7 +128,7 @@ DataModelPrivate::beginProgressBlock(const QString& name, size_t count)
     if (d.changeDepth == 1) {
         d.expectedChanges = count;
         d.completedChanges = 0;
-        Q_EMIT d.dataModel->progressBlockChanged(name, DataModel::ProgressMode::ProgressRunning);
+        Q_EMIT d.dataModel->progressBlockChanged(name, DataModel::ProgressMode::Running);
     }
 }
 
@@ -158,7 +158,7 @@ DataModelPrivate::endProgressBlock()
     bool cancelled = d.changeCancelled.load();
     d.changeCancelled.store(false);
 
-    Q_EMIT d.dataModel->progressBlockChanged(d.changeName, DataModel::ProgressMode::ProgressIdle);
+    Q_EMIT d.dataModel->progressBlockChanged(d.changeName, DataModel::ProgressMode::Idle);
     d.changeName.clear();
 
     if (cancelled) {
@@ -196,7 +196,7 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy po
 {
     {
         QWriteLocker locker(&d.stageLock);
-        if (policy == DataModel::LoadAll) {
+        if (policy == DataModel::LoadPolicy::All) {
             d.stage = UsdStage::Open(QStringToString(filename), UsdStage::LoadAll);
         }
         else {
@@ -211,7 +211,7 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy po
         d.filename = filename;
     }
     else {
-        d.stageStatus = DataModel::StageStatus::StageFailed;
+        d.stageStatus = DataModel::StageStatus::Failed;
         d.bboxCache.reset();
         return false;
     }
@@ -282,7 +282,7 @@ DataModelPrivate::close()
     {
         QWriteLocker locker(&d.stageLock);
         d.stage = nullptr;
-        d.stageStatus = DataModel::StageStatus::StageClosed;
+        d.stageStatus = DataModel::StageStatus::Closed;
         d.bboxCache.reset();
         d.pendingPaths.clear();
         d.changeDepth = 0;

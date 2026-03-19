@@ -17,31 +17,30 @@ public:
     /**
      * @brief Global theme modes.
      */
-    enum Theme { ThemeDark, ThemeLight };
+    enum Theme { Dark, Light };
     Q_ENUM(Theme)
 
     /**
      * @brief Semantic color roles.
      */
     enum ColorRole {
-        ColorBase,
-        ColorBaseAlt,
-        ColorDock,
-        ColorDockAlt,
-        ColorAccent,
-        ColorAccentAlt,
-        ColorText,
-        ColorTextDisabled,
-        ColorHighlight,
-        ColorHighlightAlt,
-        ColorBorder,
-        ColorBorderAlt,
-        ColorHandle,
-        ColorProgress,
-        ColorButton,
-        ColorButtonAlt,
-        ColorRender,
-        ColorRenderAlt
+        Base,
+        BaseAlt,
+        Dock,
+        DockAlt,
+        Accent,
+        AccentAlt,
+        Text,
+        Highlight,
+        HighlightAlt,
+        Border,
+        BorderAlt,
+        Handle,
+        Progress,
+        Button,
+        ButtonAlt,
+        Render,
+        RenderAlt
     };
     Q_ENUM(ColorRole)
 
@@ -49,26 +48,39 @@ public:
      * @brief Semantic icon roles.
      */
     enum IconRole {
-        IconBranchOpen,
-        IconBranchClosed,
-        IconHidden,
-        IconVisible,
-        IconChecked,
-        IconDropdown,
-        IconLeft,
-        IconMaterial,
-        IconMesh,
-        IconPartiallyChecked,
-        IconPrim,
-        IconRight
+        BranchOpen,
+        BranchClosed,
+        Clear,
+        Collapse,
+        Expand,
+        Export,
+        ExportImage,
+        FrameAll,
+        Follow,
+        Hidden,
+        Visible,
+        Checked,
+        Dropdown,
+        Left,
+        Material,
+        Mesh,
+        PartiallyChecked,
+        Open,
+        Prim,
+        Right,
+        Shaded,
+        Wireframe
     };
     Q_ENUM(IconRole)
 
     /**
      * @brief Logical UI scale levels.
      */
-    enum UIScale { UISmall, UIMedium, UILarge };
+    enum UIScale { Small, Medium, Large };
     Q_ENUM(UIScale)
+
+    enum UIState { Normal, Disabled };
+    Q_ENUM(UIState)
 
     /**
      * @brief Constructs a Style instance.
@@ -96,12 +108,12 @@ public:
     /**
      * @brief Returns color for a role.
      */
-    QColor color(ColorRole role) const;
+    QColor color(ColorRole role, UIState state = UIState::Normal) const;
 
     /**
      * @brief Returns icon for a role and size.
      */
-    QPixmap icon(IconRole role, UIScale scale = UIScale::UIMedium) const;
+    QPixmap icon(IconRole role, UIScale scale = UIScale::Medium, UIState = UIState::Normal) const;
 
     /**
      * @brief Returns font size for a scale.

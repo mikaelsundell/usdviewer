@@ -98,7 +98,7 @@ public:
         QImage gpuPerformance;
         ViewCamera viewCamera;
         GfBBox3d selectionBBox;
-        ImagingGLWidget::draw_mode drawMode;
+        ImagingGLWidget::DrawMode drawMode;
         UsdStageRefPtr stage;
         UsdImagingGLRenderParams params;
         GfBBox3d bbox;
@@ -135,7 +135,7 @@ ImagingGLWidgetPrivate::init()
     d.gpuPerformanceEnabled = false;
     d.cameraAxisEnabled = true;
     d.drag = false;
-    d.drawMode = ImagingGLWidget::draw_shadedsmooth;
+    d.drawMode = ImagingGLWidget::DrawMode::ShadedSmooth;
 }
 
 void
@@ -251,16 +251,16 @@ ImagingGLWidgetPrivate::paintGL()
             {
                 UsdImagingGLDrawMode mode;
                 switch (d.drawMode) {
-                case ImagingGLWidget::draw_points: mode = UsdImagingGLDrawMode::DRAW_POINTS; break;
-                case ImagingGLWidget::draw_wireframe: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME; break;
-                case ImagingGLWidget::draw_wireframeonsurface:
+                case ImagingGLWidget::DrawMode::Points: mode = UsdImagingGLDrawMode::DRAW_POINTS; break;
+                case ImagingGLWidget::DrawMode::Wireframe: mode = UsdImagingGLDrawMode::DRAW_WIREFRAME; break;
+                case ImagingGLWidget::DrawMode::WireframeOnSurface:
                     mode = UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE;
                     break;
-                case ImagingGLWidget::draw_shadedflat: mode = UsdImagingGLDrawMode::DRAW_SHADED_FLAT; break;
-                case ImagingGLWidget::draw_shadedsmooth: mode = UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH; break;
-                case ImagingGLWidget::draw_geomonly: mode = UsdImagingGLDrawMode::DRAW_GEOM_ONLY; break;
-                case ImagingGLWidget::draw_geomflat: mode = UsdImagingGLDrawMode::DRAW_GEOM_FLAT; break;
-                case ImagingGLWidget::draw_geomsmooth: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH; break;
+                case ImagingGLWidget::DrawMode::ShadedFlat: mode = UsdImagingGLDrawMode::DRAW_SHADED_FLAT; break;
+                case ImagingGLWidget::DrawMode::ShadedSmooth: mode = UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH; break;
+                case ImagingGLWidget::DrawMode::GeomOnly: mode = UsdImagingGLDrawMode::DRAW_GEOM_ONLY; break;
+                case ImagingGLWidget::DrawMode::GeomFlat: mode = UsdImagingGLDrawMode::DRAW_GEOM_FLAT; break;
+                case ImagingGLWidget::DrawMode::GeomSmooth: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH; break;
                 default: mode = UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH;
                 }
                 d.params.drawMode = mode;
@@ -671,7 +671,7 @@ void
 ImagingGLWidgetPrivate::drawBorder(QPainter& painter)
 {
     const int w = 2;
-    painter.setPen(QPen(style()->color(Style::ColorBorderAlt), w));
+    painter.setPen(QPen(style()->color(Style::ColorRole::BorderAlt), w));
     painter.setBrush(Qt::NoBrush);
     QRect r = d.glwidget->rect().adjusted(w / 2, w / 2, -w / 2, -w / 2);
     painter.drawRect(r);
@@ -716,7 +716,7 @@ ImagingGLWidgetPrivate::drawAxis(QPainter& painter)
     painter.drawEllipse(center, radius - 10, radius - 10);
 
     QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::UISmall));
+    font.setPointSize(style()->fontSize(Style::UIScale::Small));
     font.setBold(true);
     painter.setFont(font);
 
@@ -863,7 +863,7 @@ ImagingGLWidgetPrivate::updateSceneTree()
     double dpr = d.glwidget->devicePixelRatioF();
 
     QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::UISmall));
+    font.setPointSize(style()->fontSize(Style::UIScale::Small));
     font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
 
     QFontMetrics fm(font);
@@ -941,7 +941,7 @@ ImagingGLWidgetPrivate::updateGpuPerformance()
 
     double dpr = d.glwidget->devicePixelRatioF();
     QFont font = app()->font();
-    font.setPointSize(style()->fontSize(Style::UISmall));
+    font.setPointSize(style()->fontSize(Style::UIScale::Small));
     font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
 
     QFontMetrics fm(font);
@@ -1026,14 +1026,14 @@ ImagingGLWidget::resetView()
     p->resetView();
 }
 
-ImagingGLWidget::draw_mode
+ImagingGLWidget::DrawMode
 ImagingGLWidget::drawMode() const
 {
     return p->d.drawMode;
 }
 
 void
-ImagingGLWidget::setDrawMode(draw_mode drawMode)
+ImagingGLWidget::setDrawMode(DrawMode drawMode)
 {
     if (drawMode != p->d.drawMode) {
         p->d.drawMode = drawMode;

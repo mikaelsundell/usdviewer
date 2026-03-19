@@ -11,62 +11,63 @@
 #include <QApplication>
 #include <QScreen>
 
-namespace os
+namespace usdviewer {
+namespace os {
+void setDarkTheme()
 {
-    void setDarkTheme()
-    {
-        // we force dark aque no matter appearance set in system settings
-        [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+    // we force dark aque no matter appearance set in system settings
+    [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+}
+
+QString getApplicationPath()
+{
+    return QApplication::applicationDirPath() + "/..";
+}
+
+QString resolveBookmark(const QString& bookmark)
+{
+    if (bookmark.isEmpty()) {
+        return QString();
     }
-
-    QString getApplicationPath()
-    {
-        return QApplication::applicationDirPath() + "/..";
-    }
-
-    QString resolveBookmark(const QString& bookmark)
-    {
-        if (bookmark.isEmpty()) {
-            return QString();
-        }
-        QByteArray bookmarkData = QByteArray::fromBase64(bookmark.toUtf8());
-        NSError* error = nil;
-        BOOL isstale = NO;
-        NSURL *url = [NSURL URLByResolvingBookmarkData:[NSData dataWithBytes:bookmarkData.data() length:bookmarkData.size()]
-                       options:NSURLBookmarkResolutionWithSecurityScope
-                 relativeToURL:nil
-           bookmarkDataIsStale:&isstale
-                         error:&error];
-
-        if (url && !error) {
-            if ([url startAccessingSecurityScopedResource]) {
-                return QString::fromUtf8([[url path] UTF8String]);
-            } else {
-                QString();
-            }
+    QByteArray bookmarkData = QByteArray::fromBase64(bookmark.toUtf8());
+    NSError* error = nil;
+    BOOL isstale = NO;
+    NSURL *url = [NSURL URLByResolvingBookmarkData:[NSData dataWithBytes:bookmarkData.data() length:bookmarkData.size()]
+                                           options:NSURLBookmarkResolutionWithSecurityScope
+                                     relativeToURL:nil
+                               bookmarkDataIsStale:&isstale
+                                             error:&error];
+    
+    if (url && !error) {
+        if ([url startAccessingSecurityScopedResource]) {
+            return QString::fromUtf8([[url path] UTF8String]);
         } else {
             QString();
         }
+    } else {
+        QString();
+    }
+    return QString();
+}
+
+QString saveBookmark(const QString& bookmark)
+{
+    if (bookmark.isEmpty()) {
         return QString();
     }
-
-    QString saveBookmark(const QString& bookmark)
-    {
-        if (bookmark.isEmpty()) {
-            return QString();
-        }
-        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:bookmark.toUtf8().constData()]];
-        NSError* error = nil;
-        NSData* bookmarkData = [url bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope
-            includingResourceValuesForKeys:nil
-                             relativeToURL:nil
-                                    error:&error];
-
-        if (bookmarkData && !error) {
-            QByteArray bookmark((const char *)[bookmarkData bytes], [bookmarkData length]);
-            return QString::fromUtf8(bookmark.toBase64());
-        } else {
-            return QString();
-        }
+    NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:bookmark.toUtf8().constData()]];
+    NSError* error = nil;
+    NSData* bookmarkData = [url bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope
+                         includingResourceValuesForKeys:nil
+                                          relativeToURL:nil
+                                                  error:&error];
+    
+    if (bookmarkData && !error) {
+        QByteArray bookmark((const char *)[bookmarkData bytes], [bookmarkData length]);
+        return QString::fromUtf8(bookmark.toBase64());
+    } else {
+        return QString();
     }
 }
+}  // namespace os
+}  // namespace usdviewer

@@ -113,7 +113,7 @@ RenderViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 void
 RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
 {
-    if (status == DataModel::StageLoaded) {
+    if (status == DataModel::StageStatus::Loaded) {
         imageGLWidget()->updateStage(dataModel()->stage());
     }
     else {
@@ -179,25 +179,25 @@ RenderView::setBackgroundColor(const QColor& color)
     p->imageGLWidget()->setClearColor(color);
 }
 
-RenderView::render_mode
+RenderView::RenderMode
 RenderView::renderMode() const
 {
-    ImagingGLWidget::draw_mode drawMode = p->imageGLWidget()->drawMode();
+    ImagingGLWidget::DrawMode drawMode = p->imageGLWidget()->drawMode();
     switch (drawMode) {
-    case ImagingGLWidget::draw_wireframe:
-    case ImagingGLWidget::draw_wireframeonsurface: return render_wireframe;
+    case ImagingGLWidget::DrawMode::Wireframe:
+    case ImagingGLWidget::DrawMode::WireframeOnSurface: return RenderMode::Wireframe;
 
-    default: return render_shaded;
+    default: return RenderMode::Shaded;
     }
 }
 
 void
-RenderView::setDrawMode(RenderView::render_mode renderMode)
+RenderView::setRenderMode(RenderMode renderMode)
 {
     switch (renderMode) {
-    case render_shaded: p->imageGLWidget()->setDrawMode(ImagingGLWidget::draw_shadedsmooth); break;
+    case RenderMode::Shaded: p->imageGLWidget()->setDrawMode(ImagingGLWidget::DrawMode::ShadedSmooth); break;
 
-    case render_wireframe: p->imageGLWidget()->setDrawMode(ImagingGLWidget::draw_wireframeonsurface); break;
+    case RenderMode::Wireframe: p->imageGLWidget()->setDrawMode(ImagingGLWidget::DrawMode::WireframeOnSurface); break;
     }
     p->imageGLWidget()->update();
 }

@@ -35,6 +35,8 @@ public:
     virtual ~TreeWidget();
 
 protected:
+    bool viewportEvent(QEvent* event) override;
+    
     void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override;
 
     /**

@@ -41,4 +41,11 @@ PropertyItem::PropertyItem(QTreeWidgetItem* parent)
 }
 
 PropertyItem::~PropertyItem() = default;
+
+TreeItem::ItemStates
+PropertyItem::itemStates() const
+{
+    return Visible;
+}
+
 }  // namespace usdviewer

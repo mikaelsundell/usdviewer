@@ -23,7 +23,7 @@ class PrimItemPrivate;
  */
 class PrimItem : public TreeItem {
 public:
-    enum PrimRole { PrimPath = TreeItem::ItemActive + 1 };
+    enum PrimRole { PrimPath = Qt::UserRole + 1 };
 
     /**
      * @brief Column indices used by the stage tree.
@@ -62,6 +62,14 @@ public:
      * Provides display and decoration data used by the tree view.
      */
     QVariant data(int column, int role) const override;
+
+    /**
+     * @brief Returns semantic state flags for the item.
+     *
+     * Used by the base class or delegates to derive Qt roles
+     * (e.g. font, color, enabled state).
+     */
+    TreeItem::ItemStates itemStates() const override;
 
 private:
     QScopedPointer<PrimItemPrivate> p;

@@ -44,7 +44,7 @@ namespace stage {
      *
      * @return List of payload prim paths.
      */
-        QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = true);
+    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = true);
 
     /**
      * @brief Filters a list of prim paths to only top-most paths.
@@ -181,7 +181,6 @@ namespace stage {
      * @param recursive If true, apply visibility recursively.
      */
     void setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false);
-
 
 
 

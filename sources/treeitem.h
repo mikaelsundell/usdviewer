@@ -27,7 +27,8 @@ public:
     /**
      * @brief Custom roles shared across all tree items.
      */
-    enum ItemRole { ItemActive = Qt::UserRole + 1 };
+    enum ItemState { None = 0, ReadOnly = 1 << 0, Visible = 1 << 1 };
+    Q_DECLARE_FLAGS(ItemStates, ItemState)
 
     /**
      * @brief Constructs a top-level tree item.
@@ -61,6 +62,14 @@ public:
      * common roles. Derived classes override as needed.
      */
     QVariant data(int column, int role) const override;
+
+    /**
+     * @brief Returns semantic state flags for the item.
+     *
+     * Used by the base class or delegates to derive Qt roles
+     * (e.g. font, color, enabled state).
+     */
+    virtual ItemStates itemStates() const;
 
 private:
     QScopedPointer<TreeItemPrivate> p;

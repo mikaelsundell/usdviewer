@@ -44,7 +44,7 @@ protected:
      * @note Hit area must match drawBranches() positioning.
      */
     bool viewportEvent(QEvent* event) override;
-    
+
     /**
      * @brief Draws custom branch (expand/collapse) icons.
      *

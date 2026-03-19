@@ -3,6 +3,8 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "treeitem.h"
+#include "application.h"
+#include "style.h"
 
 namespace usdviewer {
 
@@ -24,11 +26,23 @@ TreeItem::TreeItem(QTreeWidgetItem* parent)
 
 TreeItem::~TreeItem() {}
 
+TreeItem::ItemStates
+TreeItem::itemStates() const
+{
+    return None;
+}
+
 QVariant
 TreeItem::data(int column, int role) const
 {
-    if (role == ItemActive) {
-        return true;
+    const ItemStates states = itemStates();
+    if (role == Qt::FontRole && (states & ReadOnly)) {
+        QFont f;
+        f.setItalic(true);
+        return f;
+    }
+    if (role == Qt::ForegroundRole && !(states & Visible)) {
+        return QBrush(style()->color(Style::ColorRole::Text, Style::UIState::Disabled));
     }
     return QTreeWidgetItem::data(column, role);
 }

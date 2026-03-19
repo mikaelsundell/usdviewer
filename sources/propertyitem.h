@@ -48,6 +48,14 @@ public:
      */
     virtual ~PropertyItem();
 
+    /**
+     * @brief Returns semantic state flags for the item.
+     *
+     * Used by the base class or delegates to derive Qt roles
+     * (e.g. font, color, enabled state).
+     */
+    TreeItem::ItemStates itemStates() const;
+
 private:
     QScopedPointer<PropertyItemPrivate> p;
 };

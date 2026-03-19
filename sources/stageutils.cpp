@@ -176,9 +176,8 @@ namespace stage {
 
             auto payloads = spec->GetPayloadList();
 
-            if (!payloads.GetExplicitItems().empty() ||
-                !payloads.GetAddedItems().empty() ||
-                !payloads.GetPrependedItems().empty())
+            if (!payloads.GetExplicitItems().empty() || !payloads.GetAddedItems().empty()
+                || !payloads.GetPrependedItems().empty())
                 return true;
         }
 

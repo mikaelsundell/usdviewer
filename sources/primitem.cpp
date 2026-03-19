@@ -64,7 +64,6 @@ PrimItem::data(int column, int role) const
 {
     if (!p->d.stage)
         return QVariant();
-
     const SdfPath path = p->d.path;
     const UsdPrim prim = p->d.stage->GetPrimAtPath(path);
     if (role == Qt::DisplayRole) {
@@ -74,7 +73,6 @@ PrimItem::data(int column, int role) const
         default: break;
         }
     }
-
     if (role == Qt::ToolTipRole) {
         if (!prim)
             return QVariant();
@@ -83,7 +81,6 @@ PrimItem::data(int column, int role) const
             .arg(StringToQString(path.GetString()))
             .arg(StringToQString(prim.GetTypeName().GetString()));
     }
-
     if (role == Qt::DecorationRole && column == Name) {
         if (!prim)
             return {};
@@ -100,7 +97,6 @@ PrimItem::data(int column, int role) const
 
         return QIcon(style()->icon(iconRole, Style::UIScale::Medium));
     }
-
     if (role == Qt::DecorationRole && column == Vis) {
         if (!prim || !prim.IsActive())
             return QVariant();
@@ -115,16 +111,33 @@ PrimItem::data(int column, int role) const
         const bool visible = stage::isVisible(p->d.stage, path);
         return style()->icon(visible ? Style::IconRole::Visible : Style::IconRole::Hidden, Style::UIScale::Medium);
     }
-
     if (role == PrimItem::PrimPath) {
         return StringToQString(path.GetString());
     }
-
-    if (role == TreeItem::ItemActive) {
-        return stage::isVisible(p->d.stage, path);
-    }
-
     return TreeItem::data(column, role);
+}
+
+TreeItem::ItemStates
+PrimItem::itemStates() const
+{
+    ItemStates states = None;
+
+    if (!p->d.stage)
+        return states;
+
+    const SdfPath& path = p->d.path;
+    const UsdPrim prim = p->d.stage->GetPrimAtPath(path);
+
+    if (!prim || !prim.IsActive())
+        return states;
+
+    if (stage::isVisible(p->d.stage, path)) {
+        states |= Visible;
+    }
+    if (!stage::isEditTarget(p->d.stage, path)) {
+        states |= ReadOnly;
+    }
+    return states;
 }
 
 }  // namespace usdviewer

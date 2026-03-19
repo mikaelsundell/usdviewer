@@ -66,6 +66,7 @@ public:
         Mesh,
         PartiallyChecked,
         Open,
+        Payload,
         Prim,
         Right,
         Shaded,

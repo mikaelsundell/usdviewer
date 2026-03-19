@@ -35,8 +35,24 @@ public:
     virtual ~TreeWidget();
 
 protected:
+    /**
+     * @brief Handles mouse interaction for branch expand/collapse.
+     *
+     * Intercepts mouse presses in the branch hit area and toggles
+     * expansion manually. Other events are forwarded to the base class.
+     *
+     * @note Hit area must match drawBranches() positioning.
+     */
     bool viewportEvent(QEvent* event) override;
     
+    /**
+     * @brief Draws custom branch (expand/collapse) icons.
+     *
+     * Replaces Qt’s default branch rendering to control icon style
+     * and positioning. Uses the provided @p rect as the branch area.
+     *
+     * @note Do not use visualRect(); it breaks alignment.
+     */
     void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override;
 
     /**

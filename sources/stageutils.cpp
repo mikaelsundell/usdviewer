@@ -134,6 +134,97 @@ namespace stage {
         return bbox;
     }
 
+    bool isAuthored(UsdStageRefPtr stage, const SdfPath& path)
+    {
+        if (!stage)
+            return false;
+
+        UsdPrim prim = stage->GetPrimAtPath(path);
+        if (!prim)
+            return false;
+
+        return !prim.GetPrimStack().empty();
+    }
+
+    bool isEditTarget(UsdStageRefPtr stage, const SdfPath& path)
+    {
+        if (!stage)
+            return false;
+
+        SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
+        if (!editLayer)
+            return false;
+
+        return editLayer->GetPrimAtPath(path) != nullptr;
+    }
+
+    bool isPayload(UsdStageRefPtr stage, const SdfPath& path)
+    {
+        if (!stage)
+            return false;
+
+        UsdPrim prim = stage->GetPrimAtPath(path);
+        if (!prim)
+            return false;
+
+        if (prim.HasPayload())
+            return true;
+
+        for (const SdfPrimSpecHandle& spec : prim.GetPrimStack()) {
+            if (!spec)
+                continue;
+
+            auto payloads = spec->GetPayloadList();
+
+            if (!payloads.GetExplicitItems().empty() ||
+                !payloads.GetAddedItems().empty() ||
+                !payloads.GetPrependedItems().empty())
+                return true;
+        }
+
+        return false;
+    }
+
+    bool isPayloadHierarchy(UsdStageRefPtr stage, const SdfPath& path)
+    {
+        if (!stage)
+            return false;
+
+        UsdPrim prim = stage->GetPrimAtPath(path);
+        if (!prim)
+            return false;
+
+        UsdPrim p = prim;
+        while (p) {
+            if (isPayload(stage, p.GetPath()))
+                return true;
+            p = p.GetParent();
+        }
+
+        return false;
+    }
+
+    bool isEditable(UsdStageRefPtr stage, const SdfPath& path)
+    {
+        if (!stage)
+            return false;
+
+        UsdPrim prim = stage->GetPrimAtPath(path);
+        if (!prim || !prim.IsActive())
+            return false;
+
+        if (isPayloadHierarchy(stage, path))
+            return false;
+
+        if (!isAuthored(stage, path))
+            return false;
+
+        if (!isEditTarget(stage, path))
+            return false;
+
+        return true;
+    }
+
     bool isVisible(UsdStageRefPtr stage, const SdfPath& path)
     {
         UsdPrim prim = stage->GetPrimAtPath(path);

@@ -18,20 +18,15 @@ public:
     void init();
     bool hasSelectedChildren(QTreeWidgetItem* item) const;
     int visualRowIndex(const QModelIndex& index) const;
-    
-    
-    
     QRect branchRect(const QRect& rect, const QModelIndex& index) const
     {
         const int indent = d.tree->indentation();
         const int depth = indexDepth(index);
         const int size = style()->iconSize(Style::UIScale::Small);
         int x = 6;
-        int y = rect.center().y() - size / 2;
+        int y = (rect.center().y() - size / 2) + 2;
         return QRect(x, y, size, size);
     }
-    
-    
     int indexDepth(const QModelIndex& index) const
     {
         int depth = 0;
@@ -42,9 +37,6 @@ public:
         }
         return depth;
     }
-    
-    
-
 public:
     class ItemDelegate : public QStyledItemDelegate {
         public:

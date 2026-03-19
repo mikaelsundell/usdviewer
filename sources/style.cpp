@@ -252,6 +252,7 @@ StylePrivate::updateTheme(Style::Theme theme)
     d.icons[roleName(Style::IconRole::Mesh)] = ":/icons/resources/Mesh.png";
     d.icons[roleName(Style::IconRole::Open)] = ":/icons/resources/Open.png";
     d.icons[roleName(Style::IconRole::PartiallyChecked)] = ":/icons/resources/PartiallyChecked.png";
+    d.icons[roleName(Style::IconRole::Payload)] = ":/icons/resources/Payload.png";
     d.icons[roleName(Style::IconRole::Prim)] = ":/icons/resources/Prim.png";
     d.icons[roleName(Style::IconRole::Right)] = ":/icons/resources/Right.png";
     d.icons[roleName(Style::IconRole::Wireframe)] = ":/icons/resources/Wireframe.png";

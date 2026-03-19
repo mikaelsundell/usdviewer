@@ -86,16 +86,19 @@ PrimItem::data(int column, int role) const
 
     if (role == Qt::DecorationRole && column == Name) {
         if (!prim)
-            return QVariant();
-
+            return {};
         const QString typeName = StringToQString(prim.GetTypeName().GetString());
 
+        Style::IconRole iconRole = Style::IconRole::Prim;
         if (typeName == "Material" || typeName == "Shader")
-            return QIcon(style()->icon(Style::IconRole::Material, Style::UIScale::Medium));
+            iconRole = Style::IconRole::Material;
         else if (typeName == "Mesh")
-            return QIcon(style()->icon(Style::IconRole::Mesh, Style::UIScale::Medium));
-        else
-            return QIcon(style()->icon(Style::IconRole::Prim, Style::UIScale::Medium));
+            iconRole = Style::IconRole::Mesh;
+
+        if (stage::isPayload(p->d.stage, path))
+            iconRole = Style::IconRole::Payload;
+
+        return QIcon(style()->icon(iconRole, Style::UIScale::Medium));
     }
 
     if (role == Qt::DecorationRole && column == Vis) {

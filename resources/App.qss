@@ -167,6 +167,20 @@ QProgressBar {
     background-color: $color.base;
 }
 
+QPlainTextEdit
+{
+    font-family: "Menlo", "Consolas", "Courier New", monospace;
+    font-size: 12px;
+    caret-color: $color.text;
+    color: $color.text;
+    background-color: $color.base;
+    selection-background-color: $color.highlight;
+    selection-color: $color.text;
+    border: 1px solid $color.borderalt;
+    outline: none;
+    padding: 6px;
+}
+
 QProgressBar::chunk {
     border-radius: 4px;
     background-color: $color.highlight;

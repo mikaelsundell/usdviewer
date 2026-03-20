@@ -44,7 +44,7 @@ public:
      * @brief Returns the python interpreter subsystem.
      */
     PythonInterpreter* pythonInterpreter() const;
-    
+
     /**
      * @brief Returns the session subsystem.
      */

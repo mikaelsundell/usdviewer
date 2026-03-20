@@ -71,6 +71,7 @@ public:
         Payload,
         Prim,
         Right,
+        Run,
         Shaded,
         Wireframe
     };

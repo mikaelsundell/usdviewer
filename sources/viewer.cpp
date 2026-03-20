@@ -10,6 +10,7 @@
 #include "os.h"
 #include "outlinerview.h"
 #include "progressview.h"
+#include "pythonview.h"
 #include "qtutils.h"
 #include "renderview.h"
 #include "selectionlist.h"
@@ -48,6 +49,7 @@ public:
     DockWidget* progressDock();
     OutlinerView* outlinerView();
     ProgressView* progressView();
+    PythonView* pythonView();
     RenderView* renderView();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
@@ -94,6 +96,7 @@ public Q_SLOTS:
     void dark();
     void toggleOutliner(bool checked);
     void toggleProgress(bool checked);
+    void togglePython(bool checked);
     void openGithubReadme();
     void openGithubIssues();
 
@@ -115,6 +118,7 @@ public:
         QColor backgroundColor;
         Qt::DockWidgetArea outlinerArea;
         Qt::DockWidgetArea progressArea;
+        Qt::DockWidgetArea pythonArea;
         QScopedPointer<MouseEvent> backgroundColorFilter;
         QScopedPointer<Ui_Viewer> ui;
         QPointer<Viewer> viewer;
@@ -147,6 +151,8 @@ ViewerPrivate::init()
     outlinerView()->setAttribute(Qt::WA_DeleteOnClose, false);
     d.progressArea = d.viewer->dockWidgetArea(d.ui->progressDock);
     progressView()->setAttribute(Qt::WA_DeleteOnClose, false);
+    d.pythonArea = d.viewer->dockWidgetArea(d.ui->pythonDock);
+    pythonView()->setAttribute(Qt::WA_DeleteOnClose, false);
     renderView()->setBackgroundColor(d.backgroundColor);
     // actions
     d.ui->fileOpen->setIcon(style()->icon(Style::IconRole::Open));
@@ -272,6 +278,7 @@ ViewerPrivate::init()
             [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this, &ViewerPrivate::toggleOutliner);
     connect(d.ui->viewProgress, &QAction::toggled, this, &ViewerPrivate::toggleProgress);
+    connect(d.ui->viewPython, &QAction::toggled, this, &ViewerPrivate::togglePython);
     // setup
     progressDock()->hide();
     renderView()->setFocus();
@@ -401,6 +408,12 @@ ProgressView*
 ViewerPrivate::progressView()
 {
     return d.ui->progressView;
+}
+
+PythonView*
+ViewerPrivate::pythonView()
+{
+    return d.ui->pythonView;
 }
 
 RenderView*
@@ -888,6 +901,23 @@ ViewerPrivate::toggleProgress(bool checked)
     else {
         if (d.ui->progressDock->isVisible())
             d.ui->progressDock->hide();
+    }
+}
+
+void
+ViewerPrivate::togglePython(bool checked)
+{
+    if (checked) {
+        if (!d.ui->pythonDock->isVisible()) {
+            d.ui->pythonDock->setFloating(false);
+            if (!d.ui->pythonDock->parentWidget())
+                d.viewer->addDockWidget(d.pythonArea, d.ui->pythonDock);
+            d.ui->pythonDock->show();
+        }
+    }
+    else {
+        if (d.ui->pythonDock->isVisible())
+            d.ui->pythonDock->hide();
     }
 }
 

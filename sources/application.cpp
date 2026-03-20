@@ -4,8 +4,8 @@
 
 #include "application.h"
 #include "os.h"
-#include "qtutils.h"
 #include "pythoninterpreter.h"
+#include "qtutils.h"
 #include "session.h"
 #include "settings.h"
 #include "style.h"
@@ -42,10 +42,14 @@ ApplicationPrivate::~ApplicationPrivate() {}
 void
 ApplicationPrivate::init()
 {
-    d.pythonInterpreter.reset(new PythonInterpreter());
     d.session.reset(new Session());
     d.settings.reset(new Settings());
     d.style.reset(new Style());
+
+    d.pythonInterpreter.reset(new PythonInterpreter());
+
+
+
 #ifdef NDEBUG
     QStringList plugindirs;
     QString pluginusddir = os::getApplicationPath() + "/plugin/usd";

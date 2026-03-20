@@ -20,22 +20,21 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
 {
     return Command(
         // redo
-        [paths, variantSet, variantValue](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("redo load payloads", paths.size());
-
-            QFuture<void> future = QtConcurrent::run([dm, paths, variantSet, variantValue]() {
+        [paths, variantSet, variantValue](Session* session) {
+            session->beginProgressBlock("redo load payloads", paths.size());
+            QFuture<void> future = QtConcurrent::run([session, paths, variantSet, variantValue]() {
                 const bool useVariant = (!variantSet.isEmpty() && !variantValue.isEmpty());
                 std::string setNameStd = QStringToString(variantSet);
                 std::string setValueStd = QStringToString(variantValue);
-                UsdStageRefPtr stage = dm->stage();
+                UsdStageRefPtr stage = session->stage();
 
                 size_t completed = 0;
                 QList<SdfPath> loaded;
                 QList<SdfPath> failed;
                 {
-                    QWriteLocker locker(dm->stageLock());
+                    QWriteLocker locker(session->stageLock());
                     for (const SdfPath& path : paths) {
-                        if (dm->isProgressBlockCancelled())
+                        if (session->isProgressBlockCancelled())
                             break;
 
                         QVariantMap info;
@@ -46,7 +45,7 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                         /*QMetaObject::invokeMethod(
                             dm,
                             [dm, path, info, completed]() {
-                                dm->updateProgressNotify(DataModel::Notify("loading payload", { path }, info),
+                                dm->updateProgressNotify(Session::Notify("loading payload", { path }, info),
                                                          completed);
                             },
                             Qt::QueuedConnection);*/
@@ -56,9 +55,10 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             failed.append(path);
 
                             QMetaObject::invokeMethod(
-                                dm,
-                                [dm, path, completed]() {
-                                    dm->updateProgressNotify(DataModel::Notify("payload failed", { path }), completed);
+                                session,
+                                [session, path, completed]() {
+                                    session->updateProgressNotify(Session::Notify("payload failed", { path }),
+                                                                  completed);
                                 },
                                 Qt::QueuedConnection);
 
@@ -84,10 +84,10 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             prim.Load();
                             loaded.append(path);
                             QMetaObject::invokeMethod(
-                                dm,
-                                [dm, path, completed]() {
-                                    dm->updateProgressNotify(DataModel::Notify("payload loaded", { path }),
-                                                             completed + 1);
+                                session,
+                                [session, path, completed]() {
+                                    session->updateProgressNotify(Session::Notify("payload loaded", { path }),
+                                                                  completed + 1);
                                 },
                                 Qt::QueuedConnection);
 
@@ -95,10 +95,10 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             failed.append(path);
 
                             QMetaObject::invokeMethod(
-                                dm,
-                                [dm, path, completed]() {
-                                    dm->updateProgressNotify(DataModel::Notify("payload failed", { path }),
-                                                             completed + 1);
+                                session,
+                                [session, path, completed]() {
+                                    session->updateProgressNotify(Session::Notify("payload failed", { path }),
+                                                                  completed + 1);
                                 },
                                 Qt::QueuedConnection);
                         }
@@ -107,11 +107,11 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     }
                 }
                 QMetaObject::invokeMethod(
-                    dm, [dm]() { dm->endProgressBlock(); }, Qt::QueuedConnection);
+                    session, [session]() { session->endProgressBlock(); }, Qt::QueuedConnection);
             });
         },
         // undo
-        [paths](DataModel* dm, SelectionModel*) {
+        [paths](Session* session) {
             // todo: undo should be fixed
         });
 }
@@ -121,19 +121,19 @@ unloadPayloads(const QList<SdfPath>& paths)
 {
     return Command(
         // redo
-        [paths](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("unload payloads", paths.size());
-            QPointer<DataModel> safe_dm = dm;
-            QFuture<void> future = QtConcurrent::run([safe_dm, paths]() {
-                if (!safe_dm)
+        [paths](Session* session) {
+            session->beginProgressBlock("unload payloads", paths.size());
+            QPointer<Session> safe_session = session;
+            QFuture<void> future = QtConcurrent::run([safe_session, paths]() {
+                if (!safe_session)
                     return;
 
-                UsdStageRefPtr stage = safe_dm->stage();
+                UsdStageRefPtr stage = safe_session->stage();
                 size_t completed = 0;
                 {
-                    QWriteLocker locker(safe_dm->stageLock());
+                    QWriteLocker locker(safe_session->stageLock());
                     for (const SdfPath& path : paths) {
-                        if (!safe_dm || safe_dm->isProgressBlockCancelled())
+                        if (!safe_session || safe_session->isProgressBlockCancelled())
                             break;
 
                         UsdPrim prim = stage->GetPrimAtPath(path);
@@ -141,10 +141,10 @@ unloadPayloads(const QList<SdfPath>& paths)
                             prim.Unload();
 
                         QMetaObject::invokeMethod(
-                            safe_dm,
-                            [safe_dm, path, completed]() {
-                                safe_dm->updateProgressNotify(DataModel::Notify("payload unloaded", { path }),
-                                                              completed + 1);
+                            safe_session,
+                            [safe_session, path, completed]() {
+                                safe_session->updateProgressNotify(Session::Notify("payload unloaded", { path }),
+                                                                   completed + 1);
                             },
                             Qt::QueuedConnection);
 
@@ -152,17 +152,17 @@ unloadPayloads(const QList<SdfPath>& paths)
                     }
                 }
                 QMetaObject::invokeMethod(
-                    safe_dm,
-                    [safe_dm]() {
-                        if (!safe_dm)
+                    safe_session,
+                    [safe_session]() {
+                        if (!safe_session)
                             return;
-                        safe_dm->endProgressBlock();
+                        safe_session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [paths](DataModel* dm, SelectionModel*) {
+        [paths](Session* session) {
             // todo: undo should be fixed
         });
 }
@@ -173,35 +173,34 @@ isolatePaths(const QList<SdfPath>& paths)
     auto previous = std::make_shared<QList<SdfPath>>();
     return Command(
         // redo
-        [paths, previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Isolate", 1);
-
-            QFuture<void> future = QtConcurrent::run([dm, paths, previous]() {
+        [paths, previous](Session* session) {
+            session->beginProgressBlock("Isolate", 1);
+            QFuture<void> future = QtConcurrent::run([session, paths, previous]() {
                 {
-                    *previous = dm->mask();
-                    dm->setMask(paths);
+                    *previous = session->mask();
+                    session->setMask(paths);
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Isolate", paths), 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, paths]() {
+                        session->updateProgressNotify(Session::Notify("Isolate", paths), 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Isolate restored", 1);
-            QFuture<void> future = QtConcurrent::run([dm, previous]() {
+        [previous](Session* session) {
+            session->beginProgressBlock("Isolate restored", 1);
+            QFuture<void> future = QtConcurrent::run([session, previous]() {
                 {
-                    dm->setMask(*previous);
+                    session->setMask(*previous);
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, previous]() {
-                        dm->updateProgressNotify(DataModel::Notify("Isolate restored", *previous), 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, previous]() {
+                        session->updateProgressNotify(Session::Notify("Isolate restored", *previous), 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
@@ -214,39 +213,39 @@ selectPaths(const QList<SdfPath>& paths)
     auto previous = std::make_shared<QList<SdfPath>>();
     return Command(
         // redo
-        [paths, previous](DataModel* dm, SelectionModel* sel) {
-            dm->beginProgressBlock("Select", 1);
-            QFuture<void> future = QtConcurrent::run([dm, sel, paths, previous]() {
+        [paths, previous](Session* session) {
+            session->beginProgressBlock("Select", 1);
+            QFuture<void> future = QtConcurrent::run([session, paths, previous]() {
                 {
-                    *previous = sel->paths();
-                    sel->updatePaths(paths);
+                    *previous = session->selectionList()->paths();
+                    session->selectionList()->updatePaths(paths);
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, paths]() {
-                        using Status = DataModel::Notify::Status;
-                        DataModel::Notify notify("Select", paths, Status::Info);
+                    session,
+                    [session, paths]() {
+                        using Status = Session::Notify::Status;
+                        Session::Notify notify("Select", paths, Status::Info);
 
-                        dm->updateProgressNotify(notify, 1);
-                        dm->endProgressBlock();
+                        session->updateProgressNotify(notify, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [previous](DataModel* dm, SelectionModel* sel) {
-            dm->beginProgressBlock("Select restored", 1);
-            QFuture<void> future = QtConcurrent::run([dm, sel, previous]() {
+        [previous](Session* session) {
+            session->beginProgressBlock("Select restored", 1);
+            QFuture<void> future = QtConcurrent::run([session, previous]() {
                 {
-                    sel->updatePaths(*previous);
+                    session->selectionList()->updatePaths(*previous);
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, previous]() {
-                        using Status = DataModel::Notify::Status;
-                        DataModel::Notify notify("Select restored", *previous, Status::Info);
-                        dm->updateProgressNotify(notify, 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, previous]() {
+                        using Status = Session::Notify::Status;
+                        Session::Notify notify("Select restored", *previous, Status::Info);
+                        session->updateProgressNotify(notify, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
@@ -259,45 +258,45 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
     auto previous = std::make_shared<QHash<SdfPath, bool>>();
     return Command(
         // redo
-        [paths, recursive, previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Show", 1);
-            QFuture<void> future = QtConcurrent::run([dm, paths, recursive, previous]() {
+        [paths, recursive, previous](Session* session) {
+            session->beginProgressBlock("Show", 1);
+            QFuture<void> future = QtConcurrent::run([session, paths, recursive, previous]() {
                 {
-                    QWriteLocker lock(dm->stageLock());
+                    QWriteLocker lock(session->stageLock());
                     previous->clear();
                     for (const SdfPath& path : paths) {
-                        previous->insert(path, stage::isVisible(dm->stage(), path));
+                        previous->insert(path, stage::isVisible(session->stage(), path));
                     }
-                    stage::setVisible(dm->stage(), paths, true, recursive);
+                    stage::setVisible(session->stage(), paths, true, recursive);
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, paths]() {
-                        using Status = DataModel::Notify::Status;
-                        DataModel::Notify notify("Show", paths, Status::Info);
-                        dm->updateProgressNotify(notify, 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, paths]() {
+                        using Status = Session::Notify::Status;
+                        Session::Notify notify("Show", paths, Status::Info);
+                        session->updateProgressNotify(notify, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [previous, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Show restored", 1);
-            QFuture<void> future = QtConcurrent::run([dm, previous, recursive]() {
+        [previous, recursive](Session* session) {
+            session->beginProgressBlock("Show restored", 1);
+            QFuture<void> future = QtConcurrent::run([session, previous, recursive]() {
                 {
-                    QWriteLocker lock(dm->stageLock());
+                    QWriteLocker lock(session->stageLock());
                     for (auto it = previous->cbegin(); it != previous->cend(); ++it) {
-                        stage::setVisible(dm->stage(), { it.key() }, it.value(), recursive);
+                        stage::setVisible(session->stage(), { it.key() }, it.value(), recursive);
                     }
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, previous]() {
-                        using Status = DataModel::Notify::Status;
-                        DataModel::Notify notify("Show restored", previous->keys(), Status::Info);
-                        dm->updateProgressNotify(notify, 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, previous]() {
+                        using Status = Session::Notify::Status;
+                        Session::Notify notify("Show restored", previous->keys(), Status::Info);
+                        session->updateProgressNotify(notify, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
@@ -310,49 +309,48 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
     auto previous = std::make_shared<QHash<SdfPath, bool>>();
     return Command(
         // redo
-        [paths, recursive, previous](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Hide", 1);
-            QFuture<void> future = QtConcurrent::run([dm, paths, recursive, previous]() {
+        [paths, recursive, previous](Session* session) {
+            session->beginProgressBlock("Hide", 1);
+            QFuture<void> future = QtConcurrent::run([session, paths, recursive, previous]() {
                 {
-                    QWriteLocker lock(dm->stageLock());
+                    QWriteLocker lock(session->stageLock());
                     previous->clear();
                     for (const SdfPath& path : paths) {
-                        previous->insert(path, stage::isVisible(dm->stage(), path));
+                        previous->insert(path, stage::isVisible(session->stage(), path));
                     }
-                    stage::setVisible(dm->stage(), paths, false, recursive);
+                    stage::setVisible(session->stage(), paths, false, recursive);
                 }
 
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, paths]() {
-                        using Status = DataModel::Notify::Status;
-                        DataModel::Notify notify("Hide", paths, Status::Info);
+                    session,
+                    [session, paths]() {
+                        using Status = Session::Notify::Status;
+                        Session::Notify notify("Hide", paths, Status::Info);
 
-                        dm->updateProgressNotify(notify, 1);
-                        dm->endProgressBlock();
+                        session->updateProgressNotify(notify, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [previous, recursive](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Hide restored", 1);
-            QFuture<void> future = QtConcurrent::run([dm, previous, recursive]() {
+        [previous, recursive](Session* session) {
+            session->beginProgressBlock("Hide restored", 1);
+            QFuture<void> future = QtConcurrent::run([session, previous, recursive]() {
                 {
-                    QWriteLocker lock(dm->stageLock());
-
+                    QWriteLocker lock(session->stageLock());
                     for (auto it = previous->cbegin(); it != previous->cend(); ++it) {
-                        stage::setVisible(dm->stage(), { it.key() }, it.value(), recursive);
+                        stage::setVisible(session->stage(), { it.key() }, it.value(), recursive);
                     }
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, previous]() {
-                        using Status = DataModel::Notify::Status;
-                        DataModel::Notify notify("Hide restored", previous->keys(), Status::Info);
+                    session,
+                    [session, previous]() {
+                        using Status = Session::Notify::Status;
+                        Session::Notify notify("Hide restored", previous->keys(), Status::Info);
 
-                        dm->updateProgressNotify(notify, 1);
-                        dm->endProgressBlock();
+                        session->updateProgressNotify(notify, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
@@ -478,11 +476,11 @@ deletePaths(const QList<SdfPath>& inPaths)
     auto snapshots = std::make_shared<utils::Snapshot>();
     return Command(
         // redo
-        [inPaths, snapshots](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Delete", 1);
-            QFuture<void> future = QtConcurrent::run([dm, inPaths, snapshots]() {
-                QWriteLocker lock(dm->stageLock());
-                UsdStageRefPtr stage = dm->stage();
+        [inPaths, snapshots](Session* session) {
+            session->beginProgressBlock("Delete", 1);
+            QFuture<void> future = QtConcurrent::run([session, inPaths, snapshots]() {
+                QWriteLocker lock(session->stageLock());
+                UsdStageRefPtr stage = session->stage();
                 QList<SdfPath> filtered = utils::filterEditablePaths(stage, inPaths);
                 QList<SdfPath> paths = utils::minimalRootPaths(filtered);
                 snapshots->clear();
@@ -495,20 +493,20 @@ deletePaths(const QList<SdfPath>& inPaths)
                     }
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, paths]() {
-                        dm->updateProgressNotify(DataModel::Notify("Delete", paths), 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, paths]() {
+                        session->updateProgressNotify(Session::Notify("Delete", paths), 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
         // undo
-        [snapshots](DataModel* dm, SelectionModel*) {
-            dm->beginProgressBlock("Delete restored", 1);
-            QFuture<void> future = QtConcurrent::run([dm, snapshots]() {
-                QWriteLocker lock(dm->stageLock());
-                UsdStageRefPtr stage = dm->stage();
+        [snapshots](Session* session) {
+            session->beginProgressBlock("Delete restored", 1);
+            QFuture<void> future = QtConcurrent::run([session, snapshots]() {
+                QWriteLocker lock(session->stageLock());
+                UsdStageRefPtr stage = session->stage();
                 SdfLayerHandle layer = stage->GetEditTarget().GetLayer();
                 sortByHierarchy(*snapshots);
 
@@ -518,10 +516,10 @@ deletePaths(const QList<SdfPath>& inPaths)
                     restored.append(s.stagePath);
                 }
                 QMetaObject::invokeMethod(
-                    dm,
-                    [dm, restored]() {
-                        dm->updateProgressNotify(DataModel::Notify("Delete restored", restored), 1);
-                        dm->endProgressBlock();
+                    session,
+                    [session, restored]() {
+                        session->updateProgressNotify(Session::Notify("Delete restored", restored), 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
@@ -634,19 +632,19 @@ renamePath(const SdfPath& path, const SdfPath& newPathInput)
     };
 
     return Command(
-        [path, newPathInput, buildNewPath, applyRename](DataModel* dm, SelectionModel* sel) {
-            dm->beginProgressBlock("rename prim", 1);
-
-            QtConcurrent::run([=]() {
-                QWriteLocker lock(dm->stageLock());
-                UsdStageRefPtr stage = dm->stage();
+        // redo
+        [path, newPathInput, buildNewPath, applyRename](Session* session) {
+            session->beginProgressBlock("rename prim", 1);
+            QFuture<void> future = QtConcurrent::run([=]() {
+                QWriteLocker lock(session->stageLock());
+                UsdStageRefPtr stage = session->stage();
 
                 if (!stage) {
                     QMetaObject::invokeMethod(
-                        dm,
+                        session,
                         [=]() {
-                            dm->updateProgressNotify({ "Rename failed (no stage)", {} }, 1);
-                            dm->endProgressBlock();
+                            session->updateProgressNotify({ "Rename failed (no stage)", {} }, 1);
+                            session->endProgressBlock();
                         },
                         Qt::QueuedConnection);
                     return;
@@ -655,10 +653,10 @@ renamePath(const SdfPath& path, const SdfPath& newPathInput)
                 SdfPath newPath = buildNewPath(path, newPathInput);
                 if (newPath.IsEmpty() || newPath == path) {
                     QMetaObject::invokeMethod(
-                        dm,
+                        session,
                         [=]() {
-                            dm->updateProgressNotify({ "Rename noop", {} }, 1);
-                            dm->endProgressBlock();
+                            session->updateProgressNotify({ "Rename noop", {} }, 1);
+                            session->endProgressBlock();
                         },
                         Qt::QueuedConnection);
                     return;
@@ -668,54 +666,47 @@ renamePath(const SdfPath& path, const SdfPath& newPathInput)
                 QString error;
                 if (!applyRename(stage, path, newPath, error)) {
                     QMetaObject::invokeMethod(
-                        dm,
+                        session,
                         [=]() {
-                            dm->updateProgressNotify({ "Rename failed (" + error + ")", {} }, 1);
-                            dm->endProgressBlock();
+                            session->updateProgressNotify({ "Rename failed (" + error + ")", {} }, 1);
+                            session->endProgressBlock();
                         },
                         Qt::QueuedConnection);
                     return;
                 }
                 stage->SetLoadRules(remapLoadRules(rules, path, newPath));
                 QMetaObject::invokeMethod(
-                    dm,
+                    session,
                     [=]() {
-                        if (sel) {
-                            QList<SdfPath> updated;
-                            for (const auto& p : sel->paths()) {
-                                if (p.HasPrefix(path)) {
-                                    updated.append(newPath.AppendPath(p.MakeRelativePath(path)));
-                                }
-                                else {
-                                    updated.append(p);
-                                }
+                        QList<SdfPath> updated;
+                        for (const auto& p : session->selectionList()->paths()) {
+                            if (p.HasPrefix(path)) {
+                                updated.append(newPath.AppendPath(p.MakeRelativePath(path)));
                             }
-                            sel->updatePaths(updated);
+                            else {
+                                updated.append(p);
+                            }
                         }
-
-                        dm->updateProgressNotify({ "Renamed", { path, newPath } }, 1);
-                        dm->endProgressBlock();
+                        session->selectionList()->updatePaths(updated);
+                        session->updateProgressNotify({ "Renamed", { path, newPath } }, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-
-        // =========================
-        // UNDO
-        // =========================
-        [path, newPathInput, buildNewPath, applyRename](DataModel* dm, SelectionModel* sel) {
-            dm->beginProgressBlock("undo rename", 1);
-
-            QtConcurrent::run([=]() {
-                QWriteLocker lock(dm->stageLock());
-                UsdStageRefPtr stage = dm->stage();
+        // undo
+        [path, newPathInput, buildNewPath, applyRename](Session* session) {
+            session->beginProgressBlock("undo rename", 1);
+            QFuture<void> future = QtConcurrent::run([=]() {
+                QWriteLocker lock(session->stageLock());
+                UsdStageRefPtr stage = session->stage();
 
                 if (!stage) {
                     QMetaObject::invokeMethod(
-                        dm,
+                        session,
                         [=]() {
-                            dm->updateProgressNotify({ "Undo failed (no stage)", {} }, 1);
-                            dm->endProgressBlock();
+                            session->updateProgressNotify({ "Undo failed (no stage)", {} }, 1);
+                            session->endProgressBlock();
                         },
                         Qt::QueuedConnection);
                     return;
@@ -724,10 +715,10 @@ renamePath(const SdfPath& path, const SdfPath& newPathInput)
                 SdfPath newPath = buildNewPath(path, newPathInput);
                 if (newPath.IsEmpty()) {
                     QMetaObject::invokeMethod(
-                        dm,
+                        session,
                         [=]() {
-                            dm->updateProgressNotify({ "Undo failed (invalid path)", {} }, 1);
-                            dm->endProgressBlock();
+                            session->updateProgressNotify({ "Undo failed (invalid path)", {} }, 1);
+                            session->endProgressBlock();
                         },
                         Qt::QueuedConnection);
                     return;
@@ -737,34 +728,31 @@ renamePath(const SdfPath& path, const SdfPath& newPathInput)
                 QString error;
                 if (!applyRename(stage, newPath, path, error)) {
                     QMetaObject::invokeMethod(
-                        dm,
+                        session,
                         [=]() {
-                            dm->updateProgressNotify({ "Undo failed (" + error + ")", {} }, 1);
-                            dm->endProgressBlock();
+                            session->updateProgressNotify({ "Undo failed (" + error + ")", {} }, 1);
+                            session->endProgressBlock();
                         },
                         Qt::QueuedConnection);
                     return;
                 }
                 stage->SetLoadRules(remapLoadRules(rules, newPath, path));
-                
-                QMetaObject::invokeMethod(
-                    dm,
-                    [=]() {
-                        if (sel) {
-                            QList<SdfPath> updated;
-                            for (const auto& p : sel->paths()) {
-                                if (p.HasPrefix(newPath)) {
-                                    updated.append(path.AppendPath(p.MakeRelativePath(newPath)));
-                                }
-                                else {
-                                    updated.append(p);
-                                }
-                            }
-                            sel->updatePaths(updated);
-                        }
 
-                        dm->updateProgressNotify({ "Rename restored", { path } }, 1);
-                        dm->endProgressBlock();
+                QMetaObject::invokeMethod(
+                    session,
+                    [=]() {
+                        QList<SdfPath> updated;
+                        for (const auto& p : session->selectionList()->paths()) {
+                            if (p.HasPrefix(newPath)) {
+                                updated.append(path.AppendPath(p.MakeRelativePath(newPath)));
+                            }
+                            else {
+                                updated.append(p);
+                            }
+                        }
+                        session->selectionList()->updatePaths(updated);
+                        session->updateProgressNotify({ "Rename restored", { path } }, 1);
+                        session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });

@@ -5,7 +5,7 @@
 #include "propertytree.h"
 #include "propertyitem.h"
 #include "qtutils.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
 #include "signalguard.h"
 #include <QFileInfo>
 #include <QHeaderView>

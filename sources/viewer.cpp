@@ -6,14 +6,14 @@
 #include "application.h"
 #include "commanddispatcher.h"
 #include "commandstack.h"
-#include "datamodel.h"
 #include "mouseevent.h"
 #include "os.h"
 #include "outlinerview.h"
 #include "progressview.h"
 #include "qtutils.h"
 #include "renderview.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
+#include "session.h"
 #include "settings.h"
 #include "stageutils.h"
 #include "style.h"
@@ -100,14 +100,14 @@ public Q_SLOTS:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths) const;
-    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
+    void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void statusChanged(const QString& status);
 
 public:
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
     struct Data {
-        DataModel::LoadPolicy loadPolicy;
+        Session::LoadPolicy loadPolicy;
         bool stageInit;
         QStringList arguments;
         QStringList extensions;
@@ -124,7 +124,7 @@ public:
 
 ViewerPrivate::ViewerPrivate()
 {
-    d.loadPolicy = DataModel::LoadPolicy::All;
+    d.loadPolicy = Session::LoadPolicy::All;
     d.stageInit = false;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
@@ -158,11 +158,11 @@ ViewerPrivate::init()
     // connect
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
-        d.loadPolicy = DataModel::LoadPolicy::All;
+        d.loadPolicy = Session::LoadPolicy::All;
         settings()->setValue("loadType", "all");
     });
     connect(d.ui->policyPayload, &QAction::triggered, this, [this]() {
-        d.loadPolicy = DataModel::LoadPolicy::Payload;
+        d.loadPolicy = Session::LoadPolicy::Payload;
         settings()->setValue("loadType", "payload");
     });
     {
@@ -247,14 +247,14 @@ ViewerPrivate::init()
         }
     }
     // models
-    connect(selectionModel(), &SelectionModel::selectionChanged, this, &ViewerPrivate::selectionChanged);
-    connect(dataModel(), &DataModel::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
-    connect(dataModel(), &DataModel::stageChanged, this, &ViewerPrivate::stageChanged);
-    connect(dataModel(), &DataModel::statusChanged, this, &ViewerPrivate::statusChanged);
+    connect(session(), &Session::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
+    connect(session(), &Session::stageChanged, this, &ViewerPrivate::stageChanged);
+    connect(session(), &Session::statusChanged, this, &ViewerPrivate::statusChanged);
+    connect(session()->selectionList(), &SelectionList::selectionChanged, this, &ViewerPrivate::selectionChanged);
     // command stack
-    connect(commandStack(), &CommandStack::canUndoChanged, d.ui->editUndo, &QAction::setEnabled);
-    connect(commandStack(), &CommandStack::canRedoChanged, d.ui->editRedo, &QAction::setEnabled);
-    connect(commandStack(), &CommandStack::canClearChanged, d.ui->editClear, &QAction::setEnabled);
+    connect(session()->commandStack(), &CommandStack::canUndoChanged, d.ui->editUndo, &QAction::setEnabled);
+    connect(session()->commandStack(), &CommandStack::canRedoChanged, d.ui->editRedo, &QAction::setEnabled);
+    connect(session()->commandStack(), &CommandStack::canClearChanged, d.ui->editClear, &QAction::setEnabled);
     // views
     connect(d.ui->hudSceneTree, &QAction::toggled, this, [=](bool checked) { renderView()->enableSceneTree(checked); });
     connect(d.ui->hudGpuPerformance, &QAction::toggled, this,
@@ -317,11 +317,11 @@ ViewerPrivate::initSettings()
 {
     QString loadType = settings()->value("loadType", "all").toString();
     if (loadType == "all") {
-        d.loadPolicy = DataModel::LoadPolicy::All;
+        d.loadPolicy = Session::LoadPolicy::All;
         d.ui->policyAll->setChecked(true);
     }
     else {
-        d.loadPolicy = DataModel::LoadPolicy::Payload;
+        d.loadPolicy = Session::LoadPolicy::Payload;
         d.ui->policyPayload->setChecked(true);
     }
 
@@ -361,8 +361,8 @@ ViewerPrivate::loadFile(const QString& filename)
     QElapsedTimer timer;
     timer.start();
 
-    dataModel()->loadFromFile(filename, d.loadPolicy);
-    if (dataModel()->isLoaded()) {
+    session()->loadFromFile(filename, d.loadPolicy);
+    if (session()->isLoaded()) {
         qint64 elapsedMs = timer.elapsed();
         double elapsedSec = elapsedMs / 1000.0;
 
@@ -462,12 +462,12 @@ ViewerPrivate::open()
 void
 ViewerPrivate::save()
 {
-    QString filename = dataModel()->filename();
+    QString filename = session()->filename();
     if (filename.isEmpty()) {
         saveAs();
         return;
     }
-    if (dataModel()->saveToFile(filename)) {
+    if (session()->saveToFile(filename)) {
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
     }
 }
@@ -476,7 +476,7 @@ void
 ViewerPrivate::saveAs()
 {
     QString saveDir = settings()->value("saveDir", QDir::homePath()).toString();
-    QString currentFile = dataModel()->filename();
+    QString currentFile = session()->filename();
     QString defaultName;
 
     if (!currentFile.isEmpty()) {
@@ -499,7 +499,7 @@ ViewerPrivate::saveAs()
     if (filename.isEmpty())
         return;
 
-    if (dataModel()->saveToFile(filename)) {
+    if (session()->saveToFile(filename)) {
         settings()->setValue("saveDir", QFileInfo(filename).absolutePath());
         d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
         updateRecentFiles(filename);
@@ -510,7 +510,7 @@ void
 ViewerPrivate::saveCopy()
 {
     QString copyDir = settings()->value("copyDir", QDir::homePath()).toString();
-    QString currentFile = dataModel()->filename();
+    QString currentFile = session()->filename();
     QString defaultName;
 
     if (!currentFile.isEmpty()) {
@@ -533,7 +533,7 @@ ViewerPrivate::saveCopy()
     if (filename.isEmpty())
         return;
 
-    if (dataModel()->exportToFile(filename)) {
+    if (session()->exportToFile(filename)) {
         settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
     }
 }
@@ -541,18 +541,18 @@ ViewerPrivate::saveCopy()
 void
 ViewerPrivate::reload()
 {
-    if (dataModel()->isLoaded()) {
-        commandStack()->clear();
-        dataModel()->reload();
+    if (session()->isLoaded()) {
+        session()->commandStack()->clear();
+        session()->reload();
     }
 }
 
 void
 ViewerPrivate::close()
 {
-    if (dataModel()->isLoaded()) {
-        commandStack()->clear();
-        dataModel()->close();
+    if (session()->isLoaded()) {
+        session()->commandStack()->clear();
+        session()->close();
         d.viewer->setWindowTitle(QString("%1").arg(PROJECT_NAME));
         enable(false);
     }
@@ -561,19 +561,19 @@ ViewerPrivate::close()
 void
 ViewerPrivate::undo()
 {
-    commandStack()->undo();
+    session()->commandStack()->undo();
 }
 
 void
 ViewerPrivate::redo()
 {
-    commandStack()->redo();
+    session()->commandStack()->redo();
 }
 
 void
 ViewerPrivate::clear()
 {
-    commandStack()->clear();
+    session()->commandStack()->clear();
 }
 
 void
@@ -609,7 +609,7 @@ ViewerPrivate::exportAll()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (dataModel()->exportToFile(filename)) {
+        if (session()->exportToFile(filename)) {
             settings()->setValue("exportDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -631,7 +631,7 @@ ViewerPrivate::exportSelected()
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
     if (!filename.isEmpty()) {
-        if (dataModel()->exportPathsToFile(selectionModel()->paths(), filename)) {
+        if (session()->exportPathsToFile(session()->selectionList()->paths(), filename)) {
             settings()->value("exportSelectedDir", QFileInfo(filename).absolutePath());
         }
         else {
@@ -697,7 +697,7 @@ ViewerPrivate::exit()
 void
 ViewerPrivate::showSelected()
 {
-    QList<SdfPath> paths = selectionModel()->paths();
+    QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
         CommandDispatcher::run(new Command(showPaths(paths, false)));
     }
@@ -706,7 +706,7 @@ ViewerPrivate::showSelected()
 void
 ViewerPrivate::showRecursive()
 {
-    QList<SdfPath> paths = selectionModel()->paths();
+    QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
         CommandDispatcher::run(new Command(showPaths(paths, true)));
     }
@@ -715,7 +715,7 @@ ViewerPrivate::showRecursive()
 void
 ViewerPrivate::hideSelected()
 {
-    QList<SdfPath> paths = selectionModel()->paths();
+    QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
         CommandDispatcher::run(new Command(hidePaths(paths, false)));
     }
@@ -724,7 +724,7 @@ ViewerPrivate::hideSelected()
 void
 ViewerPrivate::hideRecursive()
 {
-    QList<SdfPath> paths = selectionModel()->paths();
+    QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
         CommandDispatcher::run(new Command(hidePaths(paths, true)));
     }
@@ -765,21 +765,22 @@ ViewerPrivate::unloadRecursive()
 void
 ViewerPrivate::deleteSelected()
 {
-    CommandDispatcher::run(new Command(deletePaths(selectionModel()->paths())));
+    CommandDispatcher::run(new Command(deletePaths(session()->selectionList()->paths())));
 }
 
 void
 ViewerPrivate::isolate(bool checked)
 {
-    const QList<SdfPath> paths = (checked && !selectionModel()->paths().isEmpty()) ? selectionModel()->paths()
-                                                                                   : QList<SdfPath>();
+    const QList<SdfPath> paths = (checked && !session()->selectionList()->paths().isEmpty())
+                                     ? session()->selectionList()->paths()
+                                     : QList<SdfPath>();
     CommandDispatcher::run(new Command(isolatePaths(paths)));
 }
 
 void
 ViewerPrivate::frameAll()
 {
-    if (dataModel()->isLoaded()) {
+    if (session()->isLoaded()) {
         renderView()->frameAll();
     }
 }
@@ -787,7 +788,7 @@ ViewerPrivate::frameAll()
 void
 ViewerPrivate::frameSelected()
 {
-    if (selectionModel()->paths().size()) {
+    if (session()->selectionList()->paths().size()) {
         renderView()->frameSelected();
     }
 }
@@ -807,7 +808,7 @@ ViewerPrivate::collapse()
 void
 ViewerPrivate::expand()
 {
-    if (selectionModel()->paths().size()) {
+    if (session()->selectionList()->paths().size()) {
         outlinerView()->expand();
     }
 }
@@ -929,7 +930,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
         }
     }
     if (!paths.isEmpty()) {
-        QMap<QString, QList<QString>> variantSets = stage::findVariantSets(dataModel()->stage(), paths, true);
+        QMap<QString, QList<QString>> variantSets = stage::findVariantSets(session()->stage(), paths, true);
 
         if (!variantSets.isEmpty()) {
             d.ui->editLoad->addSeparator();
@@ -948,8 +949,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
                         action->setShortcut(QKeySequence(key));
                     }
                     QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
-                        QList<SdfPath> payloadPaths = stage::payloadPaths(dataModel()->stage(),
-                                                                          stage::rootPaths(paths));
+                        QList<SdfPath> payloadPaths = stage::payloadPaths(session()->stage(), stage::rootPaths(paths));
 
                         CommandDispatcher::run(new Command(loadPayloads(payloadPaths, setName, value)));
                     });
@@ -961,10 +961,10 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 }
 
 void
-ViewerPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
+ViewerPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
     d.stageInit = false;
-    if (status == DataModel::StageStatus::Loaded) {
+    if (status == Session::StageStatus::Loaded) {
         enable(true);
     }
 }

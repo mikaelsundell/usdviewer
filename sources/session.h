@@ -16,11 +16,14 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usdviewer {
 
-class DataModelPrivate;
+class CommandStack;
+class SelectionList;
+class SessionPrivate;
+
 
 /**
- * @class DataModel
- * @brief Central data model managing the USD stage and scene state.
+ * @class Session
+ * @brief Central session managing the USD stage and scene state.
  *
  * Provides access to the currently loaded USD stage and maintains
  * application state such as progress notifications, scene masks,
@@ -28,10 +31,10 @@ class DataModelPrivate;
  * data source for viewer components like the stage tree, render
  * view, and property inspector.
  *
- * DataModel instances use implicit sharing and thread-safe access
+ * Session instances use implicit sharing and thread-safe access
  * to the underlying USD stage.
  */
-class DataModel : public QObject {
+class Session : public QObject {
     Q_OBJECT
 public:
     /**
@@ -87,9 +90,9 @@ public:
 
 public:
     /**
-     * @brief Constructs an empty data model.
+     * @brief Constructs an empty session.
      */
-    DataModel();
+    Session();
 
     /**
      * @brief Constructs and loads a stage from file.
@@ -97,17 +100,17 @@ public:
      * @param filename USD file to load.
      * @param policy Stage loading policy.
      */
-    DataModel(const QString& filename, LoadPolicy policy = LoadPolicy::All);
+    Session(const QString& filename, LoadPolicy policy = LoadPolicy::All);
 
     /**
      * @brief Copy constructor.
      */
-    DataModel(const DataModel& other);
+    Session(const Session& other);
 
     /**
-     * @brief Destroys the DataModel instance.
+     * @brief Destroys the Session instance.
      */
-    ~DataModel();
+    ~Session();
 
     /** @name Progress Reporting */
     ///@{
@@ -235,6 +238,21 @@ public:
 
     ///@}
 
+    /** @name Session Subsystems */
+    ///@{
+
+    /**
+     * @brief Returns the command stack subsystem.
+     */
+    CommandStack* commandStack() const;
+
+    /**
+     * @brief Returns the selection list subsystem.
+     */
+    SelectionList* selectionList() const;
+
+    ///@}
+
 Q_SIGNALS:
 
     /**
@@ -273,7 +291,7 @@ Q_SIGNALS:
     void statusChanged(const QString& status);
 
 private:
-    QExplicitlySharedDataPointer<DataModelPrivate> p;
+    QExplicitlySharedDataPointer<SessionPrivate> p;
 };
 
 }  // namespace usdviewer

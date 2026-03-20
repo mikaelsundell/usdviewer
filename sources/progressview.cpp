@@ -5,6 +5,8 @@
 #include "progressview.h"
 #include "application.h"
 #include "qtutils.h"
+#include "selectionlist.h"
+#include "session.h"
 #include "style.h"
 #include <QDir>
 #include <QElapsedTimer>
@@ -26,10 +28,10 @@ public:
 public Q_SLOTS:
     void cancel();
     void clear();
-    void progressBlockChanged(const QString& name, DataModel::ProgressMode mode);
-    void progressNotifyChanged(const DataModel::Notify& notify, size_t completed, size_t expected);
+    void progressBlockChanged(const QString& name, Session::ProgressMode mode);
+    void progressNotifyChanged(const Session::Notify& notify, size_t completed, size_t expected);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
+    void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
 
 public:
     QString updateStatus(size_t completed, size_t expected);
@@ -57,10 +59,10 @@ ProgressViewPrivate::init()
     progressTree()->setIndentation(0);
     // connect
     connect(d.ui->clear, &QPushButton::clicked, this, &ProgressViewPrivate::clear);
-    connect(dataModel(), &DataModel::progressBlockChanged, this, &ProgressViewPrivate::progressBlockChanged);
-    connect(dataModel(), &DataModel::progressNotifyChanged, this, &ProgressViewPrivate::progressNotifyChanged);
-    connect(dataModel(), &DataModel::stageChanged, this, &ProgressViewPrivate::stageChanged);
-    connect(selectionModel(), &SelectionModel::selectionChanged, this, &ProgressViewPrivate::selectionChanged);
+    connect(session(), &Session::progressBlockChanged, this, &ProgressViewPrivate::progressBlockChanged);
+    connect(session(), &Session::progressNotifyChanged, this, &ProgressViewPrivate::progressNotifyChanged);
+    connect(session(), &Session::stageChanged, this, &ProgressViewPrivate::stageChanged);
+    connect(session()->selectionList(), &SelectionList::selectionChanged, this, &ProgressViewPrivate::selectionChanged);
 }
 
 QTreeWidget*
@@ -86,7 +88,7 @@ ProgressViewPrivate::eventFilter(QObject* obj, QEvent* event)
 void
 ProgressViewPrivate::cancel()
 {
-    dataModel()->endProgressBlock();
+    session()->endProgressBlock();
 }
 
 void
@@ -96,9 +98,9 @@ ProgressViewPrivate::clear()
 }
 
 void
-ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::ProgressMode mode)
+ProgressViewPrivate::progressBlockChanged(const QString& name, Session::ProgressMode mode)
 {
-    if (mode == DataModel::ProgressMode::Running) {
+    if (mode == Session::ProgressMode::Running) {
         clear();
         d.ui->progress->setValue(0);
         d.timer.restart();
@@ -114,7 +116,7 @@ ProgressViewPrivate::progressBlockChanged(const QString& name, DataModel::Progre
 }
 
 void
-ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size_t completed, size_t expected)
+ProgressViewPrivate::progressNotifyChanged(const Session::Notify& notify, size_t completed, size_t expected)
 {
     QTreeWidget* tree = progressTree();
 
@@ -150,13 +152,13 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
     item->setIcon(0, QIcon());
 
     switch (notify.status) {
-    case DataModel::Notify::Status::Error: item->setForeground(0, style()->color(Style::ColorRole::Error)); break;
+    case Session::Notify::Status::Error: item->setForeground(0, style()->color(Style::ColorRole::Error)); break;
 
-    case DataModel::Notify::Status::Warning: item->setForeground(0, style()->color(Style::ColorRole::Warning)); break;
+    case Session::Notify::Status::Warning: item->setForeground(0, style()->color(Style::ColorRole::Warning)); break;
 
-    case DataModel::Notify::Status::Progress: item->setForeground(0, style()->color(Style::ColorRole::Progress)); break;
+    case Session::Notify::Status::Progress: item->setForeground(0, style()->color(Style::ColorRole::Progress)); break;
 
-    case DataModel::Notify::Status::Info:
+    case Session::Notify::Status::Info:
     default: break;
     }
     const int pct = int((double(completed) / std::max<size_t>(1, expected)) * 100.0);
@@ -166,7 +168,7 @@ ProgressViewPrivate::progressNotifyChanged(const DataModel::Notify& notify, size
 }
 
 void
-ProgressViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
+ProgressViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
     progressTree()->clear();
     d.stage = stage;

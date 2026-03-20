@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
+#include "session.h"
 #include <pxr/usd/sdf/path.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -20,7 +19,7 @@ namespace usdviewer {
  * the scene or application state. Each command defines a redo operation
  * and optionally an undo operation.
  *
- * Commands operate on a DataModel and SelectionModel, allowing them to
+ * Commands operate on a Session and SelectionModel, allowing them to
  * interact with the USD stage and the current prim selection.
  */
 class Command {
@@ -28,9 +27,9 @@ public:
     /**
      * @brief Function signature used by commands.
      *
-     * The function receives the active DataModel and SelectionModel.
+     * The function receives the active Session and SelectionModel.
      */
-    using Func = std::function<void(DataModel*, SelectionModel*)>;
+    using Func = std::function<void(Session*)>;
 
     /**
      * @brief Constructs a command with redo and optional undo functions.
@@ -46,25 +45,23 @@ public:
     /**
      * @brief Executes the command.
      *
-     * @param s   Data model used by the command.
-     * @param sel Selection model used by the command.
+     * @param s   Session used by the command.
      */
-    void execute(DataModel* s, SelectionModel* sel)
+    void execute(Session* s)
     {
         if (m_redo)
-            m_redo(s, sel);
+            m_redo(s);
     }
 
     /**
      * @brief Undoes the command.
      *
-     * @param s   Data model used by the command.
-     * @param sel Selection model used by the command.
+     * @param s   Session used by the command.
      */
-    void undo(DataModel* s, SelectionModel* sel)
+    void undo(Session* s)
     {
         if (m_undo)
-            m_undo(s, sel);
+            m_undo(s);
     }
 
     /**

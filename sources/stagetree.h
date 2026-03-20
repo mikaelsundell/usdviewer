@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
+#include "session.h"
 #include "treewidget.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
@@ -22,7 +22,7 @@ class StageTreePrivate;
  *
  * Displays the prim hierarchy of a USD stage and allows the user
  * to navigate, filter, and select prims. The widget integrates
- * with the viewer selection model and emits signals when the
+ * with the viewer selection list and emits signals when the
  * prim selection changes.
  */
 class StageTree : public TreeWidget {

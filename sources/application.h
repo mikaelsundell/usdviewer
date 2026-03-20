@@ -8,9 +8,8 @@
 #include <QScopedPointer>
 
 namespace usdviewer {
-class CommandStack;
-class DataModel;
-class SelectionModel;
+class PythonInterpreter;
+class Session;
 class Style;
 class Settings;
 class ApplicationPrivate;
@@ -42,19 +41,14 @@ public:
     ///@{
 
     /**
-     * @brief Returns the data model subsystem.
+     * @brief Returns the python interpreter subsystem.
      */
-    DataModel* dataModel() const;
-
+    PythonInterpreter* pythonInterpreter() const;
+    
     /**
-     * @brief Returns the selection model subsystem.
+     * @brief Returns the session subsystem.
      */
-    SelectionModel* selectionModel() const;
-
-    /**
-     * @brief Returns the command stack subsystem.
-     */
-    CommandStack* commandStack() const;
+    Session* session() const;
 
     /**
      * @brief Returns the settings subsystem.
@@ -91,33 +85,23 @@ app()
 }
 
 /**
- * @brief Returns the global data model subsystem.
+ * @brief Returns the global python interpreter subsystem.
  */
-inline DataModel*
-dataModel()
+inline PythonInterpreter*
+pythonInterpreter()
 {
     auto* a = app();
-    return a ? a->dataModel() : nullptr;
+    return a ? a->pythonInterpreter() : nullptr;
 }
 
 /**
- * @brief Returns the global selection model subsystem.
+ * @brief Returns the global session subsystem.
  */
-inline SelectionModel*
-selectionModel()
+inline Session*
+session()
 {
     auto* a = app();
-    return a ? a->selectionModel() : nullptr;
-}
-
-/**
- * @brief Returns the global selection model subsystem.
- */
-inline CommandStack*
-commandStack()
-{
-    auto* a = app();
-    return a ? a->commandStack() : nullptr;
+    return a ? a->session() : nullptr;
 }
 
 /**

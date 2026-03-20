@@ -29,6 +29,6 @@ CommandDispatcher::run(Command* cmd)
 QReadWriteLock*
 CommandDispatcher::stageLock()
 {
-    return dataModel()->stageLock();
+    return session()->stageLock();
 }
 }  // namespace usdviewer

@@ -25,7 +25,7 @@ public Q_SLOTS:
     void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
+    void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void renderReady(qint64 elapsed);
 
 public:
@@ -43,11 +43,11 @@ RenderViewPrivate::init()
     d.ui->setupUi(d.view.data());
     // connect
     connect(imageGLWidget(), &ImagingGLWidget::renderReady, this, &RenderViewPrivate::renderReady);
-    connect(dataModel(), &DataModel::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
-    connect(dataModel(), &DataModel::maskChanged, this, &RenderViewPrivate::maskChanged);
-    connect(dataModel(), &DataModel::primsChanged, this, &RenderViewPrivate::primsChanged);
-    connect(dataModel(), &DataModel::stageChanged, this, &RenderViewPrivate::stageChanged);
-    connect(selectionModel(), &SelectionModel::selectionChanged, this, &RenderViewPrivate::selectionChanged);
+    connect(session(), &Session::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
+    connect(session(), &Session::maskChanged, this, &RenderViewPrivate::maskChanged);
+    connect(session(), &Session::primsChanged, this, &RenderViewPrivate::primsChanged);
+    connect(session(), &Session::stageChanged, this, &RenderViewPrivate::stageChanged);
+    connect(session()->selectionList(), &SelectionList::selectionChanged, this, &RenderViewPrivate::selectionChanged);
 }
 
 ImagingGLWidget*
@@ -65,23 +65,23 @@ RenderViewPrivate::camera()
 void
 RenderViewPrivate::frameAll()
 {
-    if (dataModel()->isLoaded()) {
-        imageGLWidget()->frame(dataModel()->boundingBox());
+    if (session()->isLoaded()) {
+        imageGLWidget()->frame(session()->boundingBox());
     }
 }
 
 void
 RenderViewPrivate::frameSelected()
 {
-    if (selectionModel()->paths().size()) {
-        imageGLWidget()->frame(stage::boundingBox(dataModel()->stage(), selectionModel()->paths()));
+    if (session()->selectionList()->paths().size()) {
+        imageGLWidget()->frame(stage::boundingBox(session()->stage(), session()->selectionList()->paths()));
     }
 }
 
 void
 RenderViewPrivate::resetView()
 {
-    if (dataModel()->isLoaded()) {
+    if (session()->isLoaded()) {
         imageGLWidget()->resetView();
     }
 }
@@ -111,10 +111,10 @@ RenderViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 }
 
 void
-RenderViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
+RenderViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
-    if (status == DataModel::StageStatus::Loaded) {
-        imageGLWidget()->updateStage(dataModel()->stage());
+    if (status == Session::StageStatus::Loaded) {
+        imageGLWidget()->updateStage(session()->stage());
     }
     else {
         imageGLWidget()->close();
@@ -126,9 +126,9 @@ RenderViewPrivate::renderReady(qint64 elapsed)
 {
     const qint64 thresholdMs = 500;
     if (elapsed > thresholdMs) {
-        if (dataModel()) {
+        if (session()) {
             QString msg = QStringLiteral("Warning: Render time %1 ms").arg(elapsed);
-            dataModel()->setStatus(msg);
+            session()->setStatus(msg);
         }
     }
 }

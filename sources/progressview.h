@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -20,7 +18,7 @@ class ProgressViewPrivate;
  * @brief Displays progress and status information for the current USD scene.
  *
  * Provides a widget used to visualize processing progress or scene-related
- * statistics driven by the DataModel and SelectionModel. The view updates
+ * statistics driven by the Session and SelectionList. The view updates
  * as the scene or selection changes.
  */
 class ProgressView : public QWidget {

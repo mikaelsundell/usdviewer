@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -21,7 +19,7 @@ class OutlinerViewPrivate;
  *
  * Displays the prim hierarchy of the current USD stage and allows
  * users to navigate and inspect the scene structure. The view is
- * connected to a DataModel for stage data and a SelectionModel
+ * connected to a Session for stage data and a SelectionList
  * to synchronize prim selections with other viewer components.
  */
 class OutlinerView : public QWidget {

@@ -2,8 +2,10 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "datamodel.h"
+#include "session.h"
+#include "commanddispatcher.h"
 #include "qtutils.h"
+#include "selectionlist.h"
 #include "stageutils.h"
 #include <QMap>
 #include <QThreadPool>
@@ -16,17 +18,18 @@
 #include <stack>
 
 namespace usdviewer {
-class DataModelPrivate : public QSharedData {
+class SessionPrivate : public QSharedData {
 public:
-    DataModelPrivate();
-    ~DataModelPrivate();
+    SessionPrivate();
+    ~SessionPrivate();
+    void init();
     void initStage();
     void beginProgressBlock(const QString& name, size_t count);
-    void updateProgressNotify(const DataModel::Notify& notify, size_t completed);
+    void updateProgressNotify(const Session::Notify& notify, size_t completed);
     void cancelProgressBlock();
     void endProgressBlock();
     bool isProgressBlockCancelled() const;
-    bool loadFromFile(const QString& filename, DataModel::LoadPolicy loadPolicy);
+    bool loadFromFile(const QString& filename, Session::LoadPolicy loadPolicy);
     bool saveToFile(const QString& filename);
     bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
     bool close();
@@ -42,7 +45,7 @@ public:
 public:
     class StageWatcher : public TfWeakBase {
     public:
-        StageWatcher(DataModelPrivate* parent)
+        StageWatcher(SessionPrivate* parent)
             : d { false, TfNotice::Key(), parent }
         {}
         void init()
@@ -62,14 +65,14 @@ public:
             if (updated.isEmpty())
                 return;
             QMetaObject::invokeMethod(
-                d.parent->d.dataModel, [this, updated]() { d.parent->updatePrims(updated); }, Qt::DirectConnection);
+                d.parent->d.session, [this, updated]() { d.parent->updatePrims(updated); }, Qt::DirectConnection);
         }
         void blockSignals(bool block) { d.suppress.store(block); }
         bool signalsBlocked() const { return d.suppress.load(); }
         struct Data {
             std::atomic<bool> suppress { false };
             TfNotice::Key key;
-            DataModelPrivate* parent;
+            SessionPrivate* parent;
         };
         Data d;
     };
@@ -94,8 +97,8 @@ public:
 public:
     struct Data {
         UsdStageRefPtr stage;
-        DataModel::LoadPolicy loadPolicy;
-        DataModel::StageStatus stageStatus;
+        Session::LoadPolicy loadPolicy;
+        Session::StageStatus stageStatus;
         QString changeName;
         size_t changeDepth;
         size_t expectedChanges;
@@ -109,15 +112,17 @@ public:
         QThreadPool pool;
         QReadWriteLock stageLock;
         QScopedPointer<UsdGeomBBoxCache> bboxCache;
+        QScopedPointer<CommandStack> commandStack;
+        QScopedPointer<SelectionList> selectionList;
         QScopedPointer<StageWatcher> stageWatcher;
-        QPointer<DataModel> dataModel;
+        QPointer<Session> session;
     };
     Data d;
 };
 
-DataModelPrivate::DataModelPrivate()
+SessionPrivate::SessionPrivate()
 {
-    d.loadPolicy = DataModel::LoadPolicy::All;
+    d.loadPolicy = Session::LoadPolicy::All;
     d.changeDepth = 0;
     d.expectedChanges = 0;
     d.completedChanges = 0;
@@ -127,12 +132,20 @@ DataModelPrivate::DataModelPrivate()
     d.stageWatcher.reset(new StageWatcher(this));
 }
 
-DataModelPrivate::~DataModelPrivate() = default;
+SessionPrivate::~SessionPrivate() = default;
 
 void
-DataModelPrivate::initStage()
+SessionPrivate::init()
 {
-    d.stageStatus = DataModel::StageStatus::Loaded;
+    d.commandStack.reset(new CommandStack());
+    d.selectionList.reset(new SelectionList());
+    CommandDispatcher::setCommandStack(d.commandStack.data());
+}
+
+void
+SessionPrivate::initStage()
+{
+    d.stageStatus = Session::StageStatus::Loaded;
     d.bboxCache.reset();
     d.bbox = boundingBox();
     d.stageWatcher->init();
@@ -142,7 +155,7 @@ DataModelPrivate::initStage()
 }
 
 void
-DataModelPrivate::beginProgressBlock(const QString& name, size_t count)
+SessionPrivate::beginProgressBlock(const QString& name, size_t count)
 {
     d.changeCancelled.store(false);
     d.changeName = name;
@@ -150,25 +163,25 @@ DataModelPrivate::beginProgressBlock(const QString& name, size_t count)
     if (d.changeDepth == 1) {
         d.expectedChanges = count;
         d.completedChanges = 0;
-        Q_EMIT d.dataModel->progressBlockChanged(name, DataModel::ProgressMode::Running);
+        Q_EMIT d.session->progressBlockChanged(name, Session::ProgressMode::Running);
     }
 }
 
 void
-DataModelPrivate::updateProgressNotify(const DataModel::Notify& notify, size_t completed)
+SessionPrivate::updateProgressNotify(const Session::Notify& notify, size_t completed)
 {
     d.completedChanges = completed;
-    Q_EMIT d.dataModel->progressNotifyChanged(notify, completed, d.expectedChanges);
+    Q_EMIT d.session->progressNotifyChanged(notify, completed, d.expectedChanges);
 }
 
 void
-DataModelPrivate::cancelProgressBlock()
+SessionPrivate::cancelProgressBlock()
 {
     d.changeCancelled.store(true);
 }
 
 void
-DataModelPrivate::endProgressBlock()
+SessionPrivate::endProgressBlock()
 {
     if (d.changeDepth == 0)
         return;
@@ -180,7 +193,7 @@ DataModelPrivate::endProgressBlock()
     bool cancelled = d.changeCancelled.load();
     d.changeCancelled.store(false);
 
-    Q_EMIT d.dataModel->progressBlockChanged(d.changeName, DataModel::ProgressMode::Idle);
+    Q_EMIT d.session->progressBlockChanged(d.changeName, Session::ProgressMode::Idle);
     d.changeName.clear();
 
     if (cancelled) {
@@ -203,24 +216,24 @@ DataModelPrivate::endProgressBlock()
     d.bboxCache.reset();
     d.bbox = boundingBox();
 
-    Q_EMIT d.dataModel->primsChanged(unique);
-    Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
+    Q_EMIT d.session->primsChanged(unique);
+    Q_EMIT d.session->boundingBoxChanged(d.bbox);
 }
 
 bool
-DataModelPrivate::isProgressBlockCancelled() const
+SessionPrivate::isProgressBlockCancelled() const
 {
     return d.changeCancelled.load();
 }
 
 bool
-DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy policy)
+SessionPrivate::loadFromFile(const QString& filename, Session::LoadPolicy policy)
 {
     {
         QWriteLocker locker(&d.stageLock);
         StageBlocker blocker(d.stageWatcher.data());
         {
-            if (policy == DataModel::LoadPolicy::All) {
+            if (policy == Session::LoadPolicy::All) {
                 d.stage = UsdStage::Open(QStringToString(filename), UsdStage::LoadAll);
             }
             else {
@@ -236,12 +249,12 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy po
         d.filename = filename;
     }
     else {
-        d.stageStatus = DataModel::StageStatus::Failed;
+        d.stageStatus = Session::StageStatus::Failed;
         d.bboxCache.reset();
         return false;
     }
     QMetaObject::invokeMethod(
-        d.dataModel,
+        d.session,
         [this]() {
             setMask(d.mask);
             updateStage();
@@ -251,7 +264,7 @@ DataModelPrivate::loadFromFile(const QString& filename, DataModel::LoadPolicy po
 }
 
 bool
-DataModelPrivate::saveToFile(const QString& filename)
+SessionPrivate::saveToFile(const QString& filename)
 {
     if (!isLoaded())
         return false;
@@ -276,7 +289,7 @@ DataModelPrivate::saveToFile(const QString& filename)
 }
 
 bool
-DataModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
+SessionPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
 {
     QReadLocker locker(&d.stageLock);
     UsdStagePopulationMask mask;
@@ -302,26 +315,26 @@ DataModelPrivate::exportPathsToFile(const QList<SdfPath>& paths, const QString& 
 }
 
 bool
-DataModelPrivate::close()
+SessionPrivate::close()
 {
     {
         QWriteLocker locker(&d.stageLock);
         StageBlocker blocker(d.stageWatcher.data());
         {
             d.stage = nullptr;
-            d.stageStatus = DataModel::StageStatus::Closed;
+            d.stageStatus = Session::StageStatus::Closed;
             d.bboxCache.reset();
             d.pendingPaths.clear();
             d.changeDepth = 0;
         }
     }
     QMetaObject::invokeMethod(
-        d.dataModel, [this]() { updateStage(); }, Qt::QueuedConnection);
+        d.session, [this]() { updateStage(); }, Qt::QueuedConnection);
     return true;
 }
 
 bool
-DataModelPrivate::reload()
+SessionPrivate::reload()
 {
     {
         QWriteLocker locker(&d.stageLock);
@@ -335,29 +348,29 @@ DataModelPrivate::reload()
     }
     d.bbox = boundingBox();
     QMetaObject::invokeMethod(
-        d.dataModel, [this]() { updateStage(); }, Qt::QueuedConnection);
+        d.session, [this]() { updateStage(); }, Qt::QueuedConnection);
 
     return true;
 }
 
 bool
-DataModelPrivate::isLoaded() const
+SessionPrivate::isLoaded() const
 {
     return d.stage != nullptr;
 }
 
 void
-DataModelPrivate::setMask(const QList<SdfPath>& paths)
+SessionPrivate::setMask(const QList<SdfPath>& paths)
 {
     {
         QWriteLocker locker(&d.stageLock);
         d.mask = paths;
     }
-    Q_EMIT d.dataModel->maskChanged(paths);
+    Q_EMIT d.session->maskChanged(paths);
 }
 
 GfBBox3d
-DataModelPrivate::boundingBox()
+SessionPrivate::boundingBox()
 {
     QReadLocker locker(&d.stageLock);
     if (d.mask.isEmpty()) {
@@ -374,14 +387,14 @@ DataModelPrivate::boundingBox()
 }
 
 void
-DataModelPrivate::updatePrims(const QList<SdfPath> paths)
+SessionPrivate::updatePrims(const QList<SdfPath> paths)
 {
     if (d.changeDepth > 0) {
         d.pendingPaths.append(paths);
         return;
     }
-    Q_EMIT d.dataModel->primsChanged(paths);
-    Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
+    Q_EMIT d.session->primsChanged(paths);
+    Q_EMIT d.session->boundingBoxChanged(d.bbox);
     if (!d.mask.isEmpty()) {
         QList<SdfPath> newMask;
         bool updated = false;
@@ -400,81 +413,83 @@ DataModelPrivate::updatePrims(const QList<SdfPath> paths)
                 QWriteLocker locker(&d.stageLock);
                 d.mask = newMask;
             }
-            Q_EMIT d.dataModel->maskChanged(newMask);
+            Q_EMIT d.session->maskChanged(newMask);
         }
     }
 }
 
 void
-DataModelPrivate::updateStage()
+SessionPrivate::updateStage()
 {
-    Q_EMIT d.dataModel->stageChanged(d.stage, d.loadPolicy, d.stageStatus);
-    Q_EMIT d.dataModel->boundingBoxChanged(d.bbox);
+    Q_EMIT d.session->stageChanged(d.stage, d.loadPolicy, d.stageStatus);
+    Q_EMIT d.session->boundingBoxChanged(d.bbox);
 }
 
-DataModel::DataModel()
-    : p(new DataModelPrivate())
+Session::Session()
+    : p(new SessionPrivate())
 {
-    p->d.dataModel = this;
+    p->d.session = this;
+    p->init();
 }
 
-DataModel::DataModel(const QString& filename, DataModel::LoadPolicy loadPolicy)
-    : p(new DataModelPrivate())
+Session::Session(const QString& filename, Session::LoadPolicy loadPolicy)
+    : p(new SessionPrivate())
 {
-    p->d.dataModel = this;
+    p->d.session = this;
+    p->init();
     loadFromFile(filename, loadPolicy);
 }
 
-DataModel::DataModel(const DataModel& other)
+Session::Session(const Session& other)
     : p(other.p)
 {}
 
-DataModel::~DataModel() = default;
+Session::~Session() = default;
 
 void
-DataModel::beginProgressBlock(const QString& name, size_t count)
+Session::beginProgressBlock(const QString& name, size_t count)
 {
     p->beginProgressBlock(name, count);
 }
 
 void
-DataModel::updateProgressNotify(const Notify& notify, size_t completed)
+Session::updateProgressNotify(const Notify& notify, size_t completed)
 {
     p->updateProgressNotify(notify, completed);
 }
 
 void
-DataModel::cancelProgressBlock()
+Session::cancelProgressBlock()
 {
     return p->cancelProgressBlock();
 }
 
 void
-DataModel::endProgressBlock()
+Session::endProgressBlock()
 {
     p->endProgressBlock();
 }
 
 bool
-DataModel::isProgressBlockCancelled() const
+Session::isProgressBlockCancelled() const
 {
     return p->isProgressBlockCancelled();
 }
 
 bool
-DataModel::loadFromFile(const QString& filename, DataModel::LoadPolicy loadPolicy)
+Session::loadFromFile(const QString& filename, Session::LoadPolicy loadPolicy)
 {
     return p->loadFromFile(filename, loadPolicy);
 }
 
 bool
-DataModel::saveToFile(const QString& filename)
+Session::saveToFile(const QString& filename)
 {
     return p->saveToFile(filename);
 }
 
 bool
-DataModel::exportToFile(const QString& filename)
+Session::exportToFile(const QString& filename)
 {
     QReadLocker locker(&p->d.stageLock);
     if (!p->d.stage)
@@ -483,76 +498,88 @@ DataModel::exportToFile(const QString& filename)
 }
 
 bool
-DataModel::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
+Session::exportPathsToFile(const QList<SdfPath>& paths, const QString& filename)
 {
     return p->exportPathsToFile(paths, filename);
 }
 
 bool
-DataModel::reload()
+Session::reload()
 {
     return p->reload();
 }
 
 bool
-DataModel::close()
+Session::close()
 {
     return p->close();
 }
 
 bool
-DataModel::isLoaded() const
+Session::isLoaded() const
 {
     return p->isLoaded();
 }
 
 QList<SdfPath>
-DataModel::mask() const
+Session::mask() const
 {
     return p->d.mask;
 }
 
 void
-DataModel::setMask(const QList<SdfPath>& paths)
+Session::setMask(const QList<SdfPath>& paths)
 {
     p->setMask(paths);
 }
 
 void
-DataModel::setStatus(const QString& status)
+Session::setStatus(const QString& status)
 {
     Q_EMIT statusChanged(status);
 }
 
 GfBBox3d
-DataModel::boundingBox()
+Session::boundingBox()
 {
     return p->boundingBox();
 }
 
-DataModel::LoadPolicy
-DataModel::loadPolicy() const
+Session::LoadPolicy
+Session::loadPolicy() const
 {
     return p->d.loadPolicy;
 }
 
 QString
-DataModel::filename() const
+Session::filename() const
 {
     return p->d.filename;
 }
 
 UsdStageRefPtr
-DataModel::stage() const
+Session::stage() const
 {
     Q_ASSERT("stage is not loaded" && isLoaded());
     return p->d.stage;
 }
 
 QReadWriteLock*
-DataModel::stageLock() const
+Session::stageLock() const
 {
     return &p->d.stageLock;
+}
+
+SelectionList*
+Session::selectionList() const
+{
+    return p->d.selectionList.data();
+}
+
+CommandStack*
+Session::commandStack() const
+{
+    return p->d.commandStack.data();
 }
 
 }  // namespace usdviewer

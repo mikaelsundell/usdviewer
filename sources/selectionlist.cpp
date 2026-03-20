@@ -2,38 +2,38 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-#include "selectionmodel.h"
+#include "selectionlist.h"
 #include "qtutils.h"
 #include <QList>
 
 namespace usdviewer {
-class SelectionModelPrivate {
+class SelectionListPrivate {
 public:
-    SelectionModelPrivate();
-    ~SelectionModelPrivate();
+    SelectionListPrivate();
+    ~SelectionListPrivate();
     struct Data {
         QList<SdfPath> paths;
     };
     Data d;
 };
 
-SelectionModelPrivate::SelectionModelPrivate() {}
+SelectionListPrivate::SelectionListPrivate() {}
 
-SelectionModelPrivate::~SelectionModelPrivate() {}
+SelectionListPrivate::~SelectionListPrivate() {}
 
-SelectionModel::SelectionModel(QObject* parent)
+SelectionList::SelectionList(QObject* parent)
     : QObject(parent)
-    , p(new SelectionModelPrivate())
+    , p(new SelectionListPrivate())
 {}
 
 bool
-SelectionModel::isSelected(const SdfPath& path) const
+SelectionList::isSelected(const SdfPath& path) const
 {
     return p->d.paths.contains(path);
 }
 
 void
-SelectionModel::addPaths(const QList<SdfPath>& paths)
+SelectionList::addPaths(const QList<SdfPath>& paths)
 {
     bool changed = false;
     for (const SdfPath& path : paths) {
@@ -47,7 +47,7 @@ SelectionModel::addPaths(const QList<SdfPath>& paths)
 }
 
 void
-SelectionModel::removePaths(const QList<SdfPath>& paths)
+SelectionList::removePaths(const QList<SdfPath>& paths)
 {
     bool changed = false;
     for (const SdfPath& path : paths) {
@@ -59,7 +59,7 @@ SelectionModel::removePaths(const QList<SdfPath>& paths)
 }
 
 void
-SelectionModel::togglePaths(const QList<SdfPath>& paths)
+SelectionList::togglePaths(const QList<SdfPath>& paths)
 {
     bool changed = false;
     for (const SdfPath& path : paths) {
@@ -77,7 +77,7 @@ SelectionModel::togglePaths(const QList<SdfPath>& paths)
 }
 
 void
-SelectionModel::updatePaths(const QList<SdfPath>& paths)
+SelectionList::updatePaths(const QList<SdfPath>& paths)
 {
     if (p->d.paths == paths)
         return;
@@ -86,13 +86,13 @@ SelectionModel::updatePaths(const QList<SdfPath>& paths)
 }
 
 QList<SdfPath>
-SelectionModel::paths() const
+SelectionList::paths() const
 {
     return p->d.paths;
 }
 
 void
-SelectionModel::clear()
+SelectionList::clear()
 {
     if (p->d.paths.size()) {
         p->d.paths.clear();
@@ -100,16 +100,16 @@ SelectionModel::clear()
     Q_EMIT selectionChanged(p->d.paths);
 }
 
-SelectionModel::~SelectionModel() = default;
+SelectionList::~SelectionList() = default;
 
 bool
-SelectionModel::isEmpty() const
+SelectionList::isEmpty() const
 {
     return p->d.paths.size();
 }
 
 bool
-SelectionModel::isValid() const
+SelectionList::isValid() const
 {
     return true;
 }

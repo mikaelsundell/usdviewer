@@ -14,10 +14,10 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usdviewer {
 
-class SelectionModelPrivate;
+class SelectionListPrivate;
 
 /**
- * @class SelectionModel
+ * @class SelectionList
  * @brief Maintains the current USD prim selection.
  *
  * Provides a centralized model for tracking selected prim paths
@@ -28,20 +28,19 @@ class SelectionModelPrivate;
  * This class is typically shared between viewer components such
  * as the stage tree, viewport, and property panels.
  */
-class SelectionModel : public QObject {
+class SelectionList : public QObject {
     Q_OBJECT
 public:
     /**
-     * @brief Constructs a SelectionModel.
+     * @brief Constructs a SelectionList.
      *
      * @param parent Optional parent object.
      */
-    SelectionModel(QObject* parent = nullptr);
-
+    SelectionList(QObject* parent = nullptr);
     /**
-     * @brief Destroys the SelectionModel instance.
+     * @brief Destroys the SelectionList instance.
      */
-    ~SelectionModel();
+    ~SelectionList();
 
     /** @name Selection Queries */
     ///@{
@@ -120,7 +119,7 @@ Q_SIGNALS:
     void selectionChanged(const QList<SdfPath>& paths);
 
 private:
-    QScopedPointer<SelectionModelPrivate> p;
+    QScopedPointer<SelectionListPrivate> p;
 };
 
 }  // namespace usdviewer

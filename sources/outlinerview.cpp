@@ -34,7 +34,7 @@ public Q_SLOTS:
     void filterChanged(const QString& filter);
     void primsChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
-    void stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status);
+    void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void depthChanged(int value);
 
 public:
@@ -75,9 +75,9 @@ OutlinerViewPrivate::init()
     connect(d.ui->follow, &QToolButton::toggled, this, &OutlinerViewPrivate::follow);
     connect(d.ui->depth, &QSlider::valueChanged, this, &OutlinerViewPrivate::depthChanged);
     // models
-    connect(dataModel(), &DataModel::stageChanged, this, &OutlinerViewPrivate::stageChanged);
-    connect(dataModel(), &DataModel::primsChanged, this, &OutlinerViewPrivate::primsChanged);
-    connect(selectionModel(), &SelectionModel::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
+    connect(session(), &Session::stageChanged, this, &OutlinerViewPrivate::stageChanged);
+    connect(session(), &Session::primsChanged, this, &OutlinerViewPrivate::primsChanged);
+    connect(session()->selectionList(), &SelectionList::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
 }
 
 PropertyTree*
@@ -131,7 +131,7 @@ OutlinerViewPrivate::clearDepth()
 void
 OutlinerViewPrivate::collapse()
 {
-    if (selectionModel()->paths().size()) {
+    if (session()->selectionList()->paths().size()) {
         d.ui->stageTree->collapse();
     }
 }
@@ -189,10 +189,10 @@ OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 }
 
 void
-OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy policy, DataModel::StageStatus status)
+OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
-    if (status == DataModel::StageStatus::Loaded) {
-        if (policy == DataModel::LoadPolicy::Payload) {
+    if (status == Session::StageStatus::Loaded) {
+        if (policy == Session::LoadPolicy::Payload) {
             stageTree()->setPayloadEnabled(true);
         }
         else {
@@ -220,7 +220,7 @@ OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, DataModel::LoadPolicy po
 void
 OutlinerViewPrivate::depthChanged(int value)
 {
-    QList<SdfPath> paths = selectionModel()->paths();
+    QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size() == 1) {
         stageTree()->expandDepth(value, paths.first());
     }

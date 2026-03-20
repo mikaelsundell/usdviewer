@@ -60,8 +60,8 @@ CommandStack::execute(Command* command)
     const bool prevCanUndo = canUndo();
     const bool prevCanRedo = canRedo();
     const bool prevCanClear = canClear();
-    
-    command->execute(dataModel(), selectionModel());
+
+    command->execute(session());
     p->push(command);
 
     Q_EMIT commandExecuted(command);
@@ -105,10 +105,8 @@ CommandStack::undo()
     const bool prevCanRedo = canRedo();
     const bool prevCanClear = canClear();
 
-    qDebug() << "CommandStack::undo";
-
     Command* cmd = p->d.stack[p->d.index];
-    cmd->undo(dataModel(), selectionModel());
+    cmd->undo(session());
     p->d.index--;
 
     Q_EMIT changed();
@@ -133,11 +131,9 @@ CommandStack::redo()
     const bool prevCanRedo = canRedo();
     const bool prevCanClear = canClear();
 
-    qDebug() << "CommandStack::redo";
-
     p->d.index++;
     Command* cmd = p->d.stack[p->d.index];
-    cmd->execute(dataModel(), selectionModel());
+    cmd->execute(session());
 
     Q_EMIT changed();
 
@@ -157,8 +153,6 @@ CommandStack::clear()
     const bool prevCanUndo = canUndo();
     const bool prevCanRedo = canRedo();
     const bool prevCanClear = canClear();
-
-    qDebug() << "CommandStack::clear";
 
     for (Command* cmd : p->d.stack)
         delete cmd;

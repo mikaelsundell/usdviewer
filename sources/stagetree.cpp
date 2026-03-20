@@ -8,7 +8,7 @@
 #include "commanddispatcher.h"
 #include "primitem.h"
 #include "qtutils.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
 #include "signalguard.h"
 #include "stageutils.h"
 #include "style.h"

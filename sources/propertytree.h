@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
 #include "treewidget.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>

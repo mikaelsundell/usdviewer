@@ -18,7 +18,7 @@ class TreeItemPrivate;
  * standardized roles used by delegates and views.
  *
  * It is intentionally domain-agnostic and should not depend
- * on USD or any specific data model.
+ * on USD or any specific session.
  *
  * Derived classes (e.g. PrimItem) provide actual data.
  */

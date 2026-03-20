@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
+#include "session.h"
 #include "viewcamera.h"
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
@@ -23,7 +23,7 @@ class ImagingGLWidgetPrivate;
  * USD ImagingGL renderer and supports interactive camera
  * navigation, draw modes, lighting options, and scene updates.
  *
- * The widget integrates with DataModel and SelectionModel
+ * The widget integrates with Session and SelectionList
  * to reflect scene data and selection changes.
  */
 class ImagingGLWidget : public QOpenGLWidget, protected QOpenGLFunctions {

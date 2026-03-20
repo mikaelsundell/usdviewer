@@ -5,8 +5,8 @@
 #pragma once
 
 #include "command.h"
-#include "datamodel.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
+#include "session.h"
 
 namespace usdviewer {
 
@@ -20,7 +20,7 @@ class CommandStackPrivate;
  * the scene or application state. Commands are stored in a history
  * allowing them to be undone or redone.
  *
- * The stack integrates with DataModel and SelectionModel so commands
+ * The stack integrates with Session and SelectionModel so commands
  * can interact with the currently loaded USD stage and selection.
  */
 class CommandStack : public QObject {

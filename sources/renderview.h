@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "datamodel.h"
-#include "selectionmodel.h"
+#include "selectionlist.h"
+#include "session.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -24,8 +24,8 @@ class RenderViewPrivate;
  * modes, and scene visualization options such as lighting, materials,
  * and statistics overlays.
  *
- * The view integrates with a DataModel for scene content and a
- * SelectionModel for prim selection synchronization.
+ * The view integrates with a Session for scene content and a
+ * SelectionList for prim selection synchronization.
  */
 class RenderView : public QWidget {
     Q_OBJECT

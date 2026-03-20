@@ -17,7 +17,6 @@ set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package (OpenUSD REQUIRED)
 find_package (Boost CONFIG COMPONENTS Python REQUIRED)
 find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
-find_package (Lcms2 REQUIRED)
 
 if (WIN32)
     find_package (OpenGL REQUIRED)

@@ -5,6 +5,7 @@
 #include "renderview.h"
 #include "application.h"
 #include "stageutils.h"
+#include "viewcontext.h"
 #include <QPointer>
 
 // generated files
@@ -23,13 +24,14 @@ public:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void maskChanged(const QList<SdfPath>& paths);
-    void primsChanged(const QList<SdfPath>& paths);
+    void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void renderReady(qint64 elapsed);
 
 public:
     struct Data {
+        QScopedPointer<ViewContext> context;
         QScopedPointer<Ui_RenderView> ui;
         QPointer<RenderView> view;
     };
@@ -41,6 +43,10 @@ RenderViewPrivate::init()
 {
     d.ui.reset(new Ui_RenderView());
     d.ui->setupUi(d.view.data());
+    d.context.reset(new ViewContext(d.view.data()));
+    d.context->setStageLock(session()->stageLock());
+    d.context->setCommandStack(session()->commandStack());
+    imageGLWidget()->setContext(d.context.data());
     // connect
     connect(imageGLWidget(), &ImagingGLWidget::renderReady, this, &RenderViewPrivate::renderReady);
     connect(session(), &Session::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
@@ -99,9 +105,9 @@ RenderViewPrivate::maskChanged(const QList<SdfPath>& paths)
 }
 
 void
-RenderViewPrivate::primsChanged(const QList<SdfPath>& paths)
+RenderViewPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
-    imageGLWidget()->updatePrims(paths);
+    imageGLWidget()->updatePrims(paths, invalidated);
 }
 
 void

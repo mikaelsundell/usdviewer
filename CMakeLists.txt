@@ -71,6 +71,7 @@ if (APPLE)
     set_target_properties (${project_name} PROPERTIES
         OUTPUT_NAME ${project_name}
     )
+    target_compile_definitions (${project_name}  PRIVATE GL_SILENCE_DEPRECATION)
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python

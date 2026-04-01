@@ -316,7 +316,7 @@
      <x>0</x>
      <y>0</y>
      <width>1576</width>
-     <height>24</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuDisplay">
@@ -362,6 +362,7 @@
      </property>
      <addaction name="actionClear"/>
     </widget>
+    <addaction name="fileNew"/>
     <addaction name="fileOpen"/>
     <addaction name="filePolicy"/>
     <addaction name="fileRecent"/>
@@ -424,6 +425,13 @@
      <addaction name="editUnloadSelected"/>
      <addaction name="editUnloadRecursive"/>
     </widget>
+    <widget class="QMenu" name="menu">
+     <property name="title">
+      <string>Stage up</string>
+     </property>
+     <addaction name="stageUpY"/>
+     <addaction name="stageUpZ"/>
+    </widget>
     <addaction name="editUndo"/>
     <addaction name="editRedo"/>
     <addaction name="separator"/>
@@ -433,6 +441,8 @@
     <addaction name="separator"/>
     <addaction name="editShow"/>
     <addaction name="editHide"/>
+    <addaction name="separator"/>
+    <addaction name="menu"/>
     <addaction name="separator"/>
     <addaction name="editLoad"/>
     <addaction name="editUnload"/>
@@ -465,7 +475,6 @@
     <addaction name="viewOutliner"/>
     <addaction name="viewProgress"/>
     <addaction name="viewPython"/>
-    <addaction name="viewConsole"/>
     <addaction name="separator"/>
    </widget>
    <addaction name="menuFile"/>
@@ -741,6 +750,9 @@
    <property name="text">
     <string>All</string>
    </property>
+   <property name="shortcut">
+    <string>Alt+A</string>
+   </property>
   </action>
   <action name="policyPayload">
    <property name="checkable">
@@ -751,6 +763,9 @@
    </property>
    <property name="text">
     <string>Payload</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+P</string>
    </property>
   </action>
   <action name="fileClose">
@@ -978,6 +993,9 @@
    </property>
   </action>
   <action name="viewPython">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>Python editor</string>
    </property>
@@ -1092,6 +1110,38 @@
    </property>
    <property name="text">
     <string>Clear history</string>
+   </property>
+  </action>
+  <action name="fileNew">
+   <property name="text">
+    <string>New</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="stageUpY">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Y</string>
+   </property>
+   <property name="shortcut">
+    <string>Y</string>
+   </property>
+  </action>
+  <action name="stageUpZ">
+   <property name="text">
+    <string>Z</string>
+   </property>
+   <property name="shortcut">
+    <string>Z</string>
+   </property>
+  </action>
+  <action name="fileExportFlatten">
+   <property name="text">
+    <string>Export flatten ...</string>
    </property>
   </action>
  </widget>

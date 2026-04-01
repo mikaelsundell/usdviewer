@@ -52,7 +52,7 @@ CommandStack::CommandStack(QObject* parent)
 CommandStack::~CommandStack() = default;
 
 void
-CommandStack::execute(Command* command)
+CommandStack::run(Command* command)
 {
     if (!command)
         return;

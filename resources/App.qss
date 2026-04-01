@@ -170,8 +170,7 @@ QProgressBar {
 QPlainTextEdit
 {
     font-family: "Menlo", "Consolas", "Courier New", monospace;
-    font-size: 12px;
-    caret-color: $color.text;
+    font-size: 10px;
     color: $color.text;
     background-color: $color.base;
     selection-background-color: $color.highlight;
@@ -179,6 +178,14 @@ QPlainTextEdit
     border: 1px solid $color.borderalt;
     outline: none;
     padding: 6px;
+}
+
+QPlainTextEdit:disabled
+{
+    color: $color.text.disabled;
+    background-color: $color.basealt;
+    selection-background-color: $color.basealt;
+    selection-color: $color.text.disabled;
 }
 
 QProgressBar::chunk {
@@ -311,6 +318,66 @@ QStatusBar {
     color: $color.text;
     background: $color.dock;
 }
+
+
+
+
+QTabWidget::pane
+{
+    background-color: $color.base;
+    border-left: 1px solid $color.borderalt;
+    border-right: 1px solid $color.borderalt;
+    border-bottom: 1px solid $color.borderalt;
+    border-top: 0px;
+    top: 0px;
+}
+
+QTabWidget::tab-bar
+{
+    alignment: left;
+}
+
+QTabBar
+{
+    background: transparent;
+}
+
+QTabBar::tab
+{
+    font-size: $font.size.medium;
+    color: $color.text;
+    background-color: $color.basealt;
+    border-top: 1px solid $color.borderalt;
+    border-left: 1px solid $color.borderalt;
+    border-right: 1px solid $color.borderalt;
+    border-bottom: 1px solid $color.borderalt;
+    padding: 4px 8px;
+    margin: 0px;
+    margin-right: -1px;
+    min-width: 80px;
+}
+
+QTabBar::tab:selected
+{
+    color: $color.text;
+    background-color: $color.base;
+    border-bottom-color: $color.base;
+}
+
+QTabBar::tab:!selected
+{
+    color: $color.text;
+    background-color: $color.basealt;
+}
+
+QTabBar::tab:hover:!selected
+{
+    background-color: $color.basealt;
+}
+
+
+
+
 
 QTextBrowser
 {

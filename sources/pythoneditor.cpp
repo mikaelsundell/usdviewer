@@ -65,13 +65,15 @@ public:
         };
         QVector<Rule> rules;
     };
+
     class PythonLineNumberArea : public QWidget {
     public:
         PythonLineNumberArea(PythonEditor* editor)
             : QWidget(editor)
             , m_editor(editor)
         {}
-        QSize sizeHint() const override { return QSize(/*m_editor->lineNumberAreaWidth()*/ 40, 0); }
+
+        QSize sizeHint() const override { return QSize(m_editor->lineNumberAreaWidth(), 0); }
 
     protected:
         void paintEvent(QPaintEvent* event) override { m_editor->lineNumberAreaPaintEvent(event); }
@@ -79,6 +81,7 @@ public:
     private:
         PythonEditor* m_editor;
     };
+
     struct Data {
         PythonEditor* widget = nullptr;
         QWidget* lineNumberArea = nullptr;
@@ -91,13 +94,16 @@ PythonEditorPrivate::init()
 {
     d.lineNumberArea = new PythonLineNumberArea(d.widget);
     d.highlighter = new PythonHighlighter(d.widget->document());
+
     updateLineNumberAreaWidth(0);
     highlightCurrentLine();
-    // connect
+
     QObject::connect(d.widget, &QPlainTextEdit::blockCountChanged, d.widget,
                      [this](int n) { updateLineNumberAreaWidth(n); });
+
     QObject::connect(d.widget, &QPlainTextEdit::updateRequest, d.widget,
                      [this](const QRect& r, int dy) { updateLineNumberArea(r, dy); });
+
     QObject::connect(d.widget, &QPlainTextEdit::cursorPositionChanged, d.widget, [this]() { highlightCurrentLine(); });
 }
 
@@ -110,7 +116,9 @@ PythonEditorPrivate::lineNumberAreaWidth() const
         max /= 10;
         ++digits;
     }
-    return 10 + d.widget->fontMetrics().horizontalAdvance('9') * digits;
+
+    const QFontMetrics fm(d.widget->font());
+    return 10 + fm.horizontalAdvance(QLatin1Char('9')) * digits;
 }
 
 void
@@ -166,7 +174,7 @@ void
 PythonEditor::resizeEvent(QResizeEvent* event)
 {
     QPlainTextEdit::resizeEvent(event);
-    QRect rect = contentsRect();
+    const QRect rect = contentsRect();
     p->d.lineNumberArea->setGeometry(QRect(rect.left(), rect.top(), p->lineNumberAreaWidth(), rect.height()));
 }
 
@@ -176,20 +184,24 @@ PythonEditor::lineNumberAreaPaintEvent(QPaintEvent* event)
     QPainter painter(p->d.lineNumberArea);
     painter.fillRect(event->rect(), QColor(30, 30, 30));
 
+    painter.setFont(font());
+    const QFontMetrics fm(font());
+
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
-    int top = blockBoundingGeometry(block).translated(contentOffset()).top();
-    int bottom = top + blockBoundingRect(block).height();
+    int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
+    int bottom = top + qRound(blockBoundingRect(block).height());
+
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
-            QString number = QString::number(blockNumber + 1);
-
+            const QString number = QString::number(blockNumber + 1);
             painter.setPen(QColor(150, 150, 150));
-            painter.drawText(0, top, p->d.lineNumberArea->width() - 4, fontMetrics().height(), Qt::AlignRight, number);
+            painter.drawText(0, top, p->d.lineNumberArea->width() - 4, fm.height(), Qt::AlignRight, number);
         }
+
         block = block.next();
         top = bottom;
-        bottom = top + blockBoundingRect(block).height();
+        bottom = top + qRound(blockBoundingRect(block).height());
         ++blockNumber;
     }
 }

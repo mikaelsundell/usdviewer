@@ -42,11 +42,11 @@ public:
     ///@{
 
     /**
-     * @brief Executes a command and adds it to the stack.
+     * @brief Run a command and adds it to the stack.
      *
      * @param command Command to execute.
      */
-    void execute(Command* command);
+    void run(Command* command);
 
     /**
      * @brief Returns whether undo is available.

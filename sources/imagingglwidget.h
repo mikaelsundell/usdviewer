@@ -13,6 +13,7 @@
 namespace usdviewer {
 
 class ImagingGLWidgetPrivate;
+class ViewContext;
 
 /**
  * @class ImagingGLWidget
@@ -51,6 +52,23 @@ public:
      * @brief Destroys the ImagingGLWidget instance.
      */
     virtual ~ImagingGLWidget();
+
+    /** @name Context */
+    ///@{
+
+    /**
+     * @brief Returns the current view context.
+     */
+    ViewContext* context() const;
+
+    /**
+     * @brief Sets the view context used by this widget.
+     *
+     * @param context View context for stage locking and command execution.
+     */
+    void setContext(ViewContext* context);
+
+    ///@}
 
     /** @name Camera */
     ///@{
@@ -242,8 +260,9 @@ public:
      * @brief Updates specific prims in the renderer.
      *
      * @param paths Prim paths to refresh.
+     * @param invalidated  Prim paths requiring structural refresh.
      */
-    void updatePrims(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
 
     /**
      * @brief Updates the current selection.

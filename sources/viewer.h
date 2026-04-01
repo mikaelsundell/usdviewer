@@ -52,6 +52,8 @@ public:
     ///@}
 
 protected:
+    void closeEvent(QCloseEvent* event) override;
+
     /** @name Drag and Drop */
     ///@{
 
@@ -76,6 +78,7 @@ protected:
     void dropEvent(QDropEvent* event) override;
 
     ///@}
+
 
 private:
     QScopedPointer<ViewerPrivate> p;

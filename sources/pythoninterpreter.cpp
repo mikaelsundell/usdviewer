@@ -2,6 +2,9 @@
 // Copyright (c) 2025 - present Mikael Sundell
 
 #include "pythoninterpreter.h"
+#include "application.h"
+#include "commandstack.h"
+#include "session.h"
 #include <QDebug>
 #include <QPointer>
 
@@ -14,10 +17,6 @@ PyInit_usdviewer_wrapper();
 
 namespace usdviewer {
 
-// ------------------------------------------------------------
-// Private
-// ------------------------------------------------------------
-
 class PythonInterpreterPrivate {
 public:
     PythonInterpreterPrivate();
@@ -26,7 +25,7 @@ public:
     void init();
     void release();
 
-    QString executeScript(const QString& script) const;
+    QString executeScript(const QString& script);
     QString pythonError() const;
 
 public:
@@ -43,10 +42,6 @@ PythonInterpreterPrivate::PythonInterpreterPrivate() {}
 
 PythonInterpreterPrivate::~PythonInterpreterPrivate() { release(); }
 
-// ------------------------------------------------------------
-// Init
-// ------------------------------------------------------------
-
 void
 PythonInterpreterPrivate::init()
 {
@@ -54,7 +49,7 @@ PythonInterpreterPrivate::init()
         return;
 
     qDebug() << "[Python] Initializing interpreter";
-    
+
     if (PyImport_AppendInittab("usdviewer", PyInit_usdviewer_wrapper) == -1) {
         qFatal("Failed to add usdviewer module");
     }
@@ -64,7 +59,7 @@ PythonInterpreterPrivate::init()
     // todo: this is temporary, will be replaced
     PyRun_SimpleString(R"(
 import sys
-sys.path.insert(0, "/Volumes/Build/pipeline/3rdparty/build/macosx/arm64.debug/lib/python")
+sys.path.insert(0, "/Volumes/Build/github/3rdparty/build/macosx/arm64.debug/lib/python")
 print("[Python] sys.path:", sys.path)
 )");
 
@@ -147,7 +142,7 @@ PythonInterpreterPrivate::release()
 }
 
 QString
-PythonInterpreterPrivate::executeScript(const QString& script) const
+PythonInterpreterPrivate::executeScript(const QString& script)
 {
     if (!d.initialized)
         return "Python not initialized";
@@ -157,8 +152,13 @@ PythonInterpreterPrivate::executeScript(const QString& script) const
     try {
         QByteArray scriptBytes = script.toUtf8();
         const char* code = scriptBytes.constData();
+
+        session()->setPrimsUpdate(Session::PrimsUpdate::Deferred);
+        session()->commandStack()->clear();
+
         PyObject* result = PyRun_String(code, Py_file_input, d.globals, d.locals);
 
+        session()->setPrimsUpdate(Session::PrimsUpdate::Immediate);
         if (result) {
             if (result != Py_None) {
                 PyObject* str = PyObject_Str(result);
@@ -173,9 +173,9 @@ PythonInterpreterPrivate::executeScript(const QString& script) const
             output = pythonError();
         }
     } catch (const std::exception& e) {
-        output = QString("[C++ Exception] ") + e.what();
+        output = QString("[c++ exception] ") + e.what();
     } catch (...) {
-        output = "[C++ Exception] Unknown error";
+        output = "[c++ exception] Unknown error";
     }
     PyGILState_Release(gil);
     return output;
@@ -247,7 +247,7 @@ PythonInterpreter::PythonInterpreter(QObject* parent)
 PythonInterpreter::~PythonInterpreter() = default;
 
 QString
-PythonInterpreter::executeScript(const QString& script) const
+PythonInterpreter::executeScript(const QString& script)
 {
     return p->executeScript(script);
 }

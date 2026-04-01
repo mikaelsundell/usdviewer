@@ -91,6 +91,7 @@ PySession_close(PySessionObject* self)
     Py_RETURN_NONE;
 }
 
+/*
 static PyObject*
 PySession_stage(PySessionObject*)
 {
@@ -139,6 +140,113 @@ PySession_stage(PySessionObject*)
     }
     return pyStage;
 }
+*/
+
+static PyObject*
+PySession_stage(PySessionObject*)
+{
+    Session* s = session();
+    if (!s) {
+        PyErr_SetString(PyExc_RuntimeError, "Session not available");
+        return nullptr;
+    }
+
+    UsdStageRefPtr stage = s->stage();
+    if (!stage)
+        Py_RETURN_NONE;
+
+    const std::string rootIdentifier = stage->GetRootLayer()->GetIdentifier();
+    const std::string sessionIdentifier = stage->GetSessionLayer()->GetIdentifier();
+
+    PyObject* sdfModule = PyImport_ImportModule("pxr.Sdf");
+    if (!sdfModule) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to import pxr.Sdf");
+        return nullptr;
+    }
+
+    PyObject* layerClass = PyObject_GetAttrString(sdfModule, "Layer");
+    Py_DECREF(sdfModule);
+    if (!layerClass) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to access Sdf.Layer");
+        return nullptr;
+    }
+
+    PyObject* findFn = PyObject_GetAttrString(layerClass, "Find");
+    if (!findFn || !PyCallable_Check(findFn)) {
+        PyErr_SetString(PyExc_RuntimeError, "Sdf.Layer.Find not callable");
+        Py_XDECREF(findFn);
+        Py_DECREF(layerClass);
+        return nullptr;
+    }
+
+    PyObject* rootArg = PyUnicode_FromString(rootIdentifier.c_str());
+    PyObject* sessionArg = PyUnicode_FromString(sessionIdentifier.c_str());
+    if (!rootArg || !sessionArg) {
+        Py_XDECREF(rootArg);
+        Py_XDECREF(sessionArg);
+        Py_DECREF(findFn);
+        Py_DECREF(layerClass);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create Python strings for layer identifiers");
+        return nullptr;
+    }
+
+    PyObject* pyRootLayer = PyObject_CallFunctionObjArgs(findFn, rootArg, nullptr);
+    PyObject* pySessionLayer = PyObject_CallFunctionObjArgs(findFn, sessionArg, nullptr);
+
+    Py_DECREF(rootArg);
+    Py_DECREF(sessionArg);
+    Py_DECREF(findFn);
+    Py_DECREF(layerClass);
+
+    if (!pyRootLayer || !pySessionLayer) {
+        Py_XDECREF(pyRootLayer);
+        Py_XDECREF(pySessionLayer);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to resolve root or session layer in Python");
+        return nullptr;
+    }
+
+    PyObject* usdModule = PyImport_ImportModule("pxr.Usd");
+    if (!usdModule) {
+        Py_DECREF(pyRootLayer);
+        Py_DECREF(pySessionLayer);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to import pxr.Usd");
+        return nullptr;
+    }
+
+    PyObject* stageClass = PyObject_GetAttrString(usdModule, "Stage");
+    Py_DECREF(usdModule);
+    if (!stageClass) {
+        Py_DECREF(pyRootLayer);
+        Py_DECREF(pySessionLayer);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to access Usd.Stage");
+        return nullptr;
+    }
+
+    PyObject* openFn = PyObject_GetAttrString(stageClass, "Open");
+    Py_DECREF(stageClass);
+    if (!openFn || !PyCallable_Check(openFn)) {
+        Py_XDECREF(openFn);
+        Py_DECREF(pyRootLayer);
+        Py_DECREF(pySessionLayer);
+        PyErr_SetString(PyExc_RuntimeError, "Usd.Stage.Open not callable");
+        return nullptr;
+    }
+
+    PyObject* pyStage = PyObject_CallFunctionObjArgs(openFn, pyRootLayer, pySessionLayer, nullptr);
+
+    Py_DECREF(openFn);
+    Py_DECREF(pyRootLayer);
+    Py_DECREF(pySessionLayer);
+
+    if (!pyStage) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to open stage in Python with root and session layer");
+        return nullptr;
+    }
+
+    return pyStage;
+}
+
+
 
 static PyObject*
 PySession_selection(PySessionObject* self)

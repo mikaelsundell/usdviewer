@@ -7,6 +7,7 @@
 #include "qtutils.h"
 #include "selectionlist.h"
 #include "signalguard.h"
+#include "viewcontext.h"
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -35,7 +36,7 @@ public:
     void init();
     void close();
     void updateStage(UsdStageRefPtr stage);
-    void updatePrims(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
     void updateSelection(const QList<SdfPath>& paths);
 
 public:
@@ -43,6 +44,7 @@ public:
     struct Data {
         UsdStageRefPtr stage;
         SdfPath path;
+        QPointer<ViewContext> context;
         QPointer<PropertyTree> tree;
     };
     Data d;
@@ -59,6 +61,7 @@ PropertyTreePrivate::close()
 {
     d.stage = nullptr;
     d.path = SdfPath();
+    d.context = nullptr;
     d.tree->clear();
 }
 
@@ -90,11 +93,18 @@ PropertyTreePrivate::updateStage(UsdStageRefPtr stage)
 }
 
 void
-PropertyTreePrivate::updatePrims(const QList<SdfPath>& paths)
+PropertyTreePrivate::updatePrims(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated)
 {
     SignalGuard::Scope guard(this);
-    if (paths.contains(d.path)) {
+    if (changed.contains(d.path)) {
         updateSelection({ d.path });
+        return;
+    }
+    for (const SdfPath& p : invalidated) {
+        if (d.path.HasPrefix(p)) {
+            updateSelection({ d.path });
+            return;
+        }
     }
 }
 
@@ -137,7 +147,9 @@ PropertyTreePrivate::updateSelection(const QList<SdfPath>& paths)
         d.path = path;
     }
     else {
-        updateStage(d.stage);
+        if (d.stage) {
+            updateStage(d.stage);
+        }
     }
 }
 
@@ -171,6 +183,20 @@ PropertyTree::PropertyTree(QWidget* parent)
 
 PropertyTree::~PropertyTree() = default;
 
+ViewContext*
+PropertyTree::context() const
+{
+    return p->d.context;
+}
+
+void
+PropertyTree::setContext(ViewContext* context)
+{
+    if (p->d.context != context) {
+        p->d.context = context;
+    }
+}
+
 void
 PropertyTree::close()
 {
@@ -184,9 +210,9 @@ PropertyTree::updateStage(UsdStageRefPtr stage)
 }
 
 void
-PropertyTree::updatePrims(const QList<SdfPath>& paths)
+PropertyTree::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
-    p->updatePrims(paths);
+    p->updatePrims(paths, invalidated);
 }
 
 void

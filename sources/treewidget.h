@@ -35,6 +35,13 @@ public:
     virtual ~TreeWidget();
 
 protected:
+    void mousePressEvent(QMouseEvent* event) override;
+
+    void mouseReleaseEvent(QMouseEvent* event) override;
+
+    QItemSelectionModel::SelectionFlags selectionCommand(const QModelIndex& index,
+                                                         const QEvent* event = nullptr) const override;
+
     /**
      * @brief Handles mouse interaction for branch expand/collapse.
      *

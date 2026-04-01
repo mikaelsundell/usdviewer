@@ -4,7 +4,6 @@
 
 #include "viewer.h"
 #include "application.h"
-#include "commanddispatcher.h"
 #include "commandstack.h"
 #include "mouseevent.h"
 #include "os.h"
@@ -26,6 +25,7 @@
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QImageWriter>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QObject>
 #include <QPointer>
@@ -44,7 +44,7 @@ public:
     void init();
     void initRecentFiles();
     void initSettings();
-    bool loadFile(const QString& filename);
+    bool loadFile(const QString& fileName);
     DockWidget* outlinerDock();
     DockWidget* progressDock();
     OutlinerView* outlinerView();
@@ -55,6 +55,7 @@ public:
     void enable(bool enable);
 
 public Q_SLOTS:
+    void newFile();
     void open();
     void save();
     void saveAs();
@@ -75,6 +76,8 @@ public Q_SLOTS:
     void showRecursive();
     void hideSelected();
     void hideRecursive();
+    void stageUpY();
+    void stageUpZ();
     void loadSelected();
     void loadRecursive();
     void loadVariant(int variant);
@@ -102,16 +105,26 @@ public Q_SLOTS:
 
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
-    void selectionChanged(const QList<SdfPath>& paths) const;
+    void selectionChanged(const QList<SdfPath>& paths);
+    void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
+    void stageUpChanged(Session::StageUp stageUp);
     void statusChanged(const QString& status);
 
 public:
+    void updateModified(bool modified);
     void updateRecentFiles(const QString& filename);
     void updateStatus(const QString& message, bool error = false);
+    void updateWindowTitle();
+    bool saveFile();
+    bool saveChanges();
+    void clearChanges();
+    bool hasChanges() const;
     struct Data {
         Session::LoadPolicy loadPolicy;
-        bool stageInit;
+        bool init;
+        bool modified;
+        int changes;
         QStringList arguments;
         QStringList extensions;
         QStringList recentFiles;
@@ -129,7 +142,9 @@ public:
 ViewerPrivate::ViewerPrivate()
 {
     d.loadPolicy = Session::LoadPolicy::All;
-    d.stageInit = false;
+    d.init = false;
+    d.modified = false;
+    d.changes = 0;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
 }
 
@@ -168,7 +183,7 @@ ViewerPrivate::init()
         settings()->setValue("loadType", "all");
     });
     connect(d.ui->policyPayload, &QAction::triggered, this, [this]() {
-        d.loadPolicy = Session::LoadPolicy::Payload;
+        d.loadPolicy = Session::LoadPolicy::None;
         settings()->setValue("loadType", "payload");
     });
     {
@@ -179,6 +194,8 @@ ViewerPrivate::init()
             actions->addAction(d.ui->policyPayload);
         }
     }
+    connect(d.ui->fileNew, &QAction::triggered, this, &ViewerPrivate::newFile);
+    connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->fileSave, &QAction::triggered, this, &ViewerPrivate::save);
     connect(d.ui->fileSaveAs, &QAction::triggered, this, &ViewerPrivate::saveAs);
     connect(d.ui->fileSaveCopy, &QAction::triggered, this, &ViewerPrivate::saveCopy);
@@ -197,6 +214,14 @@ ViewerPrivate::init()
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
     connect(d.ui->editHideRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
+    {
+        QActionGroup* actions = new QActionGroup(this);
+        actions->setExclusive(true);
+        {
+            actions->addAction(d.ui->stageUpY);
+            actions->addAction(d.ui->stageUpZ);
+        }
+    }
     connect(d.ui->editLoadSelected, &QAction::triggered, this, &ViewerPrivate::loadSelected);
     connect(d.ui->editLoadRecursive, &QAction::triggered, this, &ViewerPrivate::loadRecursive);
     connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
@@ -209,8 +234,8 @@ ViewerPrivate::init()
     connect(d.ui->editLoadVariant7, &QAction::triggered, this, [=]() { loadVariant(7); });
     connect(d.ui->editLoadVariant8, &QAction::triggered, this, [=]() { loadVariant(8); });
     connect(d.ui->editLoadVariant9, &QAction::triggered, this, [=]() { loadVariant(9); });
-    connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
-    connect(d.ui->editUnloadRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
+    connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::unloadSelected);
+    connect(d.ui->editUnloadRecursive, &QAction::triggered, this, &ViewerPrivate::unloadRecursive);
     connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
     connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
@@ -254,7 +279,9 @@ ViewerPrivate::init()
     }
     // models
     connect(session(), &Session::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
+    connect(session(), &Session::primsChanged, this, &ViewerPrivate::primsChanged);
     connect(session(), &Session::stageChanged, this, &ViewerPrivate::stageChanged);
+    connect(session(), &Session::stageUpChanged, this, &ViewerPrivate::stageUpChanged);
     connect(session(), &Session::statusChanged, this, &ViewerPrivate::statusChanged);
     connect(session()->selectionList(), &SelectionList::selectionChanged, this, &ViewerPrivate::selectionChanged);
     // command stack
@@ -271,18 +298,22 @@ ViewerPrivate::init()
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
+    connect(d.ui->pythonDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewPython->setChecked(visible); });
     // docks
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
+    connect(d.ui->pythonDock, &QDockWidget::visibilityChanged, this,
+            [=](bool visible) { d.ui->viewPython->setChecked(visible); });
     connect(d.ui->viewOutliner, &QAction::toggled, this, &ViewerPrivate::toggleOutliner);
     connect(d.ui->viewProgress, &QAction::toggled, this, &ViewerPrivate::toggleProgress);
     connect(d.ui->viewPython, &QAction::toggled, this, &ViewerPrivate::togglePython);
     // setup
-    progressDock()->hide();
     renderView()->setFocus();
     initSettings();
+    newFile();
     enable(false);
 }
 
@@ -306,7 +337,11 @@ ViewerPrivate::initRecentFiles()
         QAction* action = new QAction(fileName, recentMenu);
         action->setToolTip(file);
         action->setData(file);
-        connect(action, &QAction::triggered, this, [this, file]() { loadFile(file); });
+        connect(action, &QAction::triggered, this, [this, file]() {
+            if (!saveChanges())
+                return;
+            loadFile(file);
+        });
         recentMenu->addAction(action);
     }
     recentMenu->addSeparator();
@@ -328,7 +363,7 @@ ViewerPrivate::initSettings()
         d.ui->policyAll->setChecked(true);
     }
     else {
-        d.loadPolicy = Session::LoadPolicy::Payload;
+        d.loadPolicy = Session::LoadPolicy::None;
         d.ui->policyPayload->setChecked(true);
     }
 
@@ -358,32 +393,31 @@ ViewerPrivate::initSettings()
 }
 
 bool
-ViewerPrivate::loadFile(const QString& filename)
+ViewerPrivate::loadFile(const QString& fileName)
 {
-    QFileInfo fileInfo(filename);
+    QFileInfo fileInfo(fileName);
     if (!d.extensions.contains(fileInfo.suffix().toLower())) {
-        updateStatus(QString("unsupported file format: %1").arg(fileInfo.suffix()), true);
+        updateStatus(QString("Unsupported file format: %1").arg(fileInfo.suffix()), true);
         return false;
     }
+
     QElapsedTimer timer;
     timer.start();
 
-    session()->loadFromFile(filename, d.loadPolicy);
-    if (session()->isLoaded()) {
-        qint64 elapsedMs = timer.elapsed();
-        double elapsedSec = elapsedMs / 1000.0;
-
-        QString shortName = fileInfo.fileName();
-        d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(shortName));
-        settings()->setValue("openDir", fileInfo.absolutePath());
-        updateRecentFiles(filename);
-        updateStatus(QString("Loaded %1 in %2 seconds").arg(shortName).arg(QString::number(elapsedSec, 'f', 2)), false);
-        return true;
-    }
-    else {
-        updateStatus(QString("Failed to load file: %1").arg(fileInfo.fileName()), true);
+    if (!session()->loadFromFile(fileName, d.loadPolicy)) {
+        updateStatus(QString("Failed to load file: %1").arg(fileName), true);
         return false;
     }
+
+    const qint64 elapsedMs = timer.elapsed();
+    const double elapsedSec = elapsedMs / 1000.0;
+
+    settings()->setValue("openDir", fileInfo.absolutePath());
+    updateWindowTitle();
+    updateRecentFiles(QFileInfo(fileName).absoluteFilePath());
+    updateStatus(QString("Loaded %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)), false);
+    clearChanges();
+    return true;
 }
 
 DockWidget*
@@ -433,6 +467,8 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
                     d.ui->outlinerDock->show();
                 if (d.ui->viewProgress->isChecked() && !d.ui->progressDock->isVisible())
                     d.ui->progressDock->show();
+                if (d.ui->viewPython->isChecked() && !d.ui->pythonDock->isVisible())
+                    d.ui->progressDock->show();
             });
         }
     }
@@ -442,12 +478,14 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 void
 ViewerPrivate::enable(bool enable)
 {
-    QList<QAction*> actions = { d.ui->fileReload,           d.ui->fileClose,        d.ui->fileSave,
-                                d.ui->fileSaveAs,           d.ui->fileSaveCopy,     d.ui->fileExportAll,
-                                d.ui->fileExportSelected,   d.ui->fileExportImage,  d.ui->editCopyImage,
-                                d.ui->editDeleteSelected,   d.ui->displayIsolate,   d.ui->displayFrameAll,
-                                d.ui->displayFrameSelected, d.ui->displayResetView, d.ui->displayExpand,
-                                d.ui->displayCollapse,      d.ui->renderShaded,     d.ui->renderWireframe };
+    QList<QAction*> actions
+        = { d.ui->fileReload,           d.ui->fileClose,           d.ui->fileSave,           d.ui->fileSaveAs,
+            d.ui->fileSaveCopy,         d.ui->fileExportAll,       d.ui->fileExportSelected, d.ui->fileExportImage,
+            d.ui->editCopyImage,        d.ui->editDeleteSelected,  d.ui->editShowSelected,   d.ui->editShowRecursive,
+            d.ui->editHideSelected,     d.ui->editHideRecursive,   d.ui->editLoadRecursive,  d.ui->editLoadRecursive,
+            d.ui->editUnloadSelected,   d.ui->editUnloadRecursive, d.ui->displayIsolate,     d.ui->displayFrameAll,
+            d.ui->displayFrameSelected, d.ui->displayResetView,    d.ui->displayExpand,      d.ui->displayCollapse,
+            d.ui->renderShaded,         d.ui->renderWireframe,     d.ui->stageUpY,           d.ui->stageUpZ };
     for (QAction* action : actions) {
         if (action)
             action->setEnabled(enable);
@@ -458,8 +496,29 @@ ViewerPrivate::enable(bool enable)
 }
 
 void
+ViewerPrivate::newFile()
+{
+    if (!saveChanges())
+        return;
+
+    session()->commandStack()->clear();
+    if (!session()->newStage(d.loadPolicy)) {
+        updateStatus("Failed to create new stage", true);
+        return;
+    }
+
+    d.init = false;
+    updateWindowTitle();
+    clearChanges();
+    enable(true);
+}
+
+void
 ViewerPrivate::open()
 {
+    if (!saveChanges())
+        return;
+
     QString openDir = settings()->value("openDir", QDir::homePath()).toString();
     QStringList filters;
     for (const QString& ext : d.extensions) {
@@ -475,14 +534,7 @@ ViewerPrivate::open()
 void
 ViewerPrivate::save()
 {
-    QString filename = session()->filename();
-    if (filename.isEmpty()) {
-        saveAs();
-        return;
-    }
-    if (session()->saveToFile(filename)) {
-        d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-    }
+    saveFile();
 }
 
 void
@@ -498,24 +550,32 @@ ViewerPrivate::saveAs()
         saveDir = info.absolutePath();
     }
     else {
-        defaultName = "untitled.usd";
+        defaultName = "Untitled.usd";
     }
 
     QStringList filters;
     for (const QString& ext : d.extensions)
         filters.append("*." + ext);
 
-    QString filter = QString("USD files (%1)").arg(filters.join(' '));
-    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Save USD file as",
+    const QString filter = QString("USD Files (%1)").arg(filters.join(' '));
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Save USD File As",
                                                     QDir(saveDir).filePath(defaultName), filter);
 
     if (filename.isEmpty())
         return;
 
+    if (QFileInfo(filename).suffix().isEmpty())
+        filename += ".usd";
+
     if (session()->saveToFile(filename)) {
         settings()->setValue("saveDir", QFileInfo(filename).absolutePath());
-        d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME).arg(filename));
-        updateRecentFiles(filename);
+        updateWindowTitle();
+        updateRecentFiles(QFileInfo(filename).absoluteFilePath());
+        clearChanges();
+        updateStatus(QString("Saved %1").arg(filename), false);
+    }
+    else {
+        updateStatus(QString("Failed to save file: %1").arg(filename), true);
     }
 }
 
@@ -532,41 +592,61 @@ ViewerPrivate::saveCopy()
         copyDir = info.absolutePath();
     }
     else {
-        defaultName = "untitled.usd";
+        defaultName = "Untitled.usd";
     }
 
     QStringList filters;
     for (const QString& ext : d.extensions)
         filters.append("*." + ext);
 
-    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
-    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Save copy of USD file",
+    const QString filter = QString("USD Files (%1)").arg(filters.join(' '));
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Save Copy of USD File",
                                                     QDir(copyDir).filePath(defaultName), filter);
 
     if (filename.isEmpty())
         return;
 
-    if (session()->exportToFile(filename)) {
+    if (QFileInfo(filename).suffix().isEmpty())
+        filename += ".usd";
+
+    if (session()->copyToFile(filename)) {
         settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
+        updateStatus(QString("Saved copy %1").arg(filename), false);
+    }
+    else {
+        updateStatus(QString("Failed to save copy: %1").arg(filename), true);
     }
 }
 
 void
 ViewerPrivate::reload()
 {
-    if (session()->isLoaded()) {
-        session()->commandStack()->clear();
-        session()->reload();
+    if (!session()->isLoaded())
+        return;
+    if (!saveChanges())
+        return;
+
+    if (!session()->reload()) {
+        updateStatus("Failed to reload stage", true);
+        return;
     }
+
+    session()->commandStack()->clear();
+    clearChanges();
+    updateStatus("Reloaded stage", false);
 }
 
 void
 ViewerPrivate::close()
 {
     if (session()->isLoaded()) {
+        if (!saveChanges())
+            return;
         session()->commandStack()->clear();
         session()->close();
-        d.viewer->setWindowTitle(QString("%1").arg(PROJECT_NAME));
+        d.init = false;
+        updateWindowTitle();
+        clearChanges();
         enable(false);
     }
 }
@@ -612,44 +692,91 @@ ViewerPrivate::backgroundColor()
 void
 ViewerPrivate::exportAll()
 {
-    QString exportDir = settings()->value("exportDir", QDir::homePath()).toString();
-    QString defaultFormat = "usd";
-    QString exportName = exportDir + "/all." + defaultFormat;
-    QStringList filters;
-    for (const QString& ext : d.extensions) {
-        filters.append("*." + ext);
+    QString exportDir = settings()->value("exportAllDir", QDir::homePath()).toString();
+    QString currentFile = session()->filename();
+    QString defaultName;
+
+    if (!currentFile.isEmpty()) {
+        QFileInfo info(currentFile);
+        defaultName = QString("%1 (Export all).%2").arg(info.completeBaseName(), info.suffix());
+        exportDir = info.absolutePath();
     }
-    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
-    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export all ...", exportName, filter);
-    if (!filename.isEmpty()) {
-        if (session()->exportToFile(filename)) {
-            settings()->setValue("exportDir", QFileInfo(filename).absolutePath());
-        }
-        else {
-            qWarning() << "Failed to export stage to:" << filename;
-        }
+    else {
+        defaultName = "Untitled.usd";
+    }
+
+    QStringList filters;
+    for (const QString& ext : d.extensions)
+        filters.append("*." + ext);
+
+    const QString filter = QString("USD Files (%1)").arg(filters.join(' '));
+    QString fileName = QFileDialog::getSaveFileName(d.viewer.data(), "Export All",
+                                                    QDir(exportDir).filePath(defaultName), filter);
+
+    if (fileName.isEmpty())
+        return;
+
+    if (QFileInfo(fileName).suffix().isEmpty())
+        fileName += ".usd";
+
+    QElapsedTimer timer;
+    timer.start();
+
+    if (session()->flattenToFile(fileName)) {
+        const qint64 elapsedMs = timer.elapsed();
+        const double elapsedSec = elapsedMs / 1000.0;
+        settings()->setValue("exportAllDir", QFileInfo(fileName).absolutePath());
+        updateStatus(QString("Exported all to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)),
+                     false);
+    }
+    else {
+        updateStatus(QString("Failed to export all: %1").arg(fileName), true);
     }
 }
 
 void
 ViewerPrivate::exportSelected()
 {
-    QString exportSelectedDir = settings()->value("exportSelectedDir", QDir::homePath()).toString();
-    QString defaultFormat = "usd";
-    QString exportName = exportSelectedDir + "/selected." + defaultFormat;
-    QStringList filters;
-    for (const QString& ext : d.extensions) {
-        filters.append("*." + ext);
+    QString exportDir = settings()->value("exportSelectedDir", QDir::homePath()).toString();
+    QString currentFile = session()->filename();
+    QString defaultName;
+
+    if (!currentFile.isEmpty()) {
+        QFileInfo info(currentFile);
+        defaultName = QString("%1 (Export selected).%2").arg(info.completeBaseName(), info.suffix());
+        exportDir = info.absolutePath();
     }
-    QString filter = QString("USD Files (%1)").arg(filters.join(' '));
-    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export selected ...", exportName, filter);
-    if (!filename.isEmpty()) {
-        if (session()->exportPathsToFile(session()->selectionList()->paths(), filename)) {
-            settings()->value("exportSelectedDir", QFileInfo(filename).absolutePath());
-        }
-        else {
-            qWarning() << "Failed to export stage to:" << filename;
-        }
+    else {
+        defaultName = "Untitled.usd";
+    }
+
+    QStringList filters;
+    for (const QString& ext : d.extensions)
+        filters.append("*." + ext);
+
+    const QString filter = QString("USD Files (%1)").arg(filters.join(' '));
+    QString fileName = QFileDialog::getSaveFileName(d.viewer.data(), "Export Selected",
+                                                    QDir(exportDir).filePath(defaultName), filter);
+
+    if (fileName.isEmpty())
+        return;
+
+    if (QFileInfo(fileName).suffix().isEmpty())
+        fileName += ".usd";
+
+    QElapsedTimer timer;
+    timer.start();
+
+    if (session()->flattenPathsToFile(session()->selectionList()->paths(), fileName)) {
+        const qint64 elapsedMs = timer.elapsed();
+        const double elapsedSec = elapsedMs / 1000.0;
+        settings()->setValue("exportSelectedDir", QFileInfo(fileName).absolutePath());
+        updateStatus(
+            QString("Exported selected to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)),
+            false);
+    }
+    else {
+        updateStatus(QString("Failed to export selected: %1").arg(fileName), true);
     }
 }
 
@@ -712,7 +839,7 @@ ViewerPrivate::showSelected()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(showPaths(paths, false)));
+        session()->commandStack()->run(new Command(showPaths(paths, false)));
     }
 }
 
@@ -721,7 +848,7 @@ ViewerPrivate::showRecursive()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(showPaths(paths, true)));
+        session()->commandStack()->run(new Command(showPaths(paths, true)));
     }
 }
 
@@ -730,7 +857,7 @@ ViewerPrivate::hideSelected()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(hidePaths(paths, false)));
+        session()->commandStack()->run(new Command(hidePaths(paths, false)));
     }
 }
 
@@ -739,8 +866,20 @@ ViewerPrivate::hideRecursive()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
     if (paths.size()) {
-        CommandDispatcher::run(new Command(hidePaths(paths, true)));
+        session()->commandStack()->run(new Command(hidePaths(paths, true)));
     }
+}
+
+void
+ViewerPrivate::stageUpY()
+{
+    session()->commandStack()->run(new Command(stageUp(Session::StageUp::Y)));
+}
+
+void
+ViewerPrivate::stageUpZ()
+{
+    session()->commandStack()->run(new Command(stageUp(Session::StageUp::Z)));
 }
 
 void
@@ -778,7 +917,7 @@ ViewerPrivate::unloadRecursive()
 void
 ViewerPrivate::deleteSelected()
 {
-    CommandDispatcher::run(new Command(deletePaths(session()->selectionList()->paths())));
+    session()->commandStack()->run(new Command(deletePaths(session()->selectionList()->paths())));
 }
 
 void
@@ -787,7 +926,7 @@ ViewerPrivate::isolate(bool checked)
     const QList<SdfPath> paths = (checked && !session()->selectionList()->paths().isEmpty())
                                      ? session()->selectionList()->paths()
                                      : QList<SdfPath>();
-    CommandDispatcher::run(new Command(isolatePaths(paths)));
+    session()->commandStack()->run(new Command(isolatePaths(paths)));
 }
 
 void
@@ -936,14 +1075,14 @@ ViewerPrivate::openGithubIssues()
 void
 ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
 {
-    if (!d.stageInit && !bbox.GetRange().IsEmpty()) {
+    if (!d.init && !bbox.GetRange().IsEmpty()) {
         frameAll();
-        d.stageInit = true;
+        d.init = true;
     }
 }
 
 void
-ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
+ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
     if (paths.size()) {
         d.ui->displayExpand->setEnabled(true);
@@ -981,7 +1120,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
                     QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
                         QList<SdfPath> payloadPaths = stage::payloadPaths(session()->stage(), stage::rootPaths(paths));
 
-                        CommandDispatcher::run(new Command(loadPayloads(payloadPaths, setName, value)));
+                        session()->commandStack()->run(new Command(loadPayloads(payloadPaths, setName, value)));
                     });
                     index++;
                 }
@@ -991,18 +1130,44 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths) const
 }
 
 void
+ViewerPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+{
+    if (paths.isEmpty() && invalidated.isEmpty())
+        return;
+    ++d.changes;
+    updateModified(true);
+}
+
+void
 ViewerPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
-    d.stageInit = false;
+    d.init = false;
     if (status == Session::StageStatus::Loaded) {
         enable(true);
     }
 }
 
 void
+ViewerPrivate::stageUpChanged(Session::StageUp stageUp)
+{
+    d.ui->stageUpY->setChecked(stageUp == Session::StageUp::Y);
+    d.ui->stageUpZ->setChecked(stageUp == Session::StageUp::Z);
+}
+
+void
 ViewerPrivate::statusChanged(const QString& status)
 {
     updateStatus(status);
+}
+
+void
+ViewerPrivate::updateModified(bool modified)
+{
+    if (d.modified == modified)
+        return;
+
+    d.modified = modified;
+    updateWindowTitle();
 }
 
 void
@@ -1025,6 +1190,72 @@ ViewerPrivate::updateStatus(const QString& message, bool error)
     int timeoutMs = 6000;
     bar->showMessage(text, timeoutMs);
     QTimer::singleShot(timeoutMs, bar, [bar]() { bar->showMessage(" Ready."); });
+}
+
+void
+ViewerPrivate::updateWindowTitle()
+{
+    if (!session()->isLoaded()) {
+        d.viewer->setWindowTitle(PROJECT_NAME);
+        return;
+    }
+    QString name = session()->filename().isEmpty() ? "Untitled" : QFileInfo(session()->filename()).fileName();
+    if (d.modified)
+        name.prepend("*");
+    d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME, name));
+}
+
+bool
+ViewerPrivate::saveFile()
+{
+    const QString filename = session()->filename();
+    if (filename.isEmpty()) {
+        saveAs();
+        return !hasChanges();
+    }
+
+    if (session()->saveToFile(filename)) {
+        updateWindowTitle();
+        clearChanges();
+        updateStatus(QString("Saved %1").arg(filename), false);
+        return true;
+    }
+
+    updateStatus(QString("Failed to save file: %1").arg(filename), true);
+    return false;
+}
+
+bool
+ViewerPrivate::saveChanges()
+{
+    if (!hasChanges())
+        return true;
+
+    QString name = session()->filename().isEmpty() ? "Untitled" : QFileInfo(session()->filename()).fileName();
+
+    QMessageBox::StandardButton button
+        = QMessageBox::warning(d.viewer.data(), PROJECT_NAME, QString("Save changes to %1?").arg(name),
+                               QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+
+    switch (button) {
+    case QMessageBox::Save: return saveFile();
+    case QMessageBox::Discard: return true;
+    case QMessageBox::Cancel:
+    default: return false;
+    }
+}
+
+void
+ViewerPrivate::clearChanges()
+{
+    d.changes = 0;
+    updateModified(false);
+}
+
+bool
+ViewerPrivate::hasChanges() const
+{
+    return d.changes > 0;
 }
 
 #include "viewer.moc"
@@ -1069,6 +1300,17 @@ Viewer::setArguments(const QStringList& arguments)
 }
 
 void
+Viewer::closeEvent(QCloseEvent* event)
+{
+    if (!p->saveChanges()) {
+        event->ignore();
+        return;
+    }
+    p->saveSettings();
+    event->accept();
+}
+
+void
 Viewer::dragEnterEvent(QDragEnterEvent* event)
 {
     if (event->mimeData()->hasUrls()) {
@@ -1090,8 +1332,15 @@ Viewer::dropEvent(QDropEvent* event)
 {
     const QList<QUrl> urls = event->mimeData()->urls();
     if (urls.size() == 1) {
+        if (!p->saveChanges()) {
+            event->ignore();
+            return;
+        }
         QString filename = urls.first().toLocalFile();
         p->loadFile(filename);
+        event->acceptProposedAction();
+        return;
     }
+    event->ignore();
 }
 }  // namespace usdviewer

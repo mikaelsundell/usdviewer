@@ -13,6 +13,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace usdviewer {
 
 class PropertyTreePrivate;
+class ViewContext;
 
 /**
  * @class PropertyTree
@@ -40,6 +41,23 @@ public:
      */
     virtual ~PropertyTree();
 
+    /** @name Context */
+    ///@{
+
+    /**
+     * @brief Returns the current view context.
+     */
+    ViewContext* context() const;
+
+    /**
+     * @brief Sets the view context used by this widget.
+     *
+     * @param context View context for stage locking and command execution.
+     */
+    void setContext(ViewContext* context);
+
+    ///@}
+
     /** @name Tree Control */
     ///@{
 
@@ -64,8 +82,9 @@ public:
      * @brief Updates properties for the specified prim paths.
      *
      * @param paths Prim paths to refresh.
+     * @param invalidated Invalidated prim paths.
      */
-    void updatePrims(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
 
     /**
      * @brief Updates the tree to reflect the current selection.

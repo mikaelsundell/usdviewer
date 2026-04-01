@@ -8,6 +8,7 @@
 #include "signalguard.h"
 #include "stagetree.h"
 #include "style.h"
+#include "viewcontext.h"
 #include <QPointer>
 #include <QTimer>
 #include <pxr/usd/usd/prim.h>
@@ -18,6 +19,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 #include "ui_outlinerview.h"
 
 namespace usdviewer {
+
 class OutlinerViewPrivate : public QObject, public SignalGuard {
 public:
     OutlinerViewPrivate();
@@ -25,6 +27,7 @@ public:
     PropertyTree* propertyTree();
     StageTree* stageTree();
     bool eventFilter(QObject* obj, QEvent* event);
+
 public Q_SLOTS:
     void clearFilter();
     void clearDepth();
@@ -32,7 +35,7 @@ public Q_SLOTS:
     void expand();
     void follow(bool enabled);
     void filterChanged(const QString& filter);
-    void primsChanged(const QList<SdfPath>& paths);
+    void primsChanged(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void depthChanged(int value);
@@ -41,6 +44,7 @@ public:
     void updateDepth(const SdfPath& path = SdfPath());
     struct Data {
         bool followEnabled;
+        QScopedPointer<ViewContext> context;
         QScopedPointer<Ui_OutlinerView> ui;
         QPointer<OutlinerView> view;
     };
@@ -54,11 +58,16 @@ OutlinerViewPrivate::init()
 {
     d.ui.reset(new Ui_OutlinerView());
     d.ui->setupUi(d.view.data());
+    d.context.reset(new ViewContext(d.view.data()));
+    d.context->setStageLock(session()->stageLock());
+    d.context->setCommandStack(session()->commandStack());
     attach(d.ui->depth);
     stageTree()->setHeaderLabels(QStringList() << "Name"
                                                << "");
     propertyTree()->setHeaderLabels(QStringList() << "Name"
                                                   << "Value");
+    stageTree()->setContext(d.context.data());
+    propertyTree()->setContext(d.context.data());
     // event filter
     stageTree()->installEventFilter(this);
     propertyTree()->installEventFilter(this);
@@ -74,7 +83,6 @@ OutlinerViewPrivate::init()
     connect(d.ui->expand, &QToolButton::clicked, this, &OutlinerViewPrivate::expand);
     connect(d.ui->follow, &QToolButton::toggled, this, &OutlinerViewPrivate::follow);
     connect(d.ui->depth, &QSlider::valueChanged, this, &OutlinerViewPrivate::depthChanged);
-    // models
     connect(session(), &Session::stageChanged, this, &OutlinerViewPrivate::stageChanged);
     connect(session(), &Session::primsChanged, this, &OutlinerViewPrivate::primsChanged);
     connect(session()->selectionList(), &SelectionList::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
@@ -163,10 +171,10 @@ OutlinerViewPrivate::filterChanged(const QString& filter)
 }
 
 void
-OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths)
+OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
-    propertyTree()->updatePrims(paths);
-    stageTree()->updatePrims(paths);
+    propertyTree()->updatePrims(paths, invalidated);
+    stageTree()->updatePrims(paths, invalidated);
 }
 
 void
@@ -191,30 +199,25 @@ OutlinerViewPrivate::selectionChanged(const QList<SdfPath>& paths)
 void
 OutlinerViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
-    if (status == Session::StageStatus::Loaded) {
-        if (policy == Session::LoadPolicy::Payload) {
-            stageTree()->setPayloadEnabled(true);
-        }
-        else {
-            stageTree()->setPayloadEnabled(false);
-        }
+    const bool loaded = (status == Session::StageStatus::Loaded);
+
+    d.ui->filter->setEnabled(loaded);
+    d.ui->depth->setEnabled(loaded);
+    d.ui->follow->setEnabled(loaded);
+
+    if (loaded) {
+        stageTree()->setPayloadEnabled(policy == Session::LoadPolicy::None);
         stageTree()->updateStage(stage);
         propertyTree()->updateStage(stage);
-        d.ui->filter->setEnabled(true);
-        d.ui->depth->setEnabled(true);
-        d.ui->follow->setEnabled(true);
         updateDepth();
+        return;
     }
-    else {
-        propertyTree()->close();
-        stageTree()->close();
-        d.ui->clear->setEnabled(false);
-        d.ui->filter->setEnabled(false);
-        d.ui->depth->setEnabled(false);
-        d.ui->follow->setEnabled(false);
-        clearFilter();
-        clearDepth();
-    }
+
+    propertyTree()->close();
+    stageTree()->close();
+    d.ui->clear->setEnabled(false);
+    clearFilter();
+    clearDepth();
 }
 
 void

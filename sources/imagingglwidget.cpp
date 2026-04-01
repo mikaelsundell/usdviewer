@@ -5,13 +5,14 @@
 #include "imagingglwidget.h"
 #include "application.h"
 #include "command.h"
-#include "commanddispatcher.h"
 #include "os.h"
 #include "qtutils.h"
 #include "signalguard.h"
 #include "stageutils.h"
 #include "style.h"
+#include "tracelocks.h"
 #include "viewcamera.h"
+#include "viewcontext.h"
 #include <QApplication>
 #include <QColor>
 #include <QColorSpace>
@@ -61,7 +62,7 @@ public:
     void updateStage(UsdStageRefPtr stage);
     void updateBoundingBox(const GfBBox3d& bbox);
     void updateMask(const QList<SdfPath>& paths);
-    void updatePrims(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
     void updateSelection(const QList<SdfPath>& paths);
 
 public:
@@ -105,6 +106,7 @@ public:
         QList<SdfPath> mask;
         QList<SdfPath> selection;
         QScopedPointer<UsdImagingGLEngine> glEngine;
+        QPointer<ViewContext> context;
         QPointer<ImagingGLWidget> glwidget;
     };
     Data d;
@@ -136,6 +138,7 @@ ImagingGLWidgetPrivate::init()
     d.cameraAxisEnabled = true;
     d.drag = false;
     d.drawMode = ImagingGLWidget::DrawMode::ShadedSmooth;
+    d.context = nullptr;
 }
 
 void
@@ -143,7 +146,7 @@ ImagingGLWidgetPrivate::initGL()
 {
     if (!d.glEngine) {
         UsdImagingGLEngine::Parameters params;
-        params.displayUnloadedPrimsWithBounds = true;
+        params.allowAsynchronousSceneProcessing = false;
         d.glEngine.reset(new UsdImagingGLEngine(params));
         Hgi* hgi = d.glEngine->GetHgi();
         if (hgi) {
@@ -159,17 +162,24 @@ ImagingGLWidgetPrivate::initGL()
 void
 ImagingGLWidgetPrivate::initCamera()
 {
-    Q_ASSERT("stage is not loaded" && d.stage);
-    d.viewCamera = ViewCamera();
-    d.viewCamera.setBoundingBox(d.bbox);
-    TfToken upAxis = UsdGeomGetStageUpAxis(d.stage);
-    if (upAxis == TfToken("X")) {
-        d.viewCamera.setCameraUp(ViewCamera::X);
+    UsdStageRefPtr stage;
+    GfBBox3d bbox;
+    TfToken upAxis;
+    {
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        stage = d.stage;
+        bbox = d.bbox;
+        Q_ASSERT("stage is not loaded" && stage);
+        if (!stage)
+            return;
+        upAxis = UsdGeomGetStageUpAxis(stage);
     }
-    else if (upAxis == TfToken("Y")) {
+    d.viewCamera = ViewCamera();
+    d.viewCamera.setBoundingBox(bbox);
+    if (upAxis == TfToken("Y")) {
         d.viewCamera.setCameraUp(ViewCamera::Y);
     }
-    else if (upAxis == TfToken("Z")) {
+    else {
         d.viewCamera.setCameraUp(ViewCamera::Z);
     }
     d.viewCamera.frameAll();
@@ -179,14 +189,22 @@ void
 ImagingGLWidgetPrivate::close()
 {
     d.mask.clear();
+    d.selection.clear();
+    d.stage = nullptr;
+    d.bbox = GfBBox3d();
+    d.selectionBBox = GfBBox3d();
+    d.viewCamera = ViewCamera();
+    d.drag = false;
+    d.sweep = false;
+
     d.glEngine.reset();
     initGL();
-    d.glwidget->update();
-    d.stage = nullptr;
-    d.selection = QList<SdfPath>();
+
     if (d.sceneTreeEnabled) {
         updateSceneTree();
     }
+
+    d.glwidget->update();
 }
 
 void
@@ -209,10 +227,6 @@ ImagingGLWidgetPrivate::paintGL()
 {
     glClearColor(d.clearColor.redF(), d.clearColor.greenF(), d.clearColor.blueF(), d.clearColor.alphaF());
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // paintGL() may be invoked by Qt before the USD stage is fully initialized.
-    // Ensure the stage exists and is successfully loaded before rendering.
-
     if (d.stage) {
         if (d.glEngine) {
             QElapsedTimer timer;
@@ -226,12 +240,14 @@ ImagingGLWidgetPrivate::paintGL()
             Q_ASSERT("aov is not set and is required" && d.aov.size());
             TfToken aovtoken(QStringToTfToken(d.aov));
             d.glEngine->SetRendererAov(aovtoken);
+
             GfVec4d viewport = widgetViewport();
             d.glEngine->SetRenderBufferSize(widgetSize());
             d.glEngine->SetFraming(
                 CameraUtilFraming(GfRange2f(GfVec2i(), widgetSize()), GfRect2i(GfVec2i(), widgetSize())));
             d.glEngine->SetWindowPolicy(CameraUtilMatchVertically);
             d.glEngine->SetRenderViewport(viewport);
+
 #ifdef WIN32
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glEnable(GL_DEPTH_TEST);
@@ -239,6 +255,7 @@ ImagingGLWidgetPrivate::paintGL()
             glDepthFunc(GL_LESS);
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 #endif
+
             d.viewCamera.setAspectRatio(widgetAspectRatio());
             GfCamera camera = d.viewCamera.camera();
             GfFrustum frustum = camera.GetFrustum();
@@ -246,7 +263,6 @@ ImagingGLWidgetPrivate::paintGL()
             GfMatrix4d projectionMatrix = frustum.ComputeProjectionMatrix();
             d.glEngine->SetCameraState(viewModel, projectionMatrix);
             d.params.clearColor = QColorToGfVec4f(d.clearColor);
-            // drawmode
             {
                 UsdImagingGLDrawMode mode;
                 switch (d.drawMode) {
@@ -266,12 +282,11 @@ ImagingGLWidgetPrivate::paintGL()
             }
             d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
             d.params.enableLighting = true;
-            // defaults
             {
                 std::vector<GlfSimpleLight> lights;
                 if (d.defaultCameraLightEnabled) {
-                    GfCamera camera = d.viewCamera.camera();
-                    GfMatrix4d viewInverse = camera.GetTransform();
+                    GfCamera lightCamera = d.viewCamera.camera();
+                    GfMatrix4d viewInverse = lightCamera.GetTransform();
                     GfVec3d camPos = viewInverse.ExtractTranslation();
 
                     GlfSimpleLight light;
@@ -280,6 +295,7 @@ ImagingGLWidgetPrivate::paintGL()
                     light.SetTransform(viewInverse);
                     lights.push_back(light);
                 }
+
                 GfVec4f defaultAmbient(d.defaultAmbient, d.defaultAmbient, d.defaultAmbient, 1.0f);
                 GlfSimpleMaterial material;
                 material.SetAmbient(defaultAmbient);
@@ -289,31 +305,38 @@ ImagingGLWidgetPrivate::paintGL()
             }
             d.params.enableSampleAlphaToCoverage = true;
             d.params.enableSceneLights = d.sceneLightsEnabled;
-            d.params.enableSceneMaterials = d.sceneShadersEnabled;  // shaders not materials
+            d.params.enableSceneMaterials = d.sceneShadersEnabled;
             d.params.flipFrontFacing = true;
             d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;
             d.params.showRender = true;
+
             QElapsedTimer gpuTimer;
             gpuTimer.start();
             TfErrorMark mark;
             {
-                QReadLocker locker(CommandDispatcher::stageLock());
-                Hgi* hgi = d.glEngine->GetHgi();
-                hgi->StartFrame();
-                UsdPrim root = d.stage->GetPseudoRoot();
-                if (!d.mask.isEmpty()) {
-                    SdfPathVector paths;
-                    for (const SdfPath& path : d.mask)
-                        paths.push_back(path);
-                    d.glEngine->PrepareBatch(root, d.params);
-                    d.glEngine->RenderBatch(paths, d.params);
+                READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+                if (!d.stage) {
+                    qWarning() << "stage is not set, render pass will be skipped";
                 }
                 else {
-                    d.glEngine->Render(root, d.params);
+                    Hgi* hgi = d.glEngine->GetHgi();
+                    hgi->StartFrame();
+
+                    UsdPrim root = d.stage->GetPseudoRoot();
+                    if (!d.mask.isEmpty()) {
+                        SdfPathVector paths;
+                        for (const SdfPath& path : d.mask)
+                            paths.push_back(path);
+                        d.glEngine->PrepareBatch(root, d.params);
+                        d.glEngine->RenderBatch(paths, d.params);
+                    }
+                    else {
+                        d.glEngine->Render(root, d.params);
+                    }
+                    hgi->EndFrame();
                 }
-                hgi->EndFrame();
             }
             if (!mark.IsClean()) {
                 qWarning() << "gl engine errors occured during rendering";
@@ -390,10 +413,13 @@ ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
 
     GfVec3d hitPoint, hitNormal;
     SdfPath hitPrimPath, hitInstancerPath;
-
-    bool hit = d.glEngine->TestIntersection(pickFrustum.ComputeViewMatrix(), pickFrustum.ComputeProjectionMatrix(),
-                                            d.stage->GetPseudoRoot(), d.params, &hitPoint, &hitNormal, &hitPrimPath,
-                                            &hitInstancerPath);
+    bool hit = false;
+    {
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        hit = d.glEngine->TestIntersection(pickFrustum.ComputeViewMatrix(), pickFrustum.ComputeProjectionMatrix(),
+                                           d.stage->GetPseudoRoot(), d.params, &hitPoint, &hitNormal, &hitPrimPath,
+                                           &hitInstancerPath);
+    }
 
     if (hit) {
         d.viewCamera.setFocusPoint(hitPoint);
@@ -490,6 +516,7 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
 #ifdef WIN32
     glDepthMask(GL_TRUE);
 #endif
+
     QRect r = rect.normalized();
     QPoint tl = deviceRatio(r.topLeft());
     QPoint br = deviceRatio(r.bottomRight() - QPoint(1, 1));
@@ -507,6 +534,7 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
 
         r = QRect(QPoint(cx - halfW, cy - halfH), QPoint(cx + halfW, cy + halfH));
     }
+
     GfVec4d viewport = widgetViewport();
     GfVec2d center(((r.left() + r.right()) * 0.5 - viewport[0]) / viewport[2],
                    ((r.top() + r.bottom()) * 0.5 - viewport[1]) / viewport[3]);
@@ -523,10 +551,15 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     GfFrustum pickFr = fr.ComputeNarrowedFrustum(center, size);
 
     UsdImagingGLEngine::IntersectionResultVector results;
-    const bool hit = d.glEngine->TestIntersection(pickParams, pickFr.ComputeViewMatrix(),
-                                                  pickFr.ComputeProjectionMatrix(), d.stage->GetPseudoRoot(), d.params,
-                                                  &results);
+    bool hit = false;
+    {
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        if (!d.stage)
+            return;
 
+        hit = d.glEngine->TestIntersection(pickParams, pickFr.ComputeViewMatrix(), pickFr.ComputeProjectionMatrix(),
+                                           d.stage->GetPseudoRoot(), d.params, &results);
+    }
     QList<SdfPath> selectedPaths;
     if (hit) {
         for (const auto& rItem : results) {
@@ -534,7 +567,6 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
                 selectedPaths.append(rItem.hitPrimPath);
         }
     }
-
     bool update = false;
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {
@@ -560,14 +592,11 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
             update = true;
         }
     }
-
     if (update) {
-        CommandDispatcher::run(new Command(selectPaths(d.selection)));
+        d.context->run(new Command(selectPaths(d.selection)));
     }
-
     d.glwidget->update();
 }
-
 
 void
 ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
@@ -584,12 +613,14 @@ ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
 {
     SignalGuard::Scope guard(this);
     d.stage = stage;
-    initCamera();
     d.glEngine.reset();
     initGL();
+    if (d.stage)
+        initCamera();
     if (d.sceneTreeEnabled) {
         updateSceneTree();
     }
+    d.glwidget->update();
 }
 
 void
@@ -609,7 +640,7 @@ ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
 }
 
 void
-ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths)
+ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
     SignalGuard::Scope guard(this);
     if (d.sceneTreeEnabled) {
@@ -622,11 +653,14 @@ void
 ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 {
     SignalGuard::Scope guard(this);
-    Q_ASSERT("gl engine is not set" && d.glEngine);
-    d.glEngine->SetSelected(QListToSdfPathVector(paths));
-    updateSceneTree();
-    d.glwidget->update();
     d.selection = paths;
+    if (d.glEngine) {
+        d.glEngine->SetSelected(QListToSdfPathVector(paths));
+    }
+    if (d.sceneTreeEnabled) {
+        updateSceneTree();
+    }
+    d.glwidget->update();
 }
 
 QPoint
@@ -707,7 +741,11 @@ ImagingGLWidgetPrivate::drawAxis(QPainter& painter)
                              { "Z", QColor(70, 110, 220), zCam } };
     std::sort(axes.begin(), axes.end(), [](const AxisLine& a, const AxisLine& b) { return a.dir[2] < b.dir[2]; });
 
+    const bool hasStage = static_cast<bool>(d.stage);
+    const qreal opacity = hasStage ? 1.0 : 0.35;
+
     painter.save();
+    painter.setOpacity(opacity);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0, 0, 0, 20));
@@ -815,7 +853,7 @@ ImagingGLWidgetPrivate::updateSceneTree()
     SceneStats total;
     SceneStats selected;
     if (d.stage) {
-        QReadLocker locker(CommandDispatcher::stageLock());
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
         for (const UsdPrim& prim : d.stage->Traverse()) {
             accumulate(prim, total);
         }
@@ -893,11 +931,17 @@ ImagingGLWidgetPrivate::updateSceneTree()
     for (const auto& r : rows) {
         int labelX = marginLeft;
         int valueX = marginLeft + labelWidth + columnSpacing;
-        p.setPen(QColor(0, 0, 0, 180));
+        p.setPen(QColor(0, 0, 0, 160));
         p.drawText(labelX + 1, y + 1, r.label);
         p.drawText(valueX + 1, y + 1, r.value);
-
-        p.setPen(Qt::white);
+        QColor textColor;
+        if (d.stage) {
+            textColor = style()->color(Style::ColorRole::Text, Style::UIState::Normal);
+        }
+        else {
+            textColor = style()->color(Style::ColorRole::Text, Style::UIState::Disabled);
+        }
+        p.setPen(textColor);
         p.drawText(labelX, y, r.label);
         p.drawText(valueX, y, r.value);
 
@@ -967,11 +1011,17 @@ ImagingGLWidgetPrivate::updateGpuPerformance()
         int labelX = marginLeft;
         int valueX = marginLeft + labelWidth + columnSpacing;
 
-        p.setPen(QColor(0, 0, 0, 180));
+        p.setPen(QColor(0, 0, 0, 160));
         p.drawText(labelX + 1, y + 1, r.label);
         p.drawText(valueX + 1, y + 1, r.value);
-
-        p.setPen(Qt::white);
+        QColor textColor;
+        if (d.stage) {
+            textColor = style()->color(Style::ColorRole::Text, Style::UIState::Normal);
+        }
+        else {
+            textColor = style()->color(Style::ColorRole::Text, Style::UIState::Disabled);
+        }
+        p.setPen(textColor);
         p.drawText(labelX, y, r.label);
         p.drawText(valueX, y, r.value);
 
@@ -988,6 +1038,20 @@ ImagingGLWidget::ImagingGLWidget(QWidget* parent)
 }
 
 ImagingGLWidget::~ImagingGLWidget() = default;
+
+ViewContext*
+ImagingGLWidget::context() const
+{
+    return p->d.context;
+}
+
+void
+ImagingGLWidget::setContext(ViewContext* context)
+{
+    if (p->d.context != context) {
+        p->d.context = context;
+    }
+}
 
 ViewCamera
 ImagingGLWidget::viewCamera() const
@@ -1073,8 +1137,8 @@ ImagingGLWidget::sceneLightsEnabled() const
 void
 ImagingGLWidget::enableSceneLights(bool enabled)
 {
-    if (enabled != p->d.defaultCameraLightEnabled) {
-        p->d.defaultCameraLightEnabled = enabled;
+    if (enabled != p->d.sceneLightsEnabled) {
+        p->d.sceneLightsEnabled = enabled;
         update();
     }
 }
@@ -1143,7 +1207,8 @@ ImagingGLWidget::enableCameraAxis(bool enabled)
 QList<QString>
 ImagingGLWidget::rendererAovs() const
 {
-    Q_ASSERT("gl engine is not inititialized" && p->d.glEngine);
+    if (!p->d.glEngine)
+        return {};
     return TfTokenVectorToQList(p->d.glEngine->GetRendererAovs());
 }
 
@@ -1175,10 +1240,10 @@ ImagingGLWidget::updateMask(const QList<SdfPath>& paths)
 }
 
 void
-ImagingGLWidget::updatePrims(const QList<SdfPath>& paths)
+ImagingGLWidget::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
-    qDebug() << "updatePrims in glwidget";
-    p->updatePrims(paths);
+    qDebug() << "updatePrims: " << p->d.count;
+    p->updatePrims(paths, invalidated);
 }
 
 void

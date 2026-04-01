@@ -126,6 +126,14 @@ Command
 showPaths(const QList<SdfPath>& paths, bool recursive);
 
 /**
+ * @brief Creates a command that sets the stage up axis.
+ *
+ * @param stageUp Up axis to apply to the current stage.
+ */
+Command
+stageUp(Session::StageUp stageUp);
+
+/**
  * @brief Creates a command that hides prims.
  *
  * @param paths     Prim paths to hide.
@@ -142,9 +150,14 @@ hidePaths(const QList<SdfPath>& paths, bool recursive);
 Command
 deletePaths(const QList<SdfPath>& paths);
 
+Command
+renamePath(const SdfPath& path, const QString& newNameInput);
 
 Command
-renamePath(const SdfPath& path, const SdfPath& newpath);
+newXformPath(const SdfPath& parentPath, const QString& nameInput);
+
+Command
+movePath(const SdfPath& fromPath, const SdfPath& newParentPath);
 
 ///@}
 

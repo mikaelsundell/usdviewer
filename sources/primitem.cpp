@@ -5,7 +5,6 @@
 #include "primitem.h"
 #include "application.h"
 #include "command.h"
-#include "commanddispatcher.h"
 #include "qtutils.h"
 #include "stageutils.h"
 #include "style.h"
@@ -35,6 +34,7 @@ public:
         bool hasPayload = false;
         bool isEditTarget = true;
         bool isRoot = false;
+        QString pendingName;
         QString name;
         QString typeName;
     };
@@ -110,6 +110,7 @@ void
 PrimItem::invalidate()
 {
     p->d.dirty = true;
+    p->d.pendingName.clear();
 }
 
 QVariant
@@ -117,9 +118,13 @@ PrimItem::data(int column, int role) const
 {
     p->updateCache();
     const SdfPath path = p->d.path;
+
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
         switch (column) {
-        case Name: return p->d.name;
+        case Name:
+            if (!p->d.pendingName.isEmpty())
+                return p->d.pendingName;
+            return p->d.name;
         case Vis: return QString();
         default: break;
         }
@@ -163,18 +168,12 @@ PrimItem::setData(int column, int role, const QVariant& value)
         if (newName.isEmpty())
             return;
         p->updateCache();
-
-        const QString oldName = p->d.name;
-        if (newName == oldName)
+        if (newName == p->d.name)
             return;
-
-        const SdfPath oldPath = p->d.path;
-        const SdfPath parentPath = oldPath.GetParentPath();
-        const SdfPath newPath = parentPath.AppendChild(TfToken(qt::QStringToString(newName)));
-        CommandDispatcher::run(new Command(renamePath(oldPath, newPath)));
+        p->d.pendingName = newName;
+        TreeItem::setData(column, role, newName);
         return;
     }
-
     TreeItem::setData(column, role, value);
 }
 

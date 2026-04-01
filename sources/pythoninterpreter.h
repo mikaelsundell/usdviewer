@@ -56,7 +56,7 @@ public:
      * @param script Python source code to execute.
      * @return Output or result of the execution.
      */
-    QString executeScript(const QString& script) const;
+    QString executeScript(const QString& script);
 
     ///@}
 

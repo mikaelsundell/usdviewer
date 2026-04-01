@@ -15,6 +15,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace usdviewer {
 
 class StageTreePrivate;
+class ViewContext;
 
 /**
  * @class StageTree
@@ -39,6 +40,23 @@ public:
      * @brief Destroys the StageTree instance.
      */
     virtual ~StageTree();
+
+    /** @name Context */
+    ///@{
+
+    /**
+     * @brief Returns the current view context.
+     */
+    ViewContext* context() const;
+
+    /**
+     * @brief Sets the view context used by this widget.
+     *
+     * @param context View context for stage locking and command execution.
+     */
+    void setContext(ViewContext* context);
+
+    ///@}
 
     /** @name Tree Control */
     ///@{
@@ -131,8 +149,9 @@ public:
      * corresponding items must be refreshed.
      *
      * @param paths Prim paths to update.
+     * @param invalidated Invalidated prim paths.
      */
-    void updatePrims(const QList<SdfPath>& paths);
+    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
 
     /**
      * @brief Updates the tree selection.
@@ -156,6 +175,11 @@ Q_SIGNALS:
     void primSelectionChanged(const QList<SdfPath>& paths);
 
 protected:
+    void startDrag(Qt::DropActions supportedActions) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+
     /** @name Event Handling */
     ///@{
 

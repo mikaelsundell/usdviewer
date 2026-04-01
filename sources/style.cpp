@@ -38,10 +38,11 @@ public:
         int role;
         int scale;
         int state;
-        int dpr;
+        int physicalSize;
+
         bool operator==(const IconKey& o) const
         {
-            return role == o.role && scale == o.scale && state == o.state && dpr == o.dpr;
+            return role == o.role && scale == o.scale && state == o.state && physicalSize == o.physicalSize;
         }
     };
 
@@ -64,7 +65,7 @@ qHash(const StylePrivate::IconKey& k, size_t seed = 0)
     seed = ::qHash(k.role, seed);
     seed = ::qHash(k.scale, seed);
     seed = ::qHash(k.state, seed);
-    seed = ::qHash(k.dpr, seed);
+    seed = ::qHash(k.physicalSize, seed);
     return seed;
 }
 
@@ -297,35 +298,31 @@ StylePrivate::fontSize(Style::UIScale scale) const
 QPixmap
 StylePrivate::icon(Style::IconRole role, Style::UIScale scale, Style::UIState state) const
 {
-    const qreal dpr = qApp->devicePixelRatio();
+    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
     const int logicalSize = iconSize(scale);
-    const int physicalSize = int(logicalSize * dpr);
-
     if (logicalSize <= 0)
         return QPixmap();
 
-    IconKey key { int(role), int(scale), int(state), int(dpr) };
+    const int physicalSize = qMax(1, qRound(logicalSize * dpr));
+    IconKey key { int(role), int(scale), int(state), physicalSize };
 
-    auto it = d.pixmaps.find(key);
-    if (it == d.pixmaps.end()) {
-        const QString path = iconPath(role);
-        if (path.isEmpty())
-            return QPixmap();
+    auto it = d.pixmaps.constFind(key);
+    if (it != d.pixmaps.constEnd())
+        return it.value();
 
-        QPixmap loaded(path);
-        if (loaded.isNull())
-            return QPixmap();
+    const QString path = iconPath(role);
+    if (path.isEmpty())
+        return QPixmap();
 
-        // store ORIGINAL (not scaled) for reuse
-        it = d.pixmaps.insert(key, loaded);
-    }
+    QPixmap loaded(path);
+    if (loaded.isNull())
+        return QPixmap();
 
-    const QPixmap& base = it.value();
+    QPixmap scaled = loaded.scaled(physicalSize, physicalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    scaled.setDevicePixelRatio(dpr);
 
-    QPixmap result = base.scaled(physicalSize, physicalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
-    result.setDevicePixelRatio(dpr);
-    return result;
+    d.pixmaps.insert(key, scaled);
+    return scaled;
 }
 
 QString

@@ -41,8 +41,8 @@ public:
      * @brief Stage loading policy.
      */
     enum LoadPolicy {
-        All,     ///< Load the entire stage.
-        Payload  ///< Load stage with payloads deferred.
+        All,  ///< Fully load the stage, including payloads.
+        None  ///< Open the stage without loading payloads.
     };
 
     /**
@@ -54,12 +54,28 @@ public:
     };
 
     /**
+     * @brief Controls how prim changes are propagated.
+     */
+    enum PrimsUpdate {
+        Immediate,  ///< Emit primsChanged() immediately.
+        Deferred    ///< Buffer and emit changes on flush.
+    };
+
+    /**
      * @brief Stage loading status.
      */
     enum StageStatus {
         Loaded,  ///< Stage successfully loaded.
         Failed,  ///< Stage loading failed.
         Closed   ///< Stage has been closed.
+    };
+
+    /**
+     * @brief Stage up axis.
+     */
+    enum StageUp {
+        Y,  ///< Y-up.
+        Z,  ///< Z-up.
     };
 
 public:
@@ -152,6 +168,15 @@ public:
     ///@{
 
     /**
+     * @brief Creates a new empty USD stage in memory.
+     *
+     * Clears any existing stage and initializes a fresh one.
+     *
+     * @return True if creation succeeded.
+     */
+    bool newStage(LoadPolicy policy = LoadPolicy::All);
+
+    /**
      * @brief Loads a USD stage from file.
      *
      * @param filename File to load.
@@ -167,14 +192,19 @@ public:
     bool saveToFile(const QString& filename);
 
     /**
-     * @brief Exports the entire stage to a file.
+     * @brief Copy  the current stage to file.
      */
-    bool exportToFile(const QString& filename);
+    bool copyToFile(const QString& filename);
 
     /**
-     * @brief Exports specific prim paths to a file.
+     * @brief Flatten the entire stage to a file.
      */
-    bool exportPathsToFile(const QList<SdfPath>& paths, const QString& filename);
+    bool flattenToFile(const QString& filename);
+
+    /**
+     * @brief Flatten specific prim paths to a file.
+     */
+    bool flattenPathsToFile(const QList<SdfPath>& paths, const QString& filename);
 
     /**
      * @brief Reloads the currently opened stage.
@@ -207,9 +237,14 @@ public:
     void setMask(const QList<SdfPath>& paths);
 
     /**
-     * @brief Sets a textual status message.
+     * @brief Returns the current stage up axis.
      */
-    void setStatus(const QString& status);
+    StageUp stageUp();
+
+    /**
+     * @brief Sets the stage up axis.
+     */
+    void setStageUp(StageUp stageUp);
 
     /**
      * @brief Returns the current loading policy.
@@ -232,6 +267,13 @@ public:
     UsdStageRefPtr stage() const;
 
     /**
+     * @brief Returns the active USD stage without acquiring the stage lock.
+     *
+     * The caller must already hold stageLock().
+     */
+    UsdStageRefPtr stageUnsafe() const;
+
+    /**
      * @brief Returns the stage lock used for thread-safe access.
      */
     QReadWriteLock* stageLock() const;
@@ -252,6 +294,29 @@ public:
     SelectionList* selectionList() const;
 
     ///@}
+
+    /**
+     * @brief Returns the current prim update behavior.
+     */
+    PrimsUpdate primsUpdate() const;
+
+    /**
+     * @brief Sets how prim changes are propagated.
+     *
+     * Deferred buffers changes until flushed. Switching to Immediate
+     * flushes pending changes.
+     */
+    void setPrimsUpdate(PrimsUpdate policy);
+
+    /**
+     * @brief Emits any buffered prim changes.
+     */
+    void flushPrimsUpdates();
+
+    /**
+     * @brief Sets a textual status message.
+     */
+    void setStatus(const QString& status);
 
 Q_SIGNALS:
 
@@ -278,12 +343,17 @@ Q_SIGNALS:
     /**
      * @brief Emitted when prims are modified.
      */
-    void primsChanged(const QList<SdfPath>& paths);
+    void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
 
     /**
      * @brief Emitted when the stage changes.
      */
     void stageChanged(UsdStageRefPtr stage, LoadPolicy policy, StageStatus status);
+
+    /**
+     * @brief Emitted when the stage up axis changes.
+     */
+    void stageUpChanged(StageUp stageUp);
 
     /**
      * @brief Emitted when the status message changes.

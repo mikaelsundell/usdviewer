@@ -133,7 +133,7 @@ RenderViewPrivate::renderReady(qint64 elapsed)
     const qint64 thresholdMs = 500;
     if (elapsed > thresholdMs) {
         if (session()) {
-            QString msg = QStringLiteral("Warning: Render time %1 ms").arg(elapsed);
+            QString msg = QStringLiteral("Render time %1 ms").arg(elapsed);
             session()->setStatus(msg);
         }
     }

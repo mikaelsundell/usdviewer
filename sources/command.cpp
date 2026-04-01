@@ -51,9 +51,8 @@ namespace payload {
         }
     }
 
-    inline bool applyLoad(UsdStageRefPtr stage, const SdfPath& path, bool useVariant,
-                                 const std::string& variantSetName, const std::string& variantSelection,
-                                 UndoItem& undoItem, QString& error)
+    inline bool applyLoad(UsdStageRefPtr stage, const SdfPath& path, bool useVariant, const std::string& variantSetName,
+                          const std::string& variantSelection, UndoItem& undoItem, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -160,7 +159,7 @@ namespace payload {
         return true;
     }
 
-}  // namespace
+}  // namespace payload
 
 Command
 loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QString& variantValue)
@@ -204,7 +203,7 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                         WRITE_LOCKER(locker, session->stageLock(), "stageLock");
                         const UsdStageRefPtr stage = session->stageUnsafe();
                         result.success = payload::applyLoad(stage, path, useVariant, variantSetName, variantSelection,
-                                                          undoItem, error);
+                                                            undoItem, error);
                     } catch (...) {
                         result.success = false;
                         error = "exception";
@@ -222,7 +221,8 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     if (pending.size() >= 16) {
                         const QList<payload::Result> batch = pending;
                         QMetaObject::invokeMethod(
-                            session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
+                            session,
+                            [session, batch, completed]() { payload::flushResults(session, batch, completed); },
                             Qt::QueuedConnection);
                         pending.clear();
                     }
@@ -287,7 +287,8 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     if (pending.size() >= 16) {
                         const QList<payload::Result> batch = pending;
                         QMetaObject::invokeMethod(
-                            session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
+                            session,
+                            [session, batch, completed]() { payload::flushResults(session, batch, completed); },
                             Qt::QueuedConnection);
                         pending.clear();
                     }
@@ -366,7 +367,8 @@ unloadPayloads(const QList<SdfPath>& paths)
                     if (pending.size() >= 16) {
                         const QList<payload::Result> batch = pending;
                         QMetaObject::invokeMethod(
-                            session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
+                            session,
+                            [session, batch, completed]() { payload::flushResults(session, batch, completed); },
                             Qt::QueuedConnection);
                         pending.clear();
                     }
@@ -432,7 +434,8 @@ unloadPayloads(const QList<SdfPath>& paths)
                     if (pending.size() >= 16) {
                         const QList<payload::Result> batch = pending;
                         QMetaObject::invokeMethod(
-                            session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
+                            session,
+                            [session, batch, completed]() { payload::flushResults(session, batch, completed); },
                             Qt::QueuedConnection);
                         pending.clear();
                     }
@@ -1374,8 +1377,8 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         if (applyRename(stage, state->newPath, state->oldPath, error)) {
                             stage->SetLoadRules(names::remapLoadRules(rules, state->newPath, state->oldPath));
 
-                            if (!state->oldOrder.empty() && !state->parentPath.IsEmpty() &&
-                                state->parentPath != SdfPath::AbsoluteRootPath()) {
+                            if (!state->oldOrder.empty() && !state->parentPath.IsEmpty()
+                                && state->parentPath != SdfPath::AbsoluteRootPath()) {
                                 snapshot::restoreParentOrder(stage, state->parentPath, state->oldOrder);
                             }
 
@@ -1563,15 +1566,14 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                     if (!stage) {
                         hadStage = false;
                     }
-                    else if (state->createdPath.IsEmpty()) {
-                    }
+                    else if (state->createdPath.IsEmpty()) {}
                     else {
                         const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
                         if (editLayer) {
                             removed = snapshot::removePrimSpec(editLayer, state->createdPath);
 
-                            if (removed && !state->oldOrder.empty() && !state->parentPath.IsEmpty() &&
-                                state->parentPath != SdfPath::AbsoluteRootPath()) {
+                            if (removed && !state->oldOrder.empty() && !state->parentPath.IsEmpty()
+                                && state->parentPath != SdfPath::AbsoluteRootPath()) {
                                 snapshot::restoreParentOrder(stage, state->parentPath, state->oldOrder);
                             }
                         }
@@ -1720,8 +1722,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                         const SdfPath oldParentPath = fromPath.GetParentPath();
                         const SdfPath targetPath = newParentPath.AppendChild(fromPath.GetNameToken());
 
-                        if (fromPath.IsEmpty() || newParentPath.IsEmpty() || oldParentPath.IsEmpty() ||
-                            oldParentPath == SdfPath::AbsoluteRootPath()) {
+                        if (fromPath.IsEmpty() || newParentPath.IsEmpty() || oldParentPath.IsEmpty()
+                            || oldParentPath == SdfPath::AbsoluteRootPath()) {
                             noop = true;
                         }
                         else if (oldParentPath == newParentPath) {
@@ -1746,8 +1748,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                                     snapshot::restoreParentOrder(stage, oldParentPath,
                                                                  removeToken(state->oldParentOrder, movedName));
 
-                                state->newParentNewOrder =
-                                    appendTokenIfMissing(state->newParentOldOrder, movedName);
+                                state->newParentNewOrder = appendTokenIfMissing(state->newParentOldOrder, movedName);
 
                                 if (!state->newParentNewOrder.empty())
                                     snapshot::restoreParentOrder(stage, newParentPath, state->newParentNewOrder);
@@ -1792,8 +1793,9 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                         }
 
                         session->selectionList()->updatePaths(updated);
-                        session->updateProgressNotify(
-                            Session::Notify("path moved", { state->oldPath, state->newPath }, Status::Info), 1);
+                        session->updateProgressNotify(Session::Notify("path moved", { state->oldPath, state->newPath },
+                                                                      Status::Info),
+                                                      1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1817,8 +1819,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                     if (!stage) {
                         hadStage = false;
                     }
-                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty() ||
-                             state->oldParentPath.IsEmpty() || state->newParentPath.IsEmpty()) {
+                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty() || state->oldParentPath.IsEmpty()
+                             || state->newParentPath.IsEmpty()) {
                         error = "invalid state";
                     }
                     else {

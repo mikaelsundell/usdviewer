@@ -35,6 +35,14 @@ file (GLOB project_resources
     "resources/*.qss"
 )
 
+# build
+string(TIMESTAMP PROJECT_BUILD_DATE "%y%m%d")
+if(CMAKE_CONFIGURATION_TYPES)
+    set(PROJECT_BUILD_CONFIG "$<CONFIG>")
+else()
+    set(PROJECT_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
+endif()
+
 # source groups
 source_group ("Icon Files" FILES ${project_icons})
 source_group ("Resource Files" FILES ${project_resources})
@@ -71,7 +79,10 @@ if (APPLE)
     set_target_properties (${project_name} PROPERTIES
         OUTPUT_NAME ${project_name}
     )
-    target_compile_definitions (${project_name}  PRIVATE GL_SILENCE_DEPRECATION)
+    target_compile_definitions (${project_name} PRIVATE GL_SILENCE_DEPRECATION)
+    target_compile_definitions (${project_name} PRIVATE PXR_PYTHON_DIR="${OpenUSD_PYTHON_DIR}")
+    target_compile_definitions( ${project_name} PRIVATE PROJECT_BUILD_CONFIG="${PROJECT_BUILD_CONFIG}")
+    target_compile_definitions( ${project_name} PRIVATE PROJECT_BUILD_DATE="${PROJECT_BUILD_DATE}")
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python
@@ -89,7 +100,8 @@ elseif (WIN32)
         WINVER=0x0A00
         $<$<CONFIG:Debug>:TBB_USE_DEBUG=1>
     )
-    target_include_directories (${project_name} PRIVATE ${LCMS2_INCLUDE_DIR})
+    target_compile_definitions (${project_name} PRIVATE PXR_PYTHON_DIR="${OpenUSD_PYTHON_DIR}")
+    target_compile_definitions( ${project_name} PRIVATE PROJECT_BUILD="${PROJECT_BUILD_STRING}")
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python

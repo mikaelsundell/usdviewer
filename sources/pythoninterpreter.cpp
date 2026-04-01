@@ -56,12 +56,15 @@ PythonInterpreterPrivate::init()
     Py_Initialize();
     PyRun_SimpleString("print('[Python] Interpreter started')");
 
-    // todo: this is temporary, will be replaced
-    PyRun_SimpleString(R"(
-import sys
-sys.path.insert(0, "/Volumes/Build/github/3rdparty/build/macosx/arm64.debug/lib/python")
-print("[Python] sys.path:", sys.path)
-)");
+    PyObject* sysPath = PySys_GetObject("path");  // borrowed reference
+    if (sysPath && PyList_Check(sysPath)) {
+        PyObject* path = PyUnicode_FromString(PXR_PYTHON_DIR);
+        if (path) {
+            if (PySequence_Contains(sysPath, path) == 0)
+                PyList_Insert(sysPath, 0, path);
+            Py_DECREF(path);
+        }
+    }
 
     PyObject* mainModule = PyImport_AddModule("__main__");
     PyObject* mainDict = PyModule_GetDict(mainModule);

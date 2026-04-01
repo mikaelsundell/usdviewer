@@ -1195,14 +1195,16 @@ ViewerPrivate::updateStatus(const QString& message, bool error)
 void
 ViewerPrivate::updateWindowTitle()
 {
+    const QString title = QStringLiteral("%1 %2 (%3)").arg(PROJECT_NAME, PROJECT_BUILD_DATE, PROJECT_BUILD_CONFIG);
     if (!session()->isLoaded()) {
-        d.viewer->setWindowTitle(PROJECT_NAME);
+        d.viewer->setWindowTitle(title);
         return;
     }
-    QString name = session()->filename().isEmpty() ? "Untitled" : QFileInfo(session()->filename()).fileName();
+    const QString filename = session()->filename();
+    QString name = filename.isEmpty() ? QStringLiteral("Untitled") : QFileInfo(filename).fileName();
     if (d.modified)
-        name.prepend("*");
-    d.viewer->setWindowTitle(QString("%1: %2").arg(PROJECT_NAME, name));
+        name.prepend(QLatin1Char('*'));
+    d.viewer->setWindowTitle(QStringLiteral("%1: %2").arg(title, name));
 }
 
 bool

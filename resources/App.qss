@@ -145,7 +145,18 @@ QMenu::separator {
 QMenu::indicator {
     width: 16px;
     height: 16px;
+}
+
+QMenu::indicator:checked {
     image: url("$icon.checked");
+}
+
+QMenu::indicator:indeterminate {
+    image: url("$icon.partiallychecked");
+}
+
+QMenu::indicator:unchecked {
+    image: none;
 }
 
 QMenu::right-arrow {

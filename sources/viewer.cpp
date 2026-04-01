@@ -80,10 +80,8 @@ public Q_SLOTS:
     void stageUpY();
     void stageUpZ();
     void loadSelected();
-    void loadRecursive();
     void loadVariant(int variant);
     void unloadSelected();
-    void unloadRecursive();
     void deleteSelected();
     void isolate(bool checked);
     void frameAll();
@@ -224,7 +222,6 @@ ViewerPrivate::init()
         }
     }
     connect(d.ui->editLoadSelected, &QAction::triggered, this, &ViewerPrivate::loadSelected);
-    connect(d.ui->editLoadRecursive, &QAction::triggered, this, &ViewerPrivate::loadRecursive);
     connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
     connect(d.ui->editLoadVariant1, &QAction::triggered, this, [=]() { loadVariant(0); });
     connect(d.ui->editLoadVariant2, &QAction::triggered, this, [=]() { loadVariant(1); });
@@ -236,7 +233,6 @@ ViewerPrivate::init()
     connect(d.ui->editLoadVariant8, &QAction::triggered, this, [=]() { loadVariant(8); });
     connect(d.ui->editLoadVariant9, &QAction::triggered, this, [=]() { loadVariant(9); });
     connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::unloadSelected);
-    connect(d.ui->editUnloadRecursive, &QAction::triggered, this, &ViewerPrivate::unloadRecursive);
     connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
     connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
@@ -479,14 +475,32 @@ ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 void
 ViewerPrivate::enable(bool enable)
 {
-    QList<QAction*> actions
-        = { d.ui->fileReload,           d.ui->fileClose,           d.ui->fileSave,           d.ui->fileSaveAs,
-            d.ui->fileSaveCopy,         d.ui->fileExportAll,       d.ui->fileExportSelected, d.ui->fileExportImage,
-            d.ui->editCopyImage,        d.ui->editDeleteSelected,  d.ui->editShowSelected,   d.ui->editShowRecursive,
-            d.ui->editHideSelected,     d.ui->editHideRecursive,   d.ui->editLoadRecursive,  d.ui->editLoadRecursive,
-            d.ui->editUnloadSelected,   d.ui->editUnloadRecursive, d.ui->displayIsolate,     d.ui->displayFrameAll,
-            d.ui->displayFrameSelected, d.ui->displayResetView,    d.ui->displayExpand,      d.ui->displayCollapse,
-            d.ui->renderShaded,         d.ui->renderWireframe,     d.ui->stageUpY,           d.ui->stageUpZ };
+    QList<QAction*> actions = { d.ui->fileReload,
+                                d.ui->fileClose,
+                                d.ui->fileSave,
+                                d.ui->fileSaveAs,
+                                d.ui->fileSaveCopy,
+                                d.ui->fileExportAll,
+                                d.ui->fileExportSelected,
+                                d.ui->fileExportImage,
+                                d.ui->editCopyImage,
+                                d.ui->editDeleteSelected,
+                                d.ui->editShowSelected,
+                                d.ui->editShowRecursive,
+                                d.ui->editHideSelected,
+                                d.ui->editHideRecursive,
+                                d.ui->editLoadSelected,
+                                d.ui->editUnloadSelected,
+                                d.ui->displayIsolate,
+                                d.ui->displayFrameAll,
+                                d.ui->displayFrameSelected,
+                                d.ui->displayResetView,
+                                d.ui->displayExpand,
+                                d.ui->displayCollapse,
+                                d.ui->renderShaded,
+                                d.ui->renderWireframe,
+                                d.ui->stageUpY,
+                                d.ui->stageUpZ };
     for (QAction* action : actions) {
         if (action)
             action->setEnabled(enable);
@@ -889,7 +903,7 @@ ViewerPrivate::loadSelected()
     const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
     if (selectedPaths.isEmpty())
         return;
-    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
+
     QList<SdfPath> payloadPaths;
     {
         READ_LOCKER(locker, session()->stageLock(), "stageLock");
@@ -897,28 +911,9 @@ ViewerPrivate::loadSelected()
         if (!stage)
             return;
 
-        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+        payloadPaths = stage::selectionPayloadPaths(stage, selectedPaths);
     }
 
-    if (!payloadPaths.isEmpty())
-        session()->commandStack()->run(new Command(loadPayloads(payloadPaths)));
-}
-
-void
-ViewerPrivate::loadRecursive()
-{
-    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
-    if (selectedPaths.isEmpty())
-        return;
-    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
-    QList<SdfPath> payloadPaths;
-    {
-        READ_LOCKER(locker, session()->stageLock(), "stageLock");
-        const UsdStageRefPtr stage = session()->stageUnsafe();
-        if (!stage)
-            return;
-        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
-    }
     if (!payloadPaths.isEmpty())
         session()->commandStack()->run(new Command(loadPayloads(payloadPaths)));
 }
@@ -930,8 +925,6 @@ ViewerPrivate::loadVariant(int variant)
     if (selectedPaths.isEmpty() || variant < 0)
         return;
 
-    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
-
     QList<SdfPath> payloadPaths;
     QMap<QString, QList<QString>> variantSets;
     {
@@ -940,8 +933,8 @@ ViewerPrivate::loadVariant(int variant)
         if (!stage)
             return;
 
-        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
-        variantSets = stage::findVariantSets(stage, selectedPaths, true);
+        payloadPaths = stage::selectionPayloadPaths(stage, selectedPaths);
+        variantSets = stage::findVariantSets(stage, payloadPaths, true);
     }
 
     if (payloadPaths.isEmpty() || variantSets.isEmpty())
@@ -966,52 +959,8 @@ void
 ViewerPrivate::unloadSelected()
 {
     const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
-    qDebug() << "unloadSelected: selected paths =" << selectedPaths.size();
-    for (const SdfPath& path : selectedPaths)
-        qDebug() << "unloadSelected: selected" << qt::StringToQString(path.GetString());
-
-    if (selectedPaths.isEmpty()) {
-        qDebug() << "unloadSelected: no selected paths";
-        return;
-    }
-
-    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
-    qDebug() << "unloadSelected: root paths =" << rootPaths.size();
-    for (const SdfPath& path : rootPaths)
-        qDebug() << "unloadSelected: root" << qt::StringToQString(path.GetString());
-
-    QList<SdfPath> payloadPaths;
-    {
-        READ_LOCKER(locker, session()->stageLock(), "stageLock");
-        const UsdStageRefPtr stage = session()->stageUnsafe();
-        if (!stage) {
-            qDebug() << "unloadSelected: missing stage";
-            return;
-        }
-
-        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
-        qDebug() << "unloadSelected: payload paths =" << payloadPaths.size();
-        for (const SdfPath& path : payloadPaths)
-            qDebug() << "unloadSelected: payload" << qt::StringToQString(path.GetString());
-    }
-
-    if (payloadPaths.isEmpty()) {
-        qDebug() << "unloadSelected: no payload paths found";
-        return;
-    }
-
-    qDebug() << "unloadSelected: running unloadPayloads";
-    session()->commandStack()->run(new Command(unloadPayloads(payloadPaths)));
-}
-
-void
-ViewerPrivate::unloadRecursive()
-{
-    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
     if (selectedPaths.isEmpty())
         return;
-
-    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
 
     QList<SdfPath> payloadPaths;
     {
@@ -1020,7 +969,7 @@ ViewerPrivate::unloadRecursive()
         if (!stage)
             return;
 
-        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+        payloadPaths = stage::selectionPayloadPaths(stage, selectedPaths);
     }
 
     if (!payloadPaths.isEmpty())
@@ -1197,47 +1146,79 @@ ViewerPrivate::boundingBoxChanged(const GfBBox3d& bbox)
 void
 ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
-    if (paths.size()) {
-        d.ui->displayExpand->setEnabled(true);
-        d.ui->displayIsolate->setEnabled(true);
-    }
-    else {
-        d.ui->displayExpand->setEnabled(false);
-        d.ui->displayIsolate->setEnabled(false);
-    }
+    const bool hasSelection = !paths.isEmpty();
+    d.ui->displayExpand->setEnabled(hasSelection);
+
+    QList<QMenu*> staleMenus;
     for (QObject* child : d.ui->editLoad->children()) {
-        QMenu* m = qobject_cast<QMenu*>(child);
-        if (m && m->property("variantMenu").toBool()) {
-            delete m;
+        QMenu* menu = qobject_cast<QMenu*>(child);
+        if (menu && menu->property("variantMenu").toBool())
+            staleMenus.append(menu);
+    }
+    for (QMenu* menu : staleMenus)
+        delete menu;
+
+    d.ui->editLoadSelected->setEnabled(false);
+    d.ui->editUnloadSelected->setEnabled(false);
+
+    if (!hasSelection)
+        return;
+
+    QList<SdfPath> payloadPaths;
+    QMap<QString, QList<QString>> variantSets;
+    bool canLoadSelected = false;
+    bool canUnloadSelected = false;
+
+    {
+        READ_LOCKER(locker, session()->stageLock(), "stageLock");
+        const UsdStageRefPtr stage = session()->stageUnsafe();
+        if (!stage)
+            return;
+
+        payloadPaths = stage::selectionPayloadPaths(stage, paths);
+        variantSets = stage::findVariantSets(stage, payloadPaths, true);
+
+        for (const SdfPath& payloadPath : payloadPaths) {
+            const bool loaded = stage::isLoaded(stage, payloadPath);
+            if (loaded)
+                canUnloadSelected = true;
+            else
+                canLoadSelected = true;
+
+            if (canLoadSelected && canUnloadSelected)
+                break;
         }
     }
-    if (!paths.isEmpty()) {
-        QMap<QString, QList<QString>> variantSets = stage::findVariantSets(session()->stage(), paths, true);
 
-        if (!variantSets.isEmpty()) {
-            d.ui->editLoad->addSeparator();
-            int index = 0;
-            for (auto it = variantSets.begin(); it != variantSets.end(); ++it) {
-                const QString& setName = it.key();
-                const QList<QString>& values = it.value();
+    d.ui->editLoadSelected->setEnabled(canLoadSelected);
+    d.ui->editUnloadSelected->setEnabled(canUnloadSelected);
 
-                QMenu* setMenu = d.ui->editLoad->addMenu(setName);
-                setMenu->setProperty("variantMenu", true);
+    if (payloadPaths.isEmpty() || variantSets.isEmpty())
+        return;
 
-                for (const QString& value : values) {
-                    QAction* action = setMenu->addAction(value);
-                    if (index < 10) {
-                        int key = (index == 9) ? Qt::Key_0 : (Qt::Key_1 + index);
-                        action->setShortcut(QKeySequence(key));
-                    }
-                    QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
-                        QList<SdfPath> payloadPaths = stage::ancestorPayloadPaths(session()->stage(), stage::rootPaths(paths));
+    d.ui->editLoad->addSeparator();
 
-                        session()->commandStack()->run(new Command(loadPayloads(payloadPaths, setName, value)));
-                    });
-                    index++;
-                }
+    int index = 0;
+    for (auto it = variantSets.cbegin(); it != variantSets.cend(); ++it) {
+        const QString& setName = it.key();
+        const QList<QString>& values = it.value();
+
+        QMenu* setMenu = d.ui->editLoad->addMenu(setName);
+        setMenu->setProperty("variantMenu", true);
+
+        for (const QString& value : values) {
+            QAction* action = setMenu->addAction(value);
+            if (index < 10) {
+                const int key = (index == 9) ? Qt::Key_0 : (Qt::Key_1 + index);
+                action->setShortcut(QKeySequence(key));
             }
+
+            QObject::connect(action, &QAction::triggered, d.viewer, [this, payloadPaths, setName, value]() {
+                if (!payloadPaths.isEmpty())
+                    session()->commandStack()->run(new Command(loadPayloads(payloadPaths, setName, value)));
+            });
+
+            ++index;
         }
     }
 }
@@ -1302,7 +1283,7 @@ ViewerPrivate::updateStatus(const QString& message, bool error)
     QString text = error ? QString(" error: %1").arg(message) : QString(" %1").arg(message);
     int timeoutMs = 6000;
     bar->showMessage(text, timeoutMs);
-    QTimer::singleShot(timeoutMs, bar, [bar]() { bar->showMessage(" Ready."); });
+    QTimer::singleShot(timeoutMs, bar, [bar]() { bar->showMessage(" Ready"); });
 }
 
 void

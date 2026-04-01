@@ -78,6 +78,7 @@ public:
         QString filter;
         QList<SdfPath> loadPaths;
         QList<SdfPath> unloadPaths;
+        QList<SdfPath> maskPaths;
         UsdStageRefPtr stage;
         QPointer<ViewContext> context;
         QPointer<StageTree> tree;
@@ -518,7 +519,7 @@ StageTree::dragMoveEvent(QDragMoveEvent* event)
         return;
     }
 
-    QTreeWidgetItem* target = itemAt(event->pos());
+    QTreeWidgetItem* target = itemAt(event->position().toPoint());
     if (!target) {
         event->ignore();
         return;
@@ -536,7 +537,7 @@ StageTree::dropEvent(QDropEvent* event)
         return;
     }
 
-    QTreeWidgetItem* targetItem = itemAt(event->pos());
+    QTreeWidgetItem* targetItem = itemAt(event->position().toPoint());
     if (!targetItem) {
         event->ignore();
         return;
@@ -568,30 +569,104 @@ void
 StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 {
     QList<SdfPath> paths;
+    QList<PrimItem*> selectedItems;
+    selectedItems.reserve(d.tree->selectedItems().size());
+
     for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
         PrimItem* primItem = static_cast<PrimItem*>(selected);
         const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
-        if (!pathString.isEmpty())
-            paths.append(SdfPath(qt::QStringToString(pathString)));
+        if (pathString.isEmpty())
+            continue;
+
+        selectedItems.append(primItem);
+        paths.append(SdfPath(qt::QStringToString(pathString)));
     }
     if (paths.isEmpty())
         return;
 
-    const QList<SdfPath> rootPaths = stage::rootPaths(paths);
+    const QList<SdfPath> topLevelPaths = stage::topLevelPaths(paths);
 
     SdfPath createParentPath;
-    if (!rootPaths.isEmpty())
-        createParentPath = rootPaths.first();
+    if (!topLevelPaths.isEmpty())
+        createParentPath = topLevelPaths.first();
 
-    QList<SdfPath> payloadPaths;
-    QMap<QString, QList<QString>> variantSets;
-    {
+    auto payloadPathsAtSelection = [&]() {
+        QList<SdfPath> result;
         READ_LOCKER(locker, d.context->stageLock(), "stageLock");
         if (!d.stage)
-            return;
-        payloadPaths = stage::descendantsPayloadPaths(d.stage, rootPaths);
-        variantSets = stage::findVariantSets(d.stage, paths, true);
+            return result;
+        return stage::payloadPaths(d.stage, topLevelPaths);
+    };
+
+    auto payloadPathsInSelection = [&]() {
+        QList<SdfPath> result;
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        if (!d.stage)
+            return result;
+        return stage::descendantsPayloadPaths(d.stage, topLevelPaths);
+    };
+
+    auto maskContainsCurrentSelection = [&](const QList<SdfPath>& maskPaths, const QList<SdfPath>& selectedPaths) {
+        if (maskPaths.isEmpty() || selectedPaths.isEmpty())
+            return false;
+
+        for (const SdfPath& selectedPath : selectedPaths) {
+            bool found = false;
+            for (const SdfPath& maskPath : maskPaths) {
+                if (selectedPath == maskPath) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return false;
+        }
+        return true;
+    };
+
+    const bool isolateChecked = maskContainsCurrentSelection(d.maskPaths, paths);
+
+    bool canLoadSelected = false;
+    bool canUnloadSelected = false;
+
+    if (d.payloadEnabled) {
+        for (PrimItem* item : selectedItems) {
+            const Qt::CheckState state = item->checkState(PrimItem::Name);
+
+            if (state == Qt::Unchecked || state == Qt::PartiallyChecked)
+                canLoadSelected = true;
+            if (state == Qt::Checked || state == Qt::PartiallyChecked)
+                canUnloadSelected = true;
+        }
     }
+    else {
+        const QList<SdfPath> exactPayloadPaths = payloadPathsAtSelection();
+        canLoadSelected = !exactPayloadPaths.isEmpty();
+        canUnloadSelected = !exactPayloadPaths.isEmpty();
+    }
+
+    bool canShowSelected = false;
+    bool canHideSelected = false;
+    {
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        if (d.stage) {
+            for (const SdfPath& path : paths) {
+                const bool visible = stage::isVisible(d.stage, path);
+                if (visible)
+                    canHideSelected = true;
+                else
+                    canShowSelected = true;
+
+                if (canShowSelected && canHideSelected)
+                    break;
+            }
+        }
+    }
+
+    auto setSelectedCheckState = [&](Qt::CheckState state) {
+        for (PrimItem* item : selectedItems)
+            item->setCheckState(PrimItem::Name, state);
+    };
 
     QMenu menu(d.tree.data());
     struct VariantSelection {
@@ -599,52 +674,56 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         QString value;
     };
 
-    QAction* loadSelected = nullptr;
-    QAction* unloadSelected = nullptr;
+    QMenu* loadVariantMenu = menu.addMenu("Load Variant");
     QMap<QAction*, VariantSelection> variantActions;
-    if (!payloadPaths.isEmpty()) {
-        if (!variantSets.isEmpty()) {
-            QMenu* loadMenu = menu.addMenu("Load");
-            QMenu* unloadMenu = menu.addMenu("Unload");
+    {
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        if (!d.stage)
+            return;
 
-            loadSelected = loadMenu->addAction("Selected");
-            unloadSelected = unloadMenu->addAction("Selected");
-            loadMenu->addSeparator();
+        const QMap<QString, QList<QString>> variantSets = stage::findVariantSets(d.stage, paths, false);
+        for (auto it = variantSets.begin(); it != variantSets.end(); ++it) {
+            const QString& setName = it.key();
+            const QList<QString>& values = it.value();
 
-            for (auto it = variantSets.begin(); it != variantSets.end(); ++it) {
-                const QString& setName = it.key();
-                const QList<QString>& values = it.value();
-
-                QMenu* setMenu = loadMenu->addMenu(setName);
-                for (const QString& value : values) {
-                    QAction* action = setMenu->addAction(value);
-                    variantActions[action] = { setName, value };
-                }
+            QMenu* setMenu = loadVariantMenu->addMenu(setName);
+            for (const QString& value : values) {
+                QAction* action = setMenu->addAction(value);
+                variantActions[action] = { setName, value };
             }
         }
-        else {
-            loadSelected = menu.addAction("Load");
-            unloadSelected = menu.addAction("Unload");
-        }
+        if (variantActions.isEmpty())
+            loadVariantMenu->setEnabled(false);
     }
 
     menu.addSeparator();
-    QAction* newXform = menu.addAction("New xform");
+
+    QAction* loadSelected = menu.addAction("Load");
+    QAction* unloadSelected = menu.addAction("Unload");
+
+    loadSelected->setEnabled(canLoadSelected);
+    unloadSelected->setEnabled(canUnloadSelected);
 
     menu.addSeparator();
     QMenu* showMenu = menu.addMenu("Show");
     QAction* showSelected = showMenu->addAction("Selected");
     QAction* showRecursive = showMenu->addAction("Recursive");
+    showSelected->setEnabled(canShowSelected);
+    showRecursive->setEnabled(canShowSelected);
 
     QMenu* hideMenu = menu.addMenu("Hide");
     QAction* hideSelected = hideMenu->addAction("Selected");
     QAction* hideRecursive = hideMenu->addAction("Recursive");
+    hideSelected->setEnabled(canHideSelected);
+    hideRecursive->setEnabled(canHideSelected);
 
     menu.addSeparator();
-    QAction* isolateSelected = menu.addAction("Isolate");
-    QAction* isolateClear = menu.addAction("Clear");
+    QAction* isolateAction = menu.addAction("Isolate");
+    isolateAction->setCheckable(true);
+    isolateAction->setChecked(isolateChecked);
 
     menu.addSeparator();
+    QAction* newXform = menu.addAction("New xform");
     QAction* deleteSelected = menu.addAction("Delete");
 
     QAction* chosen = menu.exec(d.tree->mapToGlobal(event->pos()));
@@ -652,23 +731,44 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         return;
 
     if (chosen == loadSelected) {
-        d.context->run(new Command(loadPayloads(payloadPaths)));
+        if (d.payloadEnabled) {
+            setSelectedCheckState(Qt::Checked);
+        }
+        else {
+            const QList<SdfPath> payloadPaths = payloadPathsAtSelection();
+            if (!payloadPaths.isEmpty())
+                d.context->run(new Command(loadPayloads(payloadPaths)));
+        }
         return;
     }
+
     if (chosen == unloadSelected) {
-        d.context->run(new Command(unloadPayloads(payloadPaths)));
+        if (d.payloadEnabled) {
+            setSelectedCheckState(Qt::Unchecked);
+        }
+        else {
+            const QList<SdfPath> payloadPaths = payloadPathsAtSelection();
+            if (!payloadPaths.isEmpty())
+                d.context->run(new Command(unloadPayloads(payloadPaths)));
+        }
         return;
     }
+
     if (variantActions.contains(chosen)) {
-        const VariantSelection& sel = variantActions[chosen];
-        d.context->run(new Command(loadPayloads(payloadPaths, sel.setName, sel.value)));
+        const QList<SdfPath> payloadPaths = payloadPathsInSelection();
+        if (!payloadPaths.isEmpty()) {
+            const VariantSelection& sel = variantActions[chosen];
+            d.context->run(new Command(loadPayloads(payloadPaths, sel.setName, sel.value)));
+        }
         return;
     }
+
     if (chosen == newXform) {
         if (!createParentPath.IsEmpty())
             d.context->run(new Command(newXformPath(createParentPath, "Xform")));
         return;
     }
+
     if (chosen == showSelected)
         d.context->run(new Command(showPaths(paths, false)));
     else if (chosen == showRecursive)
@@ -677,10 +777,8 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         d.context->run(new Command(hidePaths(paths, false)));
     else if (chosen == hideRecursive)
         d.context->run(new Command(hidePaths(paths, true)));
-    else if (chosen == isolateSelected)
-        d.context->run(new Command(isolatePaths(paths)));
-    else if (chosen == isolateClear)
-        d.context->run(new Command(isolatePaths(QList<SdfPath>())));
+    else if (chosen == isolateAction)
+        d.context->run(new Command(isolatePaths(isolateAction->isChecked() ? paths : QList<SdfPath>())));
     else if (chosen == deleteSelected)
         d.context->run(new Command(deletePaths(paths)));
 }
@@ -702,9 +800,7 @@ StageTreePrivate::updateStage(UsdStageRefPtr stage)
 
     PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
 
-    // Always start clean.
     itemCheckState(rootItem, false, false);
-
     addChildren(rootItem, prim.GetPath());
     initTree();
 
@@ -1164,10 +1260,19 @@ StageTree::payloadEnabled() const
 void
 StageTree::setPayloadEnabled(bool enabled)
 {
-    if (enabled != p->d.payloadEnabled) {
+    if (p->d.payloadEnabled != enabled) {
         p->d.payloadEnabled = enabled;
     }
 }
+
+void
+StageTree::updateMask(const QList<SdfPath>& paths)
+{
+    if (p->d.maskPaths != paths) {
+        p->d.maskPaths = paths;
+    }
+}
+
 
 void
 StageTree::updateStage(UsdStageRefPtr stage)

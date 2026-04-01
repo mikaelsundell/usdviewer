@@ -5,11 +5,11 @@
 #include "stageutils.h"
 #include "qtutils.h"
 #include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
-#include <QSet>
 #include <stack>
 
 namespace usdviewer {
@@ -17,21 +17,11 @@ namespace stage {
     QMap<QString, QList<QString>> findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive)
     {
         QMap<QString, QList<QString>> result;
-        std::vector<SdfPath> filtered;
-        filtered.reserve(paths.size());
-        for (const SdfPath& p : paths) {
-            bool isChild = false;
-            for (const SdfPath& other : paths) {
-                if (p == other)
-                    continue;
-                if (p.HasPrefix(other)) {
-                    isChild = true;
-                    break;
-                }
-            }
-            if (!isChild)
-                filtered.push_back(p);
-        }
+        if (!stage || paths.isEmpty())
+            return result;
+
+        const QList<SdfPath> filtered = topLevelPaths(paths);
+
         std::vector<UsdPrim> prims;
         prims.reserve(filtered.size() * 4);
 
@@ -47,44 +37,44 @@ namespace stage {
                 stack.push(root);
 
                 while (!stack.empty()) {
-                    UsdPrim p = stack.top();
+                    UsdPrim prim = stack.top();
                     stack.pop();
 
-                    for (const UsdPrim& child : p.GetAllChildren()) {
+                    for (const UsdPrim& child : prim.GetAllChildren()) {
                         prims.push_back(child);
                         stack.push(child);
                     }
                 }
             }
         }
+
         for (const UsdPrim& prim : prims) {
             if (!prim)
                 continue;
 
             const std::vector<std::string> setNames = prim.GetVariantSets().GetNames();
             for (const std::string& setName : setNames) {
-                UsdVariantSet vs = prim.GetVariantSet(setName);
-                const std::vector<std::string> variantNames = vs.GetVariantNames();
-                QString key = QString::fromUtf8(setName.c_str());
+                UsdVariantSet variantSet = prim.GetVariantSet(setName);
+                const std::vector<std::string> variantNames = variantSet.GetVariantNames();
+                const QString key = QString::fromUtf8(setName.c_str());
 
                 QList<QString>& bucket = result[key];
                 bucket.reserve(bucket.size() + int(variantNames.size()));
-                for (const std::string& v : variantNames) {
-                    bucket.append(QString::fromUtf8(v.c_str()));
-                }
+                for (const std::string& value : variantNames)
+                    bucket.append(QString::fromUtf8(value.c_str()));
             }
         }
+
         for (auto it = result.begin(); it != result.end(); ++it) {
             QList<QString>& list = it.value();
-
             std::sort(list.begin(), list.end());
             list.erase(std::unique(list.begin(), list.end()), list.end());
         }
+
         return result;
     }
 
-    QList<SdfPath>
-    payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -108,8 +98,7 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath>
-    ancestorPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> ancestorPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -135,8 +124,7 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath>
-    descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -168,7 +156,43 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath> rootPaths(const QList<SdfPath>& paths)
+    QList<SdfPath>
+    selectionPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    {
+        QList<SdfPath> result;
+        if (!stage || paths.isEmpty())
+            return result;
+
+        const QList<SdfPath> roots = stage::topLevelPaths(paths);
+
+        for (const SdfPath& path : roots) {
+            if (path.IsEmpty())
+                continue;
+
+            SdfPath payloadPath;
+            SdfPath currentPath = path;
+
+            while (!currentPath.IsEmpty() && currentPath != SdfPath::AbsoluteRootPath()) {
+                if (stage::isPayload(stage, currentPath)) {
+                    payloadPath = currentPath;
+                    break;
+                }
+                currentPath = currentPath.GetParentPath();
+            }
+
+            if (!payloadPath.IsEmpty()) {
+                result.append(payloadPath);
+                continue;
+            }
+
+            const QList<SdfPath> descendantPayloads = stage::descendantsPayloadPaths(stage, { path });
+            result.append(descendantPayloads);
+        }
+
+        return stage::topLevelPaths(result);
+    }
+
+    QList<SdfPath> topLevelPaths(const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         result.reserve(paths.size());
@@ -222,6 +246,34 @@ namespace stage {
             return false;
 
         return editLayer->GetPrimAtPath(path) != nullptr;
+    }
+
+    bool
+    isLoaded(UsdStageRefPtr stage, const SdfPath& path)
+    {
+        if (!stage || path.IsEmpty())
+            return false;
+
+        const UsdPrim rootPrim = (path == SdfPath::AbsoluteRootPath()) ? stage->GetPseudoRoot() : stage->GetPrimAtPath(path);
+        if (!rootPrim)
+            return false;
+
+        bool foundPayload = false;
+
+        for (const UsdPrim& prim : UsdPrimRange(rootPrim)) {
+            if (!prim)
+                continue;
+
+            if (!stage::isPayload(stage, prim.GetPath()))
+                continue;
+
+            foundPayload = true;
+
+            if (!prim.IsLoaded())
+                return false;
+        }
+
+        return foundPayload;
     }
 
     bool isPayload(UsdStageRefPtr stage, const SdfPath& path)

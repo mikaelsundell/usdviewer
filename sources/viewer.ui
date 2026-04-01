@@ -415,7 +415,6 @@
      </property>
      <addaction name="separator"/>
      <addaction name="editLoadSelected"/>
-     <addaction name="editLoadRecursive"/>
      <addaction name="separator"/>
     </widget>
     <widget class="QMenu" name="editUnload">
@@ -423,7 +422,6 @@
       <string>Unload</string>
      </property>
      <addaction name="editUnloadSelected"/>
-     <addaction name="editUnloadRecursive"/>
     </widget>
     <widget class="QMenu" name="menu">
      <property name="title">

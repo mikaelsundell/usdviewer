@@ -133,6 +133,16 @@ public:
     ///@{
 
     /**
+     * @brief Updates the active stage mask state in the tree.
+     *
+     * Applies the current isolation or masking paths so the widget can
+     * reflect which prims are considered active in the stage view.
+     *
+     * @param paths Masked prim paths.
+     */
+    void updateMask(const QList<SdfPath>& paths);
+
+    /**
      * @brief Updates the tree from a USD stage.
      *
      * Rebuilds the tree hierarchy to reflect the contents
@@ -175,13 +185,48 @@ Q_SIGNALS:
     void primSelectionChanged(const QList<SdfPath>& paths);
 
 protected:
-    void startDrag(Qt::DropActions supportedActions) override;
-    void dragEnterEvent(QDragEnterEvent* event) override;
-    void dragMoveEvent(QDragMoveEvent* event) override;
-    void dropEvent(QDropEvent* event) override;
-
     /** @name Event Handling */
     ///@{
+
+    /**
+     * @brief Starts a drag operation from the current tree selection.
+     *
+     * Packages the selected prim paths into drag mime data and begins
+     * a drag using the supported drop actions.
+     *
+     * @param supportedActions Allowed drag-and-drop actions.
+     */
+    void startDrag(Qt::DropActions supportedActions) override;
+
+    /**
+     * @brief Handles drag enter events for incoming tree drops.
+     *
+     * Validates the incoming mime data and accepts the event when the
+     * dragged payload can be handled by the stage tree.
+     *
+     * @param event Drag enter event.
+     */
+    void dragEnterEvent(QDragEnterEvent* event) override;
+
+    /**
+     * @brief Handles drag move events over the tree.
+     *
+     * Updates drag feedback while the cursor moves across potential
+     * drop targets in the stage hierarchy.
+     *
+     * @param event Drag move event.
+     */
+    void dragMoveEvent(QDragMoveEvent* event) override;
+
+    /**
+     * @brief Handles drop events in the tree.
+     *
+     * Resolves the target item under the cursor and applies the
+     * corresponding stage operation for the dropped prim paths.
+     *
+     * @param event Drop event.
+     */
+    void dropEvent(QDropEvent* event) override;
 
     /**
      * @brief Handles context menu requests.

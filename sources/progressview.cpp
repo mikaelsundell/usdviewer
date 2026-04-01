@@ -43,6 +43,7 @@ public Q_SLOTS:
     void progressBlockChanged(const QString& name, Session::ProgressMode mode);
     void progressNotifyChanged(const Session::Notify& notify, size_t completed, size_t expected);
     void progressItemSelectionChanged();
+    void maskChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
 

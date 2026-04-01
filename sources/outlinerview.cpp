@@ -36,6 +36,7 @@ public Q_SLOTS:
     void follow(bool enabled);
     void filterChanged(const QString& filter);
     void primsChanged(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated);
+    void maskChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void depthChanged(int value);
@@ -83,6 +84,7 @@ OutlinerViewPrivate::init()
     connect(d.ui->expand, &QToolButton::clicked, this, &OutlinerViewPrivate::expand);
     connect(d.ui->follow, &QToolButton::toggled, this, &OutlinerViewPrivate::follow);
     connect(d.ui->depth, &QSlider::valueChanged, this, &OutlinerViewPrivate::depthChanged);
+    connect(session(), &Session::maskChanged, this, &OutlinerViewPrivate::maskChanged);
     connect(session(), &Session::stageChanged, this, &OutlinerViewPrivate::stageChanged);
     connect(session(), &Session::primsChanged, this, &OutlinerViewPrivate::primsChanged);
     connect(session()->selectionList(), &SelectionList::selectionChanged, this, &OutlinerViewPrivate::selectionChanged);
@@ -175,6 +177,12 @@ OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPa
 {
     propertyTree()->updatePrims(paths, invalidated);
     stageTree()->updatePrims(paths, invalidated);
+}
+
+void
+OutlinerViewPrivate::maskChanged(const QList<SdfPath>& paths)
+{
+    stageTree()->updateMask(paths);
 }
 
 void

@@ -72,6 +72,32 @@ namespace stage {
     QList<SdfPath> descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths);
 
     /**
+     * @brief Resolves selection paths to payload prim paths for load/unload operations.
+     *
+     * For each path in @p paths, this function first checks whether the path
+     * itself, or any of its ancestors, directly authors or contains a payload.
+     * If so, the nearest such payload ancestor is used as the resolved payload
+     * path for that selection.
+     *
+     * If no payload ancestor is found for a selection path, the path is treated
+     * as a container root and payload prims are collected recursively at and
+     * below that path.
+     *
+     * The final result is deduplicated and reduced to top-most payload paths,
+     * so overlapping selections do not produce redundant nested payload entries.
+     *
+     * This helper is intended for selection-driven load and unload behavior,
+     * where a selection may refer either to a prim inside a payload hierarchy
+     * or to a non-payload container that contains payloads below it.
+     *
+     * @param stage USD stage to query.
+     * @param paths Selected prim paths to resolve.
+     *
+     * @return List of resolved payload prim paths for the selection.
+     */
+    QList<SdfPath> selectionPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths);
+
+    /**
      * @brief Filters a list of prim paths to only top-most paths.
      *
      * Removes paths that are descendants of other paths in the list.
@@ -90,7 +116,7 @@ namespace stage {
      *
      * @return List of top-most prim paths.
      */
-    QList<SdfPath> rootPaths(const QList<SdfPath>& paths);
+    QList<SdfPath> topLevelPaths(const QList<SdfPath>& paths);
 
     /**
      * @brief Computes the bounding box for the specified prim paths.
@@ -132,6 +158,26 @@ namespace stage {
      * @return True if the prim exists in the edit target layer, false otherwise.
      */
     bool isEditTarget(UsdStageRefPtr stage, const SdfPath& path);
+
+    /**
+     * @brief Checks whether payloads at and below a prim path are fully loaded.
+     *
+     * Traverses the prim at the given path and its descendant hierarchy,
+     * evaluating payload prims found at or below that path.
+     *
+     * The function returns true only if one or more payload prims are found
+     * and all such payload prims are currently loaded.
+     *
+     * This is useful when a selected prim may either be a payload prim itself
+     * or a non-payload container that contains payload prims below it.
+     *
+     * @param stage USD stage containing the prim hierarchy.
+     * @param path  Root prim path to evaluate.
+     *
+     * @return True if one or more payload prims are found at or below the path
+     *         and all of them are loaded, false otherwise.
+     */
+    bool isLoaded(UsdStageRefPtr stage, const SdfPath& path);
 
     /**
      * @brief Checks whether a prim has a payload.

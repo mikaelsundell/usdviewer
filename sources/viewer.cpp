@@ -17,6 +17,7 @@
 #include "settings.h"
 #include "stageutils.h"
 #include "style.h"
+#include "tracelocks.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
@@ -885,33 +886,145 @@ ViewerPrivate::stageUpZ()
 void
 ViewerPrivate::loadSelected()
 {
-    qDebug() << "loadSelected";
+    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
+    if (selectedPaths.isEmpty())
+        return;
+    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
+    QList<SdfPath> payloadPaths;
+    {
+        READ_LOCKER(locker, session()->stageLock(), "stageLock");
+        const UsdStageRefPtr stage = session()->stageUnsafe();
+        if (!stage)
+            return;
+
+        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+    }
+
+    if (!payloadPaths.isEmpty())
+        session()->commandStack()->run(new Command(loadPayloads(payloadPaths)));
 }
 
 void
 ViewerPrivate::loadRecursive()
 {
-    qDebug() << "loadRecursive";
+    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
+    if (selectedPaths.isEmpty())
+        return;
+    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
+    QList<SdfPath> payloadPaths;
+    {
+        READ_LOCKER(locker, session()->stageLock(), "stageLock");
+        const UsdStageRefPtr stage = session()->stageUnsafe();
+        if (!stage)
+            return;
+        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+    }
+    if (!payloadPaths.isEmpty())
+        session()->commandStack()->run(new Command(loadPayloads(payloadPaths)));
 }
-
-
 
 void
 ViewerPrivate::loadVariant(int variant)
 {
-    qDebug() << "loadVariant";
+    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
+    if (selectedPaths.isEmpty() || variant < 0)
+        return;
+
+    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
+
+    QList<SdfPath> payloadPaths;
+    QMap<QString, QList<QString>> variantSets;
+    {
+        READ_LOCKER(locker, session()->stageLock(), "stageLock");
+        const UsdStageRefPtr stage = session()->stageUnsafe();
+        if (!stage)
+            return;
+
+        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+        variantSets = stage::findVariantSets(stage, selectedPaths, true);
+    }
+
+    if (payloadPaths.isEmpty() || variantSets.isEmpty())
+        return;
+
+    int index = 0;
+    for (auto it = variantSets.cbegin(); it != variantSets.cend(); ++it) {
+        const QString& setName = it.key();
+        const QList<QString>& values = it.value();
+
+        for (const QString& value : values) {
+            if (index == variant) {
+                session()->commandStack()->run(new Command(loadPayloads(payloadPaths, setName, value)));
+                return;
+            }
+            ++index;
+        }
+    }
 }
 
 void
 ViewerPrivate::unloadSelected()
 {
-    qDebug() << "unloadSelected";
+    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
+    qDebug() << "unloadSelected: selected paths =" << selectedPaths.size();
+    for (const SdfPath& path : selectedPaths)
+        qDebug() << "unloadSelected: selected" << qt::StringToQString(path.GetString());
+
+    if (selectedPaths.isEmpty()) {
+        qDebug() << "unloadSelected: no selected paths";
+        return;
+    }
+
+    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
+    qDebug() << "unloadSelected: root paths =" << rootPaths.size();
+    for (const SdfPath& path : rootPaths)
+        qDebug() << "unloadSelected: root" << qt::StringToQString(path.GetString());
+
+    QList<SdfPath> payloadPaths;
+    {
+        READ_LOCKER(locker, session()->stageLock(), "stageLock");
+        const UsdStageRefPtr stage = session()->stageUnsafe();
+        if (!stage) {
+            qDebug() << "unloadSelected: missing stage";
+            return;
+        }
+
+        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+        qDebug() << "unloadSelected: payload paths =" << payloadPaths.size();
+        for (const SdfPath& path : payloadPaths)
+            qDebug() << "unloadSelected: payload" << qt::StringToQString(path.GetString());
+    }
+
+    if (payloadPaths.isEmpty()) {
+        qDebug() << "unloadSelected: no payload paths found";
+        return;
+    }
+
+    qDebug() << "unloadSelected: running unloadPayloads";
+    session()->commandStack()->run(new Command(unloadPayloads(payloadPaths)));
 }
 
 void
 ViewerPrivate::unloadRecursive()
 {
-    qDebug() << "unloadRecursive";
+    const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
+    if (selectedPaths.isEmpty())
+        return;
+
+    const QList<SdfPath> rootPaths = stage::rootPaths(selectedPaths);
+
+    QList<SdfPath> payloadPaths;
+    {
+        READ_LOCKER(locker, session()->stageLock(), "stageLock");
+        const UsdStageRefPtr stage = session()->stageUnsafe();
+        if (!stage)
+            return;
+
+        payloadPaths = stage::ancestorPayloadPaths(stage, rootPaths);
+    }
+
+    if (!payloadPaths.isEmpty())
+        session()->commandStack()->run(new Command(unloadPayloads(payloadPaths)));
 }
 
 void
@@ -1118,7 +1231,7 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
                         action->setShortcut(QKeySequence(key));
                     }
                     QObject::connect(action, &QAction::triggered, d.viewer, [this, paths, setName, value]() {
-                        QList<SdfPath> payloadPaths = stage::payloadPaths(session()->stage(), stage::rootPaths(paths));
+                        QList<SdfPath> payloadPaths = stage::ancestorPayloadPaths(session()->stage(), stage::rootPaths(paths));
 
                         session()->commandStack()->run(new Command(loadPayloads(payloadPaths, setName, value)));
                     });
@@ -1195,7 +1308,7 @@ ViewerPrivate::updateStatus(const QString& message, bool error)
 void
 ViewerPrivate::updateWindowTitle()
 {
-    const QString title = QStringLiteral("%1 %2 (%3)").arg(PROJECT_NAME, PROJECT_BUILD_DATE, PROJECT_BUILD_CONFIG);
+    const QString title = QStringLiteral("%1 build:%2 (%3)").arg(PROJECT_NAME, PROJECT_BUILD_DATE, PROJECT_BUILD_CONFIG);
     if (!session()->isLoaded()) {
         d.viewer->setWindowTitle(title);
         return;

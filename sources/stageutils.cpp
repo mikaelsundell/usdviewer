@@ -3,11 +3,13 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "stageutils.h"
+#include "qtutils.h"
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
+#include <QSet>
 #include <stack>
 
 namespace usdviewer {
@@ -81,25 +83,89 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive)
+    QList<SdfPath>
+    payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
-        QList<SdfPath> payloadPaths;
+        QList<SdfPath> result;
+        if (!stage || paths.isEmpty())
+            return result;
+
+        QSet<QString> seen;
+        for (const SdfPath& path : paths) {
+            const UsdPrim prim = stage->GetPrimAtPath(path);
+            if (!prim)
+                continue;
+
+            const SdfPath primPath = prim.GetPath();
+            const QString key = qt::StringToQString(primPath.GetString());
+
+            if (isPayload(stage, primPath) && !seen.contains(key)) {
+                seen.insert(key);
+                result.append(primPath);
+            }
+        }
+
+        return result;
+    }
+
+    QList<SdfPath>
+    ancestorPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    {
+        QList<SdfPath> result;
+        if (!stage || paths.isEmpty())
+            return result;
+
+        QSet<QString> seen;
+        for (const SdfPath& path : paths) {
+            UsdPrim prim = stage->GetPrimAtPath(path);
+            while (prim) {
+                const SdfPath primPath = prim.GetPath();
+                if (isPayload(stage, primPath)) {
+                    const QString key = qt::StringToQString(primPath.GetString());
+                    if (!seen.contains(key)) {
+                        seen.insert(key);
+                        result.append(primPath);
+                    }
+                    break;
+                }
+                prim = prim.GetParent();
+            }
+        }
+
+        return result;
+    }
+
+    QList<SdfPath>
+    descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    {
+        QList<SdfPath> result;
+        if (!stage || paths.isEmpty())
+            return result;
+
+        QSet<QString> seen;
         std::function<void(const UsdPrim&)> collect = [&](const UsdPrim& prim) {
             if (!prim)
                 return;
-            if (prim.HasPayload())
-                payloadPaths.append(prim.GetPath());
-            if (!recursive)
-                return;
-            for (const UsdPrim& c : prim.GetAllChildren())
-                collect(c);
+
+            const SdfPath primPath = prim.GetPath();
+            const QString key = qt::StringToQString(primPath.GetString());
+
+            if (isPayload(stage, primPath) && !seen.contains(key)) {
+                seen.insert(key);
+                result.append(primPath);
+            }
+
+            for (const UsdPrim& child : prim.GetAllChildren())
+                collect(child);
         };
-        for (const SdfPath& p : paths) {
-            UsdPrim prim = stage->GetPrimAtPath(p);
+
+        for (const SdfPath& path : paths) {
+            const UsdPrim prim = stage->GetPrimAtPath(path);
             if (prim)
                 collect(prim);
         }
-        return payloadPaths;
+
+        return result;
     }
 
     QList<SdfPath> rootPaths(const QList<SdfPath>& paths)

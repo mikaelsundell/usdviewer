@@ -589,7 +589,7 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         READ_LOCKER(locker, d.context->stageLock(), "stageLock");
         if (!d.stage)
             return;
-        payloadPaths = stage::payloadPaths(d.stage, rootPaths);
+        payloadPaths = stage::descendantsPayloadPaths(d.stage, rootPaths);
         variantSets = stage::findVariantSets(d.stage, paths, true);
     }
 

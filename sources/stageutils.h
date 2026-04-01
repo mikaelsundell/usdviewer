@@ -32,19 +32,44 @@ namespace stage {
                                                   bool recursive = false);
 
     /**
-     * @brief Collects payload prim paths under the specified prim paths.
+     * @brief Collects payload prim paths at the specified prim paths.
      *
-     * Traverses the given prim paths and collects all prims that contain
-     * payloads. When @p recursive is enabled, all descendants are also
-     * traversed.
+     * Checks each path in @p paths and returns those whose corresponding
+     * prim directly authors or contains a payload.
      *
      * @param stage USD stage to query.
-     * @param paths Root prim paths.
-     * @param recursive Traverse children recursively.
+     * @param paths Prim paths to test.
      *
-     * @return List of payload prim paths.
+     * @return List of payload prim paths found exactly at @p paths.
      */
-    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive = true);
+    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths);
+
+    /**
+     * @brief Collects nearest payload ancestor prim paths for the specified prim paths.
+     *
+     * For each path in @p paths, walks upward through its parent hierarchy until
+     * the nearest prim that directly authors or contains a payload is found.
+     * At most one payload ancestor is returned per input path.
+     *
+     * @param stage USD stage to query.
+     * @param paths Prim paths to resolve upward from.
+     *
+     * @return List of nearest payload ancestor prim paths.
+     */
+    QList<SdfPath> ancestorPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths);
+
+    /**
+     * @brief Collects payload prim paths at and below the specified prim paths.
+     *
+     * Traverses each path in @p paths and recursively visits its descendants,
+     * collecting prims that directly author or contain payloads.
+     *
+     * @param stage USD stage to query.
+     * @param paths Root prim paths to traverse downward from.
+     *
+     * @return List of payload prim paths found in the descendant hierarchies.
+     */
+    QList<SdfPath> descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths);
 
     /**
      * @brief Filters a list of prim paths to only top-most paths.
@@ -181,8 +206,6 @@ namespace stage {
      * @param recursive If true, apply visibility recursively.
      */
     void setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive = false);
-
-
 
 }  // namespace stage
 }  // namespace usdviewer

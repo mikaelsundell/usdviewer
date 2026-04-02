@@ -6,12 +6,21 @@
 #include "application.h"
 #include "style.h"
 #include "treeitem.h"
+#include <QEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPointer>
 #include <QStyledItemDelegate>
 
 namespace usdviewer {
+
+namespace {
+    static constexpr const char* kDropItemPtrProperty = "_usdviewer_drop_item_ptr";
+    static constexpr const char* kDropModeProperty = "_usdviewer_drop_mode";
+
+    enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
+}  // namespace
+
 class TreeWidgetPrivate {
 public:
     TreeWidgetPrivate();
@@ -220,6 +229,12 @@ TreeWidget::~TreeWidget() = default;
 bool
 TreeWidget::viewportEvent(QEvent* event)
 {
+    if (event->type() == QEvent::DragLeave) {
+        setProperty(kDropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
+        setProperty(kDropModeProperty, DropNone);
+        viewport()->update();
+    }
+
     return QTreeWidget::viewportEvent(event);
 }
 
@@ -375,6 +390,29 @@ TreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const
     }
     else if (item && p->hasSelectedChildren(item)) {
         painter->fillRect(rowRect, app()->style()->color(Style::ColorRole::HighlightAlt));
+    }
+
+    const qulonglong dropItemPtr = property(kDropItemPtrProperty).toULongLong();
+    const int dropMode = property(kDropModeProperty).toInt();
+
+    if (item && dropItemPtr != 0 && reinterpret_cast<qulonglong>(item) == dropItemPtr) {
+        painter->save();
+
+        QPen pen(QColor(255, 80, 80));
+        pen.setWidth(2);
+        painter->setPen(pen);
+        painter->setBrush(Qt::NoBrush);
+
+        switch (dropMode) {
+        case DropAboveItem: painter->drawLine(rowRect.left(), rowRect.top(), rowRect.right(), rowRect.top()); break;
+        case DropBelowItem:
+            painter->drawLine(rowRect.left(), rowRect.bottom(), rowRect.right(), rowRect.bottom());
+            break;
+        case DropOnItem: painter->drawRect(rowRect.adjusted(1, 1, -2, -2)); break;
+        default: break;
+        }
+
+        painter->restore();
     }
 
     QTreeWidget::drawRow(painter, opt, index);

@@ -1130,7 +1130,6 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                 bool noop = false;
                 QString error;
                 SdfPath newPath;
-
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
                     const UsdStageRefPtr stage = session->stageUnsafe();

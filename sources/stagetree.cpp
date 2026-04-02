@@ -15,6 +15,7 @@
 #include "viewcontext.h"
 #include <QApplication>
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QDrag>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -32,7 +33,34 @@ namespace usdviewer {
 
 namespace {
     static constexpr const char* kPrimPathMime = "application/x-usdviewer-prim-path";
-}
+    static constexpr const char* kDropItemPtrProperty = "_usdviewer_drop_item_ptr";
+    static constexpr const char* kDropModeProperty = "_usdviewer_drop_mode";
+
+    enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
+
+    void clearDropIndicator(QWidget* widget)
+    {
+        if (!widget)
+            return;
+
+        widget->setProperty(kDropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
+        widget->setProperty(kDropModeProperty, DropNone);
+        if (widget->updatesEnabled())
+            widget->update();
+    }
+
+    void setDropIndicator(QWidget* widget, QTreeWidgetItem* item, int mode)
+    {
+        if (!widget)
+            return;
+
+        const qulonglong ptr = reinterpret_cast<qulonglong>(item);
+        widget->setProperty(kDropItemPtrProperty, QVariant::fromValue(ptr));
+        widget->setProperty(kDropModeProperty, mode);
+        if (widget->updatesEnabled())
+            widget->update();
+    }
+}  // namespace
 
 class StageTreePrivate : public QObject, public SignalGuard {
 public:
@@ -62,7 +90,6 @@ public:
 
     PrimItem* addItem(PrimItem* parent, const SdfPath& parentPath);
     void addChildren(PrimItem* parent, const SdfPath& parentPath);
-
 
 public Q_SLOTS:
     void itemSelectionChanged();
@@ -104,7 +131,7 @@ StageTreePrivate::init()
     d.tree->setDragEnabled(true);
     d.tree->setAcceptDrops(true);
     d.tree->viewport()->setAcceptDrops(true);
-    d.tree->setDropIndicatorShown(true);
+    d.tree->setDropIndicatorShown(false);
     d.tree->setDragDropMode(QAbstractItemView::DragDrop);
     d.tree->setDefaultDropAction(Qt::MoveAction);
 
@@ -162,6 +189,7 @@ StageTreePrivate::close()
     QSignalBlocker blocker(d.tree);
     d.stage = nullptr;
     d.tree->clear();
+    clearDropIndicator(d.tree);
 }
 
 void
@@ -312,6 +340,11 @@ StageTreePrivate::addItem(PrimItem* parent, const SdfPath& path)
 
     PrimItem* item = new PrimItem(parent, stage, path);
     item->invalidate();
+
+    Qt::ItemFlags flags = item->flags();
+    flags |= Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
+    item->setFlags(flags);
+
     itemCheckState(item, d.payloadEnabled);
     parent->addChild(item);
 
@@ -506,27 +539,61 @@ StageTree::startDrag(Qt::DropActions supportedActions)
 void
 StageTree::dragEnterEvent(QDragEnterEvent* event)
 {
-    if (event->mimeData()->hasFormat(kPrimPathMime))
-        event->acceptProposedAction();
-    else
+    if (!event->mimeData()->hasFormat(kPrimPathMime)) {
+        clearDropIndicator(this);
         event->ignore();
+        return;
+    }
+
+    event->acceptProposedAction();
 }
 
 void
 StageTree::dragMoveEvent(QDragMoveEvent* event)
 {
     if (!event->mimeData()->hasFormat(kPrimPathMime)) {
+        clearDropIndicator(this);
         event->ignore();
         return;
     }
 
     QTreeWidgetItem* target = itemAt(event->position().toPoint());
     if (!target) {
+        clearDropIndicator(this);
         event->ignore();
         return;
     }
 
-    setDropIndicatorShown(true);
+    auto* primTarget = static_cast<PrimItem*>(target);
+    const QString fromPathString = QString::fromUtf8(event->mimeData()->data(kPrimPathMime));
+    const QString targetPathString = primTarget->data(0, PrimItem::PrimPath).toString();
+
+    if (fromPathString.isEmpty() || targetPathString.isEmpty()) {
+        clearDropIndicator(this);
+        event->ignore();
+        return;
+    }
+
+    const SdfPath fromPath(QStringToString(fromPathString));
+    const SdfPath targetPath(QStringToString(targetPathString));
+
+    if (fromPath == targetPath || targetPath.HasPrefix(fromPath)) {
+        clearDropIndicator(this);
+        event->ignore();
+        return;
+    }
+
+    const QRect rect = visualItemRect(target);
+    const int y = event->position().toPoint().y() - rect.top();
+    const int margin = std::max(4, rect.height() / 4);
+
+    int mode = DropOnItem;
+    if (y < margin)
+        mode = DropAboveItem;
+    else if (y > rect.height() - margin)
+        mode = DropBelowItem;
+
+    setDropIndicator(this, target, mode);
     event->acceptProposedAction();
 }
 
@@ -534,12 +601,14 @@ void
 StageTree::dropEvent(QDropEvent* event)
 {
     if (!event->mimeData()->hasFormat(kPrimPathMime)) {
+        clearDropIndicator(this);
         event->ignore();
         return;
     }
 
     QTreeWidgetItem* targetItem = itemAt(event->position().toPoint());
     if (!targetItem) {
+        clearDropIndicator(this);
         event->ignore();
         return;
     }
@@ -548,12 +617,28 @@ StageTree::dropEvent(QDropEvent* event)
     const QString targetPathString = targetItem->data(0, PrimItem::PrimPath).toString();
 
     if (fromPathString.isEmpty() || targetPathString.isEmpty()) {
+        clearDropIndicator(this);
         event->ignore();
         return;
     }
 
     const SdfPath fromPath(QStringToString(fromPathString));
-    const SdfPath newParentPath(QStringToString(targetPathString));
+    const SdfPath targetPath(QStringToString(targetPathString));
+
+    const int mode = property(kDropModeProperty).toInt();
+
+    SdfPath newParentPath;
+    if (mode == DropAboveItem || mode == DropBelowItem)
+        newParentPath = targetPath.GetParentPath();
+    else
+        newParentPath = targetPath;
+
+    clearDropIndicator(this);
+
+    if (newParentPath.IsEmpty() || newParentPath == SdfPath::AbsoluteRootPath()) {
+        event->ignore();
+        return;
+    }
 
     if (fromPath == newParentPath || newParentPath.HasPrefix(fromPath)) {
         event->ignore();
@@ -843,6 +928,10 @@ StageTreePrivate::updateStage(UsdStageRefPtr stage)
 
     PrimItem* rootItem = new PrimItem(d.tree.data(), stage, prim.GetPath());
 
+    Qt::ItemFlags flags = rootItem->flags();
+    flags |= Qt::ItemIsDropEnabled;
+    rootItem->setFlags(flags);
+
     itemCheckState(rootItem, false, false);
     addChildren(rootItem, prim.GetPath());
     initTree();
@@ -886,8 +975,6 @@ namespace {
 
 }  // namespace
 
-
-
 void
 StageTreePrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
@@ -910,9 +997,6 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>&
     d.tree->setUpdatesEnabled(true);
     d.tree->update();
 }
-
-
-// ============================================
 
 void
 StageTreePrivate::updatePrim(const SdfPath& path)
@@ -1010,8 +1094,6 @@ StageTreePrivate::invalidatePrimImpl(const SdfPath& path, bool refreshParent)
 
         qDebug() << "StageTreePrivate::invalidatePrimImpl: added item" << qt::StringToQString(primPath.GetString());
     }
-
-
 
     bool isPayload = false;
     {
@@ -1255,6 +1337,7 @@ StageTree::collapse()
 {
     p->collapse();
 }
+
 void
 StageTree::expand()
 {
@@ -1315,7 +1398,6 @@ StageTree::updateMask(const QList<SdfPath>& paths)
         p->d.maskPaths = paths;
     }
 }
-
 
 void
 StageTree::updateStage(UsdStageRefPtr stage)

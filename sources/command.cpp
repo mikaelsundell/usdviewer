@@ -19,6 +19,58 @@
 
 namespace usdviewer {
 
+namespace selection {
+    inline bool isPathAffected(const SdfPath& selectedPath, const SdfPath& rootPath)
+    {
+        if (selectedPath.IsEmpty() || rootPath.IsEmpty())
+            return false;
+
+        const SdfPath selectedPrimPath = selectedPath.IsPropertyPath() ? selectedPath.GetPrimPath() : selectedPath;
+        const SdfPath rootPrimPath = rootPath.IsPropertyPath() ? rootPath.GetPrimPath() : rootPath;
+
+        return selectedPrimPath == rootPrimPath || selectedPrimPath.HasPrefix(rootPrimPath);
+    }
+
+    inline QList<SdfPath> removePaths(const QList<SdfPath>& selectedPaths, const QList<SdfPath>& removedPaths)
+    {
+        if (selectedPaths.isEmpty() || removedPaths.isEmpty())
+            return selectedPaths;
+
+        QList<SdfPath> result;
+        result.reserve(selectedPaths.size());
+
+        for (const SdfPath& selectedPath : selectedPaths) {
+            bool keep = true;
+            for (const SdfPath& removedPath : removedPaths) {
+                if (isPathAffected(selectedPath, removedPath)) {
+                    keep = false;
+                    break;
+                }
+            }
+
+            if (keep)
+                result.append(selectedPath);
+        }
+
+        return result;
+    }
+
+    inline QList<SdfPath> remapPaths(const QList<SdfPath>& selectedPaths, const SdfPath& oldPath, const SdfPath& newPath)
+    {
+        QList<SdfPath> result;
+        result.reserve(selectedPaths.size());
+
+        for (const SdfPath& selectedPath : selectedPaths) {
+            if (isPathAffected(selectedPath, oldPath))
+                result.append(newPath.AppendPath(selectedPath.MakeRelativePath(oldPath)));
+            else
+                result.append(selectedPath);
+        }
+
+        return result;
+    }
+}  // namespace selection
+
 namespace payload {
     struct UndoItem {
         SdfPath path;
@@ -30,6 +82,7 @@ namespace payload {
 
     struct State {
         QList<UndoItem> undoItems;
+        QList<SdfPath> previousSelection;
     };
 
     struct Result {
@@ -172,6 +225,8 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
             if (!session || paths.isEmpty())
                 return;
 
+            state->previousSelection = session->selectionList()->paths();
+
             session->beginProgressBlock("load payloads", paths.size());
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -294,16 +349,13 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     }
                 }
 
-                if (!pending.isEmpty()) {
-                    const QList<payload::Result> batch = pending;
-                    QMetaObject::invokeMethod(
-                        session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
-                        Qt::QueuedConnection);
-                }
-
                 QMetaObject::invokeMethod(
                     session,
-                    [session]() {
+                    [session, state, pending, completed]() {
+                        if (!pending.isEmpty())
+                            payload::flushResults(session, pending, completed);
+
+                        session->selectionList()->updatePaths(state->previousSelection);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
                     },
@@ -323,6 +375,8 @@ unloadPayloads(const QList<SdfPath>& paths)
             if (!session || paths.isEmpty())
                 return;
 
+            state->previousSelection = session->selectionList()->paths();
+
             session->beginProgressBlock("unload payloads", paths.size());
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -332,6 +386,9 @@ unloadPayloads(const QList<SdfPath>& paths)
 
                 QList<payload::UndoItem> undoItems;
                 undoItems.reserve(paths.size());
+
+                QList<SdfPath> unloadedPaths;
+                unloadedPaths.reserve(paths.size());
 
                 int completed = 0;
                 for (const SdfPath& path : paths) {
@@ -358,8 +415,10 @@ unloadPayloads(const QList<SdfPath>& paths)
                     result.message = result.success ? "payload unloaded" : "payload unload failed";
                     result.status = result.success ? Session::Notify::Status::Info : Session::Notify::Status::Error;
 
-                    if (result.success)
+                    if (result.success) {
                         undoItems.append(undoItem);
+                        unloadedPaths.append(path);
+                    }
 
                     pending.append(result);
                     ++completed;
@@ -385,7 +444,8 @@ unloadPayloads(const QList<SdfPath>& paths)
 
                 QMetaObject::invokeMethod(
                     session,
-                    [session]() {
+                    [session, state, unloadedPaths]() {
+                        session->selectionList()->updatePaths(selection::removePaths(state->previousSelection, unloadedPaths));
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
                     },
@@ -441,16 +501,13 @@ unloadPayloads(const QList<SdfPath>& paths)
                     }
                 }
 
-                if (!pending.isEmpty()) {
-                    const QList<payload::Result> batch = pending;
-                    QMetaObject::invokeMethod(
-                        session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
-                        Qt::QueuedConnection);
-                }
-
                 QMetaObject::invokeMethod(
                     session,
-                    [session]() {
+                    [session, state, pending, completed]() {
+                        if (!pending.isEmpty())
+                            payload::flushResults(session, pending, completed);
+
+                        session->selectionList()->updatePaths(state->previousSelection);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
                     },
@@ -753,6 +810,7 @@ namespace snapshot {
     struct DeleteState {
         QVector<PrimState> prims;
         QHash<SdfPath, TfTokenVector> parentOrders;
+        QList<SdfPath> previousSelection;
     };
 
     using PrimSnapshot = QVector<PrimState>;
@@ -952,12 +1010,15 @@ deletePaths(const QList<SdfPath>& inPaths)
     return Command(
         // redo
         [inPaths, state](Session* session) {
+            state->previousSelection = session->selectionList()->paths();
+
             session->beginProgressBlock("delete paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
             QThreadPool::globalInstance()->start([session, inPaths, state]() {
                 bool success = false;
                 QList<SdfPath> changed;
+                QList<SdfPath> removedPaths;
 
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
@@ -1021,6 +1082,7 @@ deletePaths(const QList<SdfPath>& inPaths)
                                 }
 
                                 state->prims.append(primState);
+                                removedPaths.append(path);
                                 removedAny = true;
                             }
                         }
@@ -1041,8 +1103,9 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                 QMetaObject::invokeMethod(
                     session,
-                    [session, changed, success]() {
+                    [session, state, changed, removedPaths, success]() {
                         using Status = Session::Notify::Status;
+                        session->selectionList()->updatePaths(selection::removePaths(state->previousSelection, removedPaths));
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->updateProgressNotify(Session::Notify(success ? "paths deleted" : "delete paths failed",
                                                                       changed, success ? Status::Info : Status::Error),
@@ -1109,8 +1172,9 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                 QMetaObject::invokeMethod(
                     session,
-                    [session, changed, success]() {
+                    [session, state, changed, success]() {
                         using Status = Session::Notify::Status;
+                        session->selectionList()->updatePaths(state->previousSelection);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->updateProgressNotify(Session::Notify(success ? "delete undone"
                                                                               : "undo delete paths failed",
@@ -1191,6 +1255,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
         SdfPath parentPath;
         TfTokenVector oldOrder;
         TfTokenVector newOrder;
+        QList<SdfPath> previousSelection;
     };
 
     auto state = std::make_shared<RenameState>();
@@ -1260,6 +1325,8 @@ renamePath(const SdfPath& path, const QString& newNameInput)
     return Command(
         // redo
         [path, newNameInput, buildNewPath, remapChildOrder, applyRename, state](Session* session) {
+            state->previousSelection = session->selectionList()->paths();
+
             session->beginProgressBlock("rename path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -1334,15 +1401,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                             return;
                         }
 
-                        QList<SdfPath> updated;
-                        for (const auto& p : session->selectionList()->paths()) {
-                            if (p.HasPrefix(path))
-                                updated.append(newPath.AppendPath(p.MakeRelativePath(path)));
-                            else
-                                updated.append(p);
-                        }
-
-                        session->selectionList()->updatePaths(updated);
+                        session->selectionList()->updatePaths(selection::remapPaths(state->previousSelection, path, newPath));
                         session->updateProgressNotify(Session::Notify("path renamed", { path, newPath }, Status::Info),
                                                       1);
                         session->endProgressBlock();
@@ -1392,6 +1451,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                     [=]() {
                         using Status = Session::Notify::Status;
 
+                        session->selectionList()->updatePaths(state->previousSelection);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
@@ -1408,15 +1468,6 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                             return;
                         }
 
-                        QList<SdfPath> updated;
-                        for (const auto& p : session->selectionList()->paths()) {
-                            if (p.HasPrefix(state->newPath))
-                                updated.append(state->oldPath.AppendPath(p.MakeRelativePath(state->newPath)));
-                            else
-                                updated.append(p);
-                        }
-
-                        session->selectionList()->updatePaths(updated);
                         session->updateProgressNotify(Session::Notify("rename undone", { state->oldPath }, Status::Info),
                                                       1);
                         session->endProgressBlock();
@@ -1629,6 +1680,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
         TfTokenVector oldParentOrder;
         TfTokenVector newParentOldOrder;
         TfTokenVector newParentNewOrder;
+        QList<SdfPath> previousSelection;
     };
 
     auto state = std::make_shared<MoveState>();
@@ -1702,6 +1754,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
     return Command(
         // redo
         [fromPath, newParentPath, removeToken, appendTokenIfMissing, applyMove, state](Session* session) {
+            state->previousSelection = session->selectionList()->paths();
+
             session->beginProgressBlock("move path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -1784,15 +1838,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                             return;
                         }
 
-                        QList<SdfPath> updated;
-                        for (const auto& p : session->selectionList()->paths()) {
-                            if (p.HasPrefix(fromPath))
-                                updated.append(state->newPath.AppendPath(p.MakeRelativePath(fromPath)));
-                            else
-                                updated.append(p);
-                        }
-
-                        session->selectionList()->updatePaths(updated);
+                        session->selectionList()->updatePaths(selection::remapPaths(state->previousSelection, fromPath, state->newPath));
                         session->updateProgressNotify(Session::Notify("path moved", { state->oldPath, state->newPath },
                                                                       Status::Info),
                                                       1);
@@ -1841,6 +1887,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                     [=]() {
                         using Status = Session::Notify::Status;
 
+                        session->selectionList()->updatePaths(state->previousSelection);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
@@ -1857,15 +1904,6 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                             return;
                         }
 
-                        QList<SdfPath> updated;
-                        for (const auto& p : session->selectionList()->paths()) {
-                            if (p.HasPrefix(state->newPath))
-                                updated.append(state->oldPath.AppendPath(p.MakeRelativePath(state->newPath)));
-                            else
-                                updated.append(p);
-                        }
-
-                        session->selectionList()->updatePaths(updated);
                         session->updateProgressNotify(Session::Notify("move undone", { state->oldPath }, Status::Info),
                                                       1);
                         session->endProgressBlock();

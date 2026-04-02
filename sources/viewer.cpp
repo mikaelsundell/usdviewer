@@ -181,7 +181,6 @@ ViewerPrivate::init()
     d.ui->renderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
     d.ui->renderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
     // connect
-    connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
         d.loadPolicy = Session::LoadPolicy::All;
         settings()->setValue("loadType", "all");
@@ -259,7 +258,6 @@ ViewerPrivate::init()
     connect(d.ui->displayExpand, &QAction::triggered, this, &ViewerPrivate::expand);
     connect(d.ui->helpGithubReadme, &QAction::triggered, this, &ViewerPrivate::openGithubReadme);
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
-    connect(d.ui->open, &QToolButton::clicked, this, &ViewerPrivate::open);
     {
         d.ui->open->setDefaultAction(d.ui->fileOpen);
         d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);

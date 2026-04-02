@@ -2,7 +2,6 @@
 // Copyright (c) 2025 - present Mikael Sundell
 // https://github.com/mikaelsundell/usdviewer
 
-
 #include "commandstack.h"
 #include "application.h"
 #include "command.h"
@@ -19,6 +18,7 @@ public:
 public:
     struct Data {
         qsizetype index = -1;
+        qsizetype size = 100;
         QVector<Command*> stack;
     };
     Data d;
@@ -40,8 +40,15 @@ CommandStackPrivate::push(Command* command)
             delete d.stack[i];
         d.stack.resize(d.index + 1);
     }
+
     d.stack.append(command);
     d.index = d.stack.size() - 1;
+
+    while (d.stack.size() > d.size) {
+        delete d.stack.front();
+        d.stack.removeFirst();
+        --d.index;
+    }
 }
 
 CommandStack::CommandStack(QObject* parent)

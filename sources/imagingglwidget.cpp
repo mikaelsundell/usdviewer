@@ -338,11 +338,7 @@ ImagingGLWidgetPrivate::paintGL()
                         d.glEngine->RenderBatch(paths, d.params);
                     }
                     else {
-                        qDebug() << "start: d.glEngine->Render(root, d.params);";
-
                         d.glEngine->Render(root, d.params);
-
-                        qDebug() << "end: d.glEngine->Render(root, d.params);";
                     }
                     hgi->EndFrame();
                 }

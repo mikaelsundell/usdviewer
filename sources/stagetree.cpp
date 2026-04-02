@@ -14,6 +14,7 @@
 #include "usdutils.h"
 #include "viewcontext.h"
 #include <QApplication>
+#include <QClipboard>
 #include <QDrag>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -572,14 +573,20 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     QList<PrimItem*> selectedItems;
     selectedItems.reserve(d.tree->selectedItems().size());
 
+    QStringList pathStrings;
+    QStringList nameStrings;
+
     for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
         PrimItem* primItem = static_cast<PrimItem*>(selected);
         const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
         if (pathString.isEmpty())
             continue;
 
+        const SdfPath path(qt::QStringToString(pathString));
+        paths.append(path);
         selectedItems.append(primItem);
-        paths.append(SdfPath(qt::QStringToString(pathString)));
+        pathStrings.append(pathString);
+        nameStrings.append(qt::StringToQString(path.GetName()));
     }
     if (paths.isEmpty())
         return;
@@ -668,11 +675,27 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
             item->setCheckState(PrimItem::Name, state);
     };
 
+    auto copyToClipboard = [](const QString& text) {
+        if (QClipboard* clipboard = QGuiApplication::clipboard())
+            clipboard->setText(text);
+    };
+
     QMenu menu(d.tree.data());
     struct VariantSelection {
         QString setName;
         QString value;
     };
+
+    QMenu* copyMenu = menu.addMenu("Copy");
+    QAction* copyPath = copyMenu->addAction("Path");
+    QAction* copyName = copyMenu->addAction("Name");
+    QAction* copyPaths = nullptr;
+    QAction* copyNames = nullptr;
+
+    if (paths.size() > 1) {
+        copyPaths = copyMenu->addAction("Paths");
+        copyNames = copyMenu->addAction("Names");
+    }
 
     QMenu* loadVariantMenu = menu.addMenu("Load Variant");
     QMap<QAction*, VariantSelection> variantActions;
@@ -729,6 +752,26 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     QAction* chosen = menu.exec(d.tree->mapToGlobal(event->pos()));
     if (!chosen)
         return;
+
+    if (chosen == copyPath) {
+        copyToClipboard(pathStrings.first());
+        return;
+    }
+
+    if (chosen == copyName) {
+        copyToClipboard(nameStrings.first());
+        return;
+    }
+
+    if (chosen == copyPaths) {
+        copyToClipboard(pathStrings.join('\n'));
+        return;
+    }
+
+    if (chosen == copyNames) {
+        copyToClipboard(nameStrings.join('\n'));
+        return;
+    }
 
     if (chosen == loadSelected) {
         if (d.payloadEnabled) {

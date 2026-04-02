@@ -51,13 +51,10 @@ PythonInterpreterPrivate::init()
     if (d.initialized)
         return;
 
-    qDebug() << "[Python] Initializing interpreter";
-
     if (PyImport_AppendInittab("usdviewer", PyInit_usdviewer_wrapper) == -1) {
-        qFatal("Failed to add usdviewer module");
+        qWarning("Failed to add usdviewer module");
+        return;
     }
-    if (PyImport_AppendInittab("_usdviewer_native", PyInit__usdviewer_native_wrapper) == -1)
-        qFatal("Failed to add _usdviewer_native module");
 
     Py_Initialize();
     PyRun_SimpleString("print('[Python] Interpreter started')");
@@ -88,8 +85,6 @@ PythonInterpreterPrivate::init()
         return;
     }
 
-    qDebug() << "[Python] usdviewer module imported";
-
     PyObject* cls = PyObject_GetAttrString(module, "Session");
     if (!cls || !PyCallable_Check(cls)) {
         PyErr_Print();
@@ -116,9 +111,7 @@ PythonInterpreterPrivate::init()
     PyObject* key = PyUnicode_FromString("session");
     int has = PyDict_Contains(d.globals, key);
     Py_DECREF(key);
-
-    qDebug() << "[Python] session injected =" << has;
-
+    
     PyRun_SimpleString(R"(
 print("[Python] globals after init:", list(globals().keys()))
 print("[Python] session exists:", 'session' in globals())
@@ -132,8 +125,6 @@ PythonInterpreterPrivate::release()
 {
     if (!d.initialized)
         return;
-
-    qDebug() << "[Python] Releasing interpreter";
 
     PyGILState_STATE gil = PyGILState_Ensure();
 

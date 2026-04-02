@@ -15,9 +15,9 @@
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/stage.h>
 
+#include <QStringList>
 #include <QVariant>
 #include <QVariantMap>
-#include <QStringList>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace usdviewer;
@@ -63,8 +63,7 @@ checkCommandStack(CommandStack* stack)
 static Session::LoadPolicy
 toLoadPolicy(long value)
 {
-    return value == static_cast<long>(Session::LoadPolicy::None) ? Session::LoadPolicy::None
-                                                                 : Session::LoadPolicy::All;
+    return value == static_cast<long>(Session::LoadPolicy::None) ? Session::LoadPolicy::None : Session::LoadPolicy::All;
 }
 
 static Session::StageUp
@@ -283,9 +282,7 @@ bboxToPyTuple(const GfBBox3d& bbox)
     const GfVec3d min = range.GetMin();
     const GfVec3d max = range.GetMax();
 
-    return Py_BuildValue("((ddd)(ddd))",
-                         min[0], min[1], min[2],
-                         max[0], max[1], max[2]);
+    return Py_BuildValue("((ddd)(ddd))", min[0], min[1], min[2], max[0], max[1], max[2]);
 }
 
 static PyObject*
@@ -297,11 +294,9 @@ wrapUsdStage(const UsdStageRefPtr& stage)
     try {
         PXR_BOOST_PYTHON_NAMESPACE::object object(stage);
         return PXR_BOOST_PYTHON_NAMESPACE::incref(object.ptr());
-    }
-    catch (const PXR_BOOST_PYTHON_NAMESPACE::error_already_set&) {
+    } catch (const PXR_BOOST_PYTHON_NAMESPACE::error_already_set&) {
         return nullptr;
-    }
-    catch (...) {
+    } catch (...) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to convert native UsdStageRefPtr to Python object");
         return nullptr;
     }
@@ -313,17 +308,15 @@ wrapUsdStage(const UsdStageRefPtr& stage)
 // Python module definition
 // ----------------------------------------------------------------------------
 
-static PyModuleDef pysessionModule = {
-    PyModuleDef_HEAD_INIT,
-    "usdviewer",
-    "Python interface for usdviewer Session",
-    -1,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr
-};
+static PyModuleDef pysessionModule = { PyModuleDef_HEAD_INIT,
+                                       "usdviewer",
+                                       "Python interface for usdviewer Session",
+                                       -1,
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       nullptr };
 
 // ----------------------------------------------------------------------------
 // PySelectionListObject
@@ -473,22 +466,19 @@ PySelectionList_clear(PySelectionListObject* self)
     Py_RETURN_NONE;
 }
 
-static PyMethodDef PySelectionList_methods[] = {
-    { "isSelected",  (PyCFunction)PySelectionList_isSelected,  METH_VARARGS, "Check if a path is selected" },
-    { "paths",       (PyCFunction)PySelectionList_paths,       METH_NOARGS,  "Get selected paths" },
-    { "isEmpty",     (PyCFunction)PySelectionList_isEmpty,     METH_NOARGS,  "Check whether selection is empty" },
-    { "isValid",     (PyCFunction)PySelectionList_isValid,     METH_NOARGS,  "Check whether selection is valid" },
-    { "addPaths",    (PyCFunction)PySelectionList_addPaths,    METH_VARARGS, "Add paths to the selection" },
-    { "removePaths", (PyCFunction)PySelectionList_removePaths, METH_VARARGS, "Remove paths from the selection" },
-    { "togglePaths", (PyCFunction)PySelectionList_togglePaths, METH_VARARGS, "Toggle selection state for paths" },
-    { "updatePaths", (PyCFunction)PySelectionList_updatePaths, METH_VARARGS, "Replace the current selection" },
-    { "clear",       (PyCFunction)PySelectionList_clear,       METH_NOARGS,  "Clear the current selection" },
-    { nullptr }
-};
+static PyMethodDef PySelectionList_methods[]
+    = { { "isSelected", (PyCFunction)PySelectionList_isSelected, METH_VARARGS, "Check if a path is selected" },
+        { "paths", (PyCFunction)PySelectionList_paths, METH_NOARGS, "Get selected paths" },
+        { "isEmpty", (PyCFunction)PySelectionList_isEmpty, METH_NOARGS, "Check whether selection is empty" },
+        { "isValid", (PyCFunction)PySelectionList_isValid, METH_NOARGS, "Check whether selection is valid" },
+        { "addPaths", (PyCFunction)PySelectionList_addPaths, METH_VARARGS, "Add paths to the selection" },
+        { "removePaths", (PyCFunction)PySelectionList_removePaths, METH_VARARGS, "Remove paths from the selection" },
+        { "togglePaths", (PyCFunction)PySelectionList_togglePaths, METH_VARARGS, "Toggle selection state for paths" },
+        { "updatePaths", (PyCFunction)PySelectionList_updatePaths, METH_VARARGS, "Replace the current selection" },
+        { "clear", (PyCFunction)PySelectionList_clear, METH_NOARGS, "Clear the current selection" },
+        { nullptr } };
 
-static PyTypeObject PySelectionListType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
-};
+static PyTypeObject PySelectionListType = { PyVarObject_HEAD_INIT(nullptr, 0) };
 
 // ----------------------------------------------------------------------------
 // PyCommandStackObject
@@ -564,19 +554,16 @@ PyCommandStack_clear(PyCommandStackObject* self)
     Py_RETURN_NONE;
 }
 
-static PyMethodDef PyCommandStack_methods[] = {
-    { "canUndo",  (PyCFunction)PyCommandStack_canUndo,  METH_NOARGS, "Check whether undo is available" },
-    { "canRedo",  (PyCFunction)PyCommandStack_canRedo,  METH_NOARGS, "Check whether redo is available" },
-    { "canClear", (PyCFunction)PyCommandStack_canClear, METH_NOARGS, "Check whether clear is available" },
-    { "undo",     (PyCFunction)PyCommandStack_undo,     METH_NOARGS, "Undo the current command" },
-    { "redo",     (PyCFunction)PyCommandStack_redo,     METH_NOARGS, "Redo the next command" },
-    { "clear",    (PyCFunction)PyCommandStack_clear,    METH_NOARGS, "Clear the command stack" },
-    { nullptr }
-};
+static PyMethodDef PyCommandStack_methods[]
+    = { { "canUndo", (PyCFunction)PyCommandStack_canUndo, METH_NOARGS, "Check whether undo is available" },
+        { "canRedo", (PyCFunction)PyCommandStack_canRedo, METH_NOARGS, "Check whether redo is available" },
+        { "canClear", (PyCFunction)PyCommandStack_canClear, METH_NOARGS, "Check whether clear is available" },
+        { "undo", (PyCFunction)PyCommandStack_undo, METH_NOARGS, "Undo the current command" },
+        { "redo", (PyCFunction)PyCommandStack_redo, METH_NOARGS, "Redo the next command" },
+        { "clear", (PyCFunction)PyCommandStack_clear, METH_NOARGS, "Clear the command stack" },
+        { nullptr } };
 
-static PyTypeObject PyCommandStackType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
-};
+static PyTypeObject PyCommandStackType = { PyVarObject_HEAD_INIT(nullptr, 0) };
 
 // ----------------------------------------------------------------------------
 // PySessionObject
@@ -631,9 +618,8 @@ PySession_updateProgressNotify(PySessionObject* self, PyObject* args, PyObject* 
     PyObject* pyDetails = Py_None;
 
     static const char* keywords[] = { "message", "completed", "paths", "status", "details", nullptr };
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sn|OlO",
-                                     const_cast<char**>(keywords),
-                                     &message, &completed, &pyPaths, &status, &pyDetails)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sn|OlO", const_cast<char**>(keywords), &message, &completed,
+                                     &pyPaths, &status, &pyDetails)) {
         return nullptr;
     }
 
@@ -1007,50 +993,51 @@ PySession_setStatus(PySessionObject* self, PyObject* args)
     Py_RETURN_NONE;
 }
 
-static PyMethodDef PySession_methods[] = {
-    { "beginProgressBlock",       (PyCFunction)PySession_beginProgressBlock,       METH_VARARGS | METH_KEYWORDS, "Begin a progress block" },
-    { "updateProgressNotify",     (PyCFunction)PySession_updateProgressNotify,     METH_VARARGS | METH_KEYWORDS, "Update progress with a notification" },
-    { "cancelProgressBlock",      (PyCFunction)PySession_cancelProgressBlock,      METH_NOARGS,                  "Cancel the current progress block" },
-    { "endProgressBlock",         (PyCFunction)PySession_endProgressBlock,         METH_NOARGS,                  "End the current progress block" },
-    { "isProgressBlockCancelled", (PyCFunction)PySession_isProgressBlockCancelled, METH_NOARGS,                  "Check whether the progress block was cancelled" },
+static PyMethodDef PySession_methods[]
+    = { { "beginProgressBlock", (PyCFunction)PySession_beginProgressBlock, METH_VARARGS | METH_KEYWORDS,
+          "Begin a progress block" },
+        { "updateProgressNotify", (PyCFunction)PySession_updateProgressNotify, METH_VARARGS | METH_KEYWORDS,
+          "Update progress with a notification" },
+        { "cancelProgressBlock", (PyCFunction)PySession_cancelProgressBlock, METH_NOARGS,
+          "Cancel the current progress block" },
+        { "endProgressBlock", (PyCFunction)PySession_endProgressBlock, METH_NOARGS, "End the current progress block" },
+        { "isProgressBlockCancelled", (PyCFunction)PySession_isProgressBlockCancelled, METH_NOARGS,
+          "Check whether the progress block was cancelled" },
 
-    { "newStage",                 (PyCFunction)PySession_newStage,                 METH_VARARGS | METH_KEYWORDS, "Create a new stage" },
-    { "load",                     (PyCFunction)PySession_load,                     METH_VARARGS | METH_KEYWORDS, "Load a USD stage from file" },
-    { "save",                     (PyCFunction)PySession_save,                     METH_VARARGS,                 "Save the current stage to file" },
-    { "copy",                     (PyCFunction)PySession_copy,                     METH_VARARGS,                 "Copy the current stage to file" },
-    { "flatten",                  (PyCFunction)PySession_flatten,                  METH_VARARGS,                 "Flatten the stage to file" },
-    { "flattenPaths",             (PyCFunction)PySession_flattenPaths,             METH_VARARGS,                 "Flatten specific paths to file" },
-    { "reload",                   (PyCFunction)PySession_reload,                   METH_NOARGS,                  "Reload the current stage" },
-    { "close",                    (PyCFunction)PySession_close,                    METH_NOARGS,                  "Close the current stage" },
-    { "isLoaded",                 (PyCFunction)PySession_isLoaded,                 METH_NOARGS,                  "Check if a stage is loaded" },
+        { "newStage", (PyCFunction)PySession_newStage, METH_VARARGS | METH_KEYWORDS, "Create a new stage" },
+        { "load", (PyCFunction)PySession_load, METH_VARARGS | METH_KEYWORDS, "Load a USD stage from file" },
+        { "save", (PyCFunction)PySession_save, METH_VARARGS, "Save the current stage to file" },
+        { "copy", (PyCFunction)PySession_copy, METH_VARARGS, "Copy the current stage to file" },
+        { "flatten", (PyCFunction)PySession_flatten, METH_VARARGS, "Flatten the stage to file" },
+        { "flattenPaths", (PyCFunction)PySession_flattenPaths, METH_VARARGS, "Flatten specific paths to file" },
+        { "reload", (PyCFunction)PySession_reload, METH_NOARGS, "Reload the current stage" },
+        { "close", (PyCFunction)PySession_close, METH_NOARGS, "Close the current stage" },
+        { "isLoaded", (PyCFunction)PySession_isLoaded, METH_NOARGS, "Check if a stage is loaded" },
 
-    { "mask",                     (PyCFunction)PySession_mask,                     METH_NOARGS,                  "Get the current mask" },
-    { "setMask",                  (PyCFunction)PySession_setMask,                  METH_VARARGS,                 "Set the current mask" },
-    { "stageUp",                  (PyCFunction)PySession_stageUp,                  METH_NOARGS,                  "Get the stage up axis" },
-    { "setStageUp",               (PyCFunction)PySession_setStageUp,               METH_VARARGS,                 "Set the stage up axis" },
-    { "loadPolicy",               (PyCFunction)PySession_loadPolicy,               METH_NOARGS,                  "Get the current load policy" },
-    { "boundingBox",              (PyCFunction)PySession_boundingBox,              METH_NOARGS,                  "Get the current bounding box" },
-    { "filename",                 (PyCFunction)PySession_filename,                 METH_NOARGS,                  "Get the current filename" },
-    { "stage",                    (PyCFunction)PySession_stage,                    METH_NOARGS,                  "Get the native USD stage" },
-    { "stageUnsafe",              (PyCFunction)PySession_stageUnsafe,              METH_NOARGS,                  "Get the native USD stage without locking" },
-    { "stageLock",                (PyCFunction)PySession_stageLock,                METH_NOARGS,                  "Get the native stage lock address" },
+        { "mask", (PyCFunction)PySession_mask, METH_NOARGS, "Get the current mask" },
+        { "setMask", (PyCFunction)PySession_setMask, METH_VARARGS, "Set the current mask" },
+        { "stageUp", (PyCFunction)PySession_stageUp, METH_NOARGS, "Get the stage up axis" },
+        { "setStageUp", (PyCFunction)PySession_setStageUp, METH_VARARGS, "Set the stage up axis" },
+        { "loadPolicy", (PyCFunction)PySession_loadPolicy, METH_NOARGS, "Get the current load policy" },
+        { "boundingBox", (PyCFunction)PySession_boundingBox, METH_NOARGS, "Get the current bounding box" },
+        { "filename", (PyCFunction)PySession_filename, METH_NOARGS, "Get the current filename" },
+        { "stage", (PyCFunction)PySession_stage, METH_NOARGS, "Get the native USD stage" },
+        { "stageUnsafe", (PyCFunction)PySession_stageUnsafe, METH_NOARGS, "Get the native USD stage without locking" },
+        { "stageLock", (PyCFunction)PySession_stageLock, METH_NOARGS, "Get the native stage lock address" },
 
-    { "commandStack",             (PyCFunction)PySession_commandStack,             METH_NOARGS,                  "Get the command stack wrapper" },
-    { "selectionList",            (PyCFunction)PySession_selectionList,            METH_NOARGS,                  "Get the selection list wrapper" },
-    { "selection",                (PyCFunction)PySession_selection,                METH_NOARGS,                  "Get the selection list wrapper" },
-    { "paths",                    (PyCFunction)PySession_paths,                    METH_NOARGS,                  "Get selected paths" },
+        { "commandStack", (PyCFunction)PySession_commandStack, METH_NOARGS, "Get the command stack wrapper" },
+        { "selectionList", (PyCFunction)PySession_selectionList, METH_NOARGS, "Get the selection list wrapper" },
+        { "selection", (PyCFunction)PySession_selection, METH_NOARGS, "Get the selection list wrapper" },
+        { "paths", (PyCFunction)PySession_paths, METH_NOARGS, "Get selected paths" },
 
-    { "primsUpdate",              (PyCFunction)PySession_primsUpdate,              METH_NOARGS,                  "Get the prim update policy" },
-    { "setPrimsUpdate",           (PyCFunction)PySession_setPrimsUpdate,           METH_VARARGS,                 "Set the prim update policy" },
-    { "flushPrimsUpdates",        (PyCFunction)PySession_flushPrimsUpdates,        METH_NOARGS,                  "Flush buffered prim updates" },
-    { "setStatus",                (PyCFunction)PySession_setStatus,                METH_VARARGS,                 "Set the session status string" },
+        { "primsUpdate", (PyCFunction)PySession_primsUpdate, METH_NOARGS, "Get the prim update policy" },
+        { "setPrimsUpdate", (PyCFunction)PySession_setPrimsUpdate, METH_VARARGS, "Set the prim update policy" },
+        { "flushPrimsUpdates", (PyCFunction)PySession_flushPrimsUpdates, METH_NOARGS, "Flush buffered prim updates" },
+        { "setStatus", (PyCFunction)PySession_setStatus, METH_VARARGS, "Set the session status string" },
 
-    { nullptr }
-};
+        { nullptr } };
 
-static PyTypeObject PySessionType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
-};
+static PyTypeObject PySessionType = { PyVarObject_HEAD_INIT(nullptr, 0) };
 
 static PyObject*
 PyModule_session(PyObject*, PyObject*)
@@ -1098,12 +1085,12 @@ PyModule_getCurrentStage(PyObject*, PyObject*)
     return wrapUsdStage(s->stage());
 }
 
-static PyMethodDef Module_methods[] = {
-    { "session",         (PyCFunction)PyModule_session,         METH_NOARGS, "Get the current usdviewer session wrapper" },
-    { "selectionList",   (PyCFunction)PyModule_selectionList,   METH_NOARGS, "Get the current usdviewer selection list wrapper" },
-    { "getCurrentStage", (PyCFunction)PyModule_getCurrentStage, METH_NOARGS, "Get the current native USD stage" },
-    { nullptr, nullptr, 0, nullptr }
-};
+static PyMethodDef Module_methods[]
+    = { { "session", (PyCFunction)PyModule_session, METH_NOARGS, "Get the current usdviewer session wrapper" },
+        { "selectionList", (PyCFunction)PyModule_selectionList, METH_NOARGS,
+          "Get the current usdviewer selection list wrapper" },
+        { "getCurrentStage", (PyCFunction)PyModule_getCurrentStage, METH_NOARGS, "Get the current native USD stage" },
+        { nullptr, nullptr, 0, nullptr } };
 
 PyMODINIT_FUNC
 PyInit_usdviewer(void)

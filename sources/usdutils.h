@@ -100,18 +100,64 @@ namespace path {
 
 namespace name {
     /**
-     * @brief Converts arbitrary text into a valid USD identifier candidate.
+     * @brief Creates a valid and unique USD child name for a parent prim.
      *
-     * Invalid characters are replaced with underscores. If the result starts
-     * with a digit, the leading character is replaced with an underscore.
-     * If the final identifier is empty, all underscores, or still invalid for
-     * USD, the fallback value "Prim" is returned.
+     * The input text is first converted into a valid USD identifier candidate
+     * by replacing invalid characters with underscores. If the identifier
+     * starts with a digit, an underscore is prepended. If the sanitized result
+     * is empty, consists only of underscores, or is still not a valid USD
+     * identifier, the fallback name "Prim" is used.
      *
-     * @param input Source name to sanitize.
+     * The resulting base name is then checked against existing children under
+     * @p parentPath. If a child with the same name already exists, a numeric
+     * suffix is appended using the pattern "_1", "_2", and so on until a
+     * unique name is found.
      *
-     * @return USD-safe identifier string.
+     * If @p stage is null, @p parentPath is not an absolute path, or the parent
+     * prim does not exist, the sanitized base name is returned without sibling
+     * uniqueness checking.
+     *
+     * @param stage Stage used to inspect existing children.
+     * @param parentPath Absolute path to the parent prim.
+     * @param inputName Source name to sanitize and uniquify.
+     *
+     * @return Valid and unique USD child name.
      */
-    std::string makeUsdSafeName(const std::string& input);
+    QString makeSafeName(const UsdStageRefPtr& stage, const SdfPath& parentPath, const QString& inputName);
+
+    /**
+     * @brief Creates a valid and unique USD child name for a parent prim while
+     *        ignoring one existing child path.
+     *
+     * This overload behaves like the standard makeSafeName() variant, but
+     * excludes @p ignorePath from the sibling uniqueness check. This is useful
+     * for rename operations where the current prim already exists under
+     * @p parentPath and should not be treated as a naming conflict.
+     *
+     * The input text is first converted into a valid USD identifier candidate
+     * by replacing invalid characters with underscores. If the identifier
+     * starts with a digit, an underscore is prepended. If the sanitized result
+     * is empty, consists only of underscores, or is still not a valid USD
+     * identifier, the fallback name "Prim" is used.
+     *
+     * The resulting base name is then checked against existing children under
+     * @p parentPath, excluding @p ignorePath. If a conflicting child already
+     * exists, a numeric suffix is appended using the pattern "_1", "_2", and
+     * so on until a unique name is found.
+     *
+     * If @p stage is null, @p parentPath is not an absolute path, or the parent
+     * prim does not exist, the sanitized base name is returned without sibling
+     * uniqueness checking.
+     *
+     * @param stage Stage used to inspect existing children.
+     * @param parentPath Absolute path to the parent prim.
+     * @param inputName Source name to sanitize and uniquify.
+     * @param ignorePath Existing child path to ignore during collision checks.
+     *
+     * @return Valid and unique USD child name.
+     */
+    QString makeSafeName(const UsdStageRefPtr& stage, const SdfPath& parentPath, const QString& inputName,
+                         const SdfPath& ignorePath);
 }  // namespace name
 
 namespace stage {

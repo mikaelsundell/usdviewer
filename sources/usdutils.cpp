@@ -17,8 +17,7 @@
 
 namespace usdviewer {
 namespace path {
-    QList<SdfPath>
-    topLevelPaths(const QList<SdfPath>& paths)
+    QList<SdfPath> topLevelPaths(const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         result.reserve(paths.size());
@@ -38,8 +37,7 @@ namespace path {
         return result;
     }
 
-    QList<SdfPath>
-    minimalRootPaths(const QList<SdfPath>& paths)
+    QList<SdfPath> minimalRootPaths(const QList<SdfPath>& paths)
     {
         QList<SdfPath> sorted = paths;
         std::sort(sorted.begin(), sorted.end(),
@@ -63,8 +61,7 @@ namespace path {
         return result;
     }
 
-    bool
-    isAffectedPath(const SdfPath& selectedPath, const SdfPath& rootPath)
+    bool isAffectedPath(const SdfPath& selectedPath, const SdfPath& rootPath)
     {
         if (selectedPath.IsEmpty() || rootPath.IsEmpty())
             return false;
@@ -75,8 +72,7 @@ namespace path {
         return selectedPrimPath == rootPrimPath || selectedPrimPath.HasPrefix(rootPrimPath);
     }
 
-    QList<SdfPath>
-    removeAffectedPaths(const QList<SdfPath>& paths, const QList<SdfPath>& removedPaths)
+    QList<SdfPath> removeAffectedPaths(const QList<SdfPath>& paths, const QList<SdfPath>& removedPaths)
     {
         if (paths.isEmpty() || removedPaths.isEmpty())
             return paths;
@@ -100,8 +96,7 @@ namespace path {
         return result;
     }
 
-    QList<SdfPath>
-    remapAffectedPaths(const QList<SdfPath>& paths, const SdfPath& oldPath, const SdfPath& newPath)
+    QList<SdfPath> remapAffectedPaths(const QList<SdfPath>& paths, const SdfPath& oldPath, const SdfPath& newPath)
     {
         QList<SdfPath> result;
         result.reserve(paths.size());
@@ -118,8 +113,7 @@ namespace path {
 }  // namespace path
 
 namespace name {
-    std::string
-    makeUsdSafeName(const std::string& input)
+    std::string makeValidIdentifier(const std::string& input)
     {
         if (input.empty())
             return "Prim";
@@ -135,7 +129,7 @@ namespace name {
         }
 
         if (!result.empty() && (result[0] >= '0' && result[0] <= '9'))
-            result[0] = '_';
+            result.insert(result.begin(), '_');
 
         bool allUnderscore = true;
         for (char c : result) {
@@ -153,13 +147,71 @@ namespace name {
 
         return result;
     }
+
+    QString makeSafeName(const UsdStageRefPtr& stage, const SdfPath& parentPath, const QString& inputName)
+    {
+        const QString baseName = qt::StringToQString(makeValidIdentifier(qt::QStringToString(inputName)));
+
+        if (!stage || !parentPath.IsAbsolutePath())
+            return baseName;
+
+        const UsdPrim parentPrim = stage->GetPrimAtPath(parentPath);
+        if (!parentPrim || !parentPrim.IsValid())
+            return baseName;
+
+        auto childExists = [&](const QString& name) {
+            const SdfPath childPath = parentPath.AppendChild(TfToken(qt::QStringToString(name)));
+            const UsdPrim childPrim = stage->GetPrimAtPath(childPath);
+            return childPrim && childPrim.IsValid();
+        };
+
+        if (!childExists(baseName))
+            return baseName;
+
+        for (int i = 1;; ++i) {
+            const QString uniqueName = QString("%1_%2").arg(baseName).arg(i);
+            if (!childExists(uniqueName))
+                return uniqueName;
+        }
+    }
+
+    QString makeSafeName(const UsdStageRefPtr& stage, const SdfPath& parentPath, const QString& inputName,
+                         const SdfPath& ignorePath)
+    {
+        const QString baseName = qt::StringToQString(makeValidIdentifier(qt::QStringToString(inputName)));
+
+        if (!stage || !parentPath.IsAbsolutePath())
+            return baseName;
+
+        const UsdPrim parentPrim = stage->GetPrimAtPath(parentPath);
+        if (!parentPrim || !parentPrim.IsValid())
+            return baseName;
+
+        auto childExists = [&](const QString& name) {
+            const SdfPath childPath = parentPath.AppendChild(TfToken(qt::QStringToString(name)));
+            if (childPath == ignorePath)
+                return false;
+
+            const UsdPrim childPrim = stage->GetPrimAtPath(childPath);
+            return childPrim && childPrim.IsValid();
+        };
+
+        if (!childExists(baseName))
+            return baseName;
+
+        for (int i = 1;; ++i) {
+            const QString uniqueName = QString("%1_%2").arg(baseName).arg(i);
+            if (!childExists(uniqueName))
+                return uniqueName;
+        }
+    }
+
 }  // namespace name
 
 namespace stage {
     namespace {
 
-        void
-        ensureParentSpecs(const SdfLayerHandle& layer, const SdfPath& path)
+        void ensureParentSpecs(const SdfLayerHandle& layer, const SdfPath& path)
         {
             if (!layer)
                 return;
@@ -176,8 +228,7 @@ namespace stage {
 
     }  // namespace
 
-    QMap<QString, QList<QString>>
-    findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive)
+    QMap<QString, QList<QString>> findVariantSets(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool recursive)
     {
         QMap<QString, QList<QString>> result;
         if (!stage || paths.isEmpty())
@@ -237,8 +288,7 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath>
-    payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> payloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -262,8 +312,7 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath>
-    ancestorPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> ancestorPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -289,8 +338,7 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath>
-    descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> descendantsPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -322,8 +370,7 @@ namespace stage {
         return result;
     }
 
-    QList<SdfPath>
-    selectionPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> selectionPayloadPaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage || paths.isEmpty())
@@ -371,8 +418,7 @@ namespace stage {
         return path::topLevelPaths(result);
     }
 
-    GfBBox3d
-    boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    GfBBox3d boundingBox(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         UsdGeomBBoxCache cache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true);
         GfBBox3d bbox;
@@ -386,8 +432,7 @@ namespace stage {
         return bbox;
     }
 
-    bool
-    isAuthored(UsdStageRefPtr stage, const SdfPath& path)
+    bool isAuthored(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage)
             return false;
@@ -399,8 +444,7 @@ namespace stage {
         return !prim.GetPrimStack().empty();
     }
 
-    bool
-    isEditTarget(UsdStageRefPtr stage, const SdfPath& path)
+    bool isEditTarget(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage)
             return false;
@@ -412,8 +456,7 @@ namespace stage {
         return editLayer->GetPrimAtPath(path) != nullptr;
     }
 
-    bool
-    isStrongestEditable(UsdStageRefPtr stage, const SdfPath& path)
+    bool isStrongestEditable(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage)
             return false;
@@ -437,8 +480,7 @@ namespace stage {
         return strongest->GetLayer() == editLayer;
     }
 
-    QList<SdfPath>
-    filterStrongestEditablePaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
+    QList<SdfPath> filterStrongestEditablePaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
     {
         QList<SdfPath> result;
         if (!stage)
@@ -453,8 +495,7 @@ namespace stage {
         return result;
     }
 
-    bool
-    isLoaded(UsdStageRefPtr stage, const SdfPath& path)
+    bool isLoaded(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage || path.IsEmpty())
             return false;
@@ -482,8 +523,7 @@ namespace stage {
         return foundPayload;
     }
 
-    bool
-    isPayload(UsdStageRefPtr stage, const SdfPath& path)
+    bool isPayload(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage)
             return false;
@@ -509,8 +549,7 @@ namespace stage {
         return false;
     }
 
-    bool
-    isPayloadHierarchy(UsdStageRefPtr stage, const SdfPath& path)
+    bool isPayloadHierarchy(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage)
             return false;
@@ -529,8 +568,7 @@ namespace stage {
         return false;
     }
 
-    bool
-    isEditable(UsdStageRefPtr stage, const SdfPath& path)
+    bool isEditable(UsdStageRefPtr stage, const SdfPath& path)
     {
         if (!stage)
             return false;
@@ -551,8 +589,7 @@ namespace stage {
         return true;
     }
 
-    bool
-    isVisible(UsdStageRefPtr stage, const SdfPath& path)
+    bool isVisible(UsdStageRefPtr stage, const SdfPath& path)
     {
         UsdPrim prim = stage->GetPrimAtPath(path);
         if (!prim)
@@ -568,8 +605,7 @@ namespace stage {
         return vis != UsdGeomTokens->invisible;
     }
 
-    void
-    setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive)
+    void setVisible(UsdStageRefPtr stage, const QList<SdfPath>& paths, bool visible, bool recursive)
     {
         for (const SdfPath& path : paths) {
             UsdPrim prim = stage->GetPrimAtPath(path);
@@ -604,8 +640,7 @@ namespace stage {
         }
     }
 
-    bool
-    captureChildOrder(UsdStageRefPtr stage, const SdfPath& parentPath, TfTokenVector& out)
+    bool captureChildOrder(UsdStageRefPtr stage, const SdfPath& parentPath, TfTokenVector& out)
     {
         if (!stage)
             return false;
@@ -621,8 +656,7 @@ namespace stage {
         return !out.empty();
     }
 
-    void
-    restoreChildOrder(UsdStageRefPtr stage, const SdfPath& parentPath, const TfTokenVector& childOrder)
+    void restoreChildOrder(UsdStageRefPtr stage, const SdfPath& parentPath, const TfTokenVector& childOrder)
     {
         if (!stage || childOrder.empty())
             return;
@@ -642,8 +676,7 @@ namespace stage {
         parent.SetChildrenReorder(childOrder);
     }
 
-    bool
-    removePrimSpec(const SdfLayerHandle& layer, const SdfPath& specPath)
+    bool removePrimSpec(const SdfLayerHandle& layer, const SdfPath& specPath)
     {
         if (!layer || specPath.IsEmpty() || specPath == SdfPath::AbsoluteRootPath())
             return false;
@@ -660,8 +693,7 @@ namespace stage {
         return layer->Apply(edits);
     }
 
-    UsdStageLoadRules
-    remapLoadRules(const UsdStageLoadRules& rules, const SdfPath& oldPath, const SdfPath& newPath)
+    UsdStageLoadRules remapLoadRules(const UsdStageLoadRules& rules, const SdfPath& oldPath, const SdfPath& newPath)
     {
         UsdStageLoadRules out;
 

@@ -19,10 +19,7 @@ namespace qt {
 
     QString TfTokenToQString(const TfToken& token) { return StringToQString(token.GetString()); }
 
-    QString SdfPathToQString(const SdfPath& path)
-    {
-        return StringToQString(path.GetString());
-    }
+    QString SdfPathToQString(const SdfPath& path) { return StringToQString(path.GetString()); }
 
     QString SdfPathListToQString(const QList<SdfPath>& paths)
     {

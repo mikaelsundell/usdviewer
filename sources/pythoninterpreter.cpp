@@ -111,7 +111,7 @@ PythonInterpreterPrivate::init()
     PyObject* key = PyUnicode_FromString("session");
     int has = PyDict_Contains(d.globals, key);
     Py_DECREF(key);
-    
+
     PyRun_SimpleString(R"(
 print("[Python] globals after init:", list(globals().keys()))
 print("[Python] session exists:", 'session' in globals())

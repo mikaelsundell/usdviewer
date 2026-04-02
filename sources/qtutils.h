@@ -22,7 +22,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usdviewer {
 namespace qt {
-    
+
     /** @name Qt / USD Conversions */
     ///@{
 

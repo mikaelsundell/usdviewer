@@ -14,11 +14,11 @@
 #include "renderview.h"
 #include "selectionlist.h"
 #include "session.h"
-#include "signalguard.h"
 #include "settings.h"
+#include "signalguard.h"
 #include "style.h"
-#include "usdutils.h"
 #include "tracelocks.h"
+#include "usdutils.h"
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>

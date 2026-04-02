@@ -1159,8 +1159,8 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                                 stage->SetLoadRules(stage::remapLoadRules(rules, path, newPath));
 
                                 if (!state->oldOrder.empty()) {
-                                    state->newOrder = remapChildOrder(
-                                        state->oldOrder, path.GetNameToken(), newPath.GetNameToken());
+                                    state->newOrder = remapChildOrder(state->oldOrder, path.GetNameToken(),
+                                                                      newPath.GetNameToken());
                                     stage::restoreChildOrder(stage, state->parentPath, state->newOrder);
                                 }
 
@@ -1178,32 +1178,28 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(
-                                Session::Notify("rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("rename path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (noop) {
-                            session->updateProgressNotify(
-                                Session::Notify("rename skipped", {}, Status::Info), 1);
+                            session->updateProgressNotify(Session::Notify("rename skipped", {}, Status::Info), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!renamed) {
-                            session->updateProgressNotify(
-                                Session::Notify("rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("rename path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         session->selectionList()->updatePaths(
                             path::remapAffectedPaths(state->previousSelection, path, newPath));
-                        session->setMask(
-                            path::remapAffectedPaths(state->previousMask, path, newPath));
-                        session->updateProgressNotify(
-                            Session::Notify("path renamed", { path, newPath }, Status::Info), 1);
+                        session->setMask(path::remapAffectedPaths(state->previousMask, path, newPath));
+                        session->updateProgressNotify(Session::Notify("path renamed", { path, newPath }, Status::Info),
+                                                      1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1232,8 +1228,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         const UsdStageLoadRules rules = stage->GetLoadRules();
 
                         if (applyRename(stage, state->newPath, state->oldPath, error)) {
-                            stage->SetLoadRules(
-                                stage::remapLoadRules(rules, state->newPath, state->oldPath));
+                            stage->SetLoadRules(stage::remapLoadRules(rules, state->newPath, state->oldPath));
 
                             if (!state->oldOrder.empty() && !state->parentPath.IsEmpty()
                                 && state->parentPath != SdfPath::AbsoluteRootPath()) {
@@ -1255,21 +1250,21 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(
-                                Session::Notify("undo rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("undo rename path failed", {}, Status::Error),
+                                                          1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!restored) {
-                            session->updateProgressNotify(
-                                Session::Notify("undo rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("undo rename path failed", {}, Status::Error),
+                                                          1);
                             session->endProgressBlock();
                             return;
                         }
 
-                        session->updateProgressNotify(
-                            Session::Notify("rename undone", { state->oldPath }, Status::Info), 1);
+                        session->updateProgressNotify(Session::Notify("rename undone", { state->oldPath }, Status::Info),
+                                                      1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1641,8 +1636,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                                     stage::restoreChildOrder(stage, oldParentPath,
                                                              removeToken(state->oldParentOrder, movedName));
 
-                                state->newParentNewOrder = insertTokenAt(
-                                    state->newParentOldOrder, movedName, insertIndex);
+                                state->newParentNewOrder = insertTokenAt(state->newParentOldOrder, movedName,
+                                                                         insertIndex);
 
                                 if (!state->newParentNewOrder.empty())
                                     stage::restoreChildOrder(stage, newParentPath, state->newParentNewOrder);
@@ -1680,10 +1675,10 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
 
                         session->selectionList()->updatePaths(
                             path::remapAffectedPaths(state->previousSelection, fromPath, state->newPath));
-                        session->setMask(
-                            path::remapAffectedPaths(state->previousMask, fromPath, state->newPath));
-                        session->updateProgressNotify(
-                            Session::Notify("path moved", { state->oldPath, state->newPath }, Status::Info), 1);
+                        session->setMask(path::remapAffectedPaths(state->previousMask, fromPath, state->newPath));
+                        session->updateProgressNotify(Session::Notify("path moved", { state->oldPath, state->newPath },
+                                                                      Status::Info),
+                                                      1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1705,8 +1700,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                     if (!stage) {
                         hadStage = false;
                     }
-                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty()
-                             || state->oldParentPath.IsEmpty() || state->newParentPath.IsEmpty()) {
+                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty() || state->oldParentPath.IsEmpty()
+                             || state->newParentPath.IsEmpty()) {
                         error = "invalid state";
                     }
                     else if (state->oldPath == state->newPath) {
@@ -1739,21 +1734,21 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(
-                                Session::Notify("undo move path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("undo move path failed", {}, Status::Error),
+                                                          1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!restored) {
-                            session->updateProgressNotify(
-                                Session::Notify("undo move path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("undo move path failed", {}, Status::Error),
+                                                          1);
                             session->endProgressBlock();
                             return;
                         }
 
-                        session->updateProgressNotify(
-                            Session::Notify("move undone", { state->oldPath }, Status::Info), 1);
+                        session->updateProgressNotify(Session::Notify("move undone", { state->oldPath }, Status::Info),
+                                                      1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);

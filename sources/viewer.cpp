@@ -319,7 +319,6 @@ ViewerPrivate::init()
     renderView()->setFocus();
     initSettings();
     newFile();
-    enable(false);
 }
 
 void

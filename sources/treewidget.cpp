@@ -14,13 +14,6 @@
 
 namespace usdviewer {
 
-namespace {
-    static constexpr const char* kDropItemPtrProperty = "_usdviewer_drop_item_ptr";
-    static constexpr const char* kDropModeProperty = "_usdviewer_drop_mode";
-
-    enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
-}  // namespace
-
 class TreeWidgetPrivate {
 public:
     TreeWidgetPrivate();
@@ -159,8 +152,10 @@ public:
             painter->restore();
         }
     };
-
+    enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
     struct Data {
+        static constexpr const char* dropItemPtrProperty = "_usdviewer_drop_item_ptr";
+        static constexpr const char* dropModeProperty = "_usdviewer_drop_mode";
         QPointer<ItemDelegate> delegate;
         QPointer<TreeWidget> tree;
         bool suppressNextSelection = false;
@@ -220,7 +215,6 @@ TreeWidget::TreeWidget(QWidget* parent)
 {
     p->d.tree = this;
     p->init();
-
     setIndentation(12);
 }
 
@@ -230,11 +224,10 @@ bool
 TreeWidget::viewportEvent(QEvent* event)
 {
     if (event->type() == QEvent::DragLeave) {
-        setProperty(kDropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
-        setProperty(kDropModeProperty, DropNone);
+        setProperty(TreeWidgetPrivate::Data::dropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
+        setProperty(TreeWidgetPrivate::Data::dropModeProperty, TreeWidgetPrivate::DropNone);
         viewport()->update();
     }
-
     return QTreeWidget::viewportEvent(event);
 }
 
@@ -248,13 +241,11 @@ TreeWidget::mousePressEvent(QMouseEvent* event)
         if (index.isValid() && index.column() == 0) {
             const QRect vr = visualRect(index);
             const QRect br = p->branchRect(vr, index);
-
             if (br.contains(event->pos())) {
                 p->d.suppressNextSelection = true;
                 event->accept();
                 return;
             }
-
             if (p->d.delegate) {
                 QStyleOptionViewItem opt;
                 initViewItemOption(&opt);
@@ -268,7 +259,6 @@ TreeWidget::mousePressEvent(QMouseEvent* event)
             }
         }
     }
-
     QTreeWidget::mousePressEvent(event);
 }
 
@@ -297,7 +287,6 @@ TreeWidget::mouseReleaseEvent(QMouseEvent* event)
                 QStyleOptionViewItem opt;
                 initViewItemOption(&opt);
                 opt.rect = vr;
-
                 if (p->d.delegate->hitCheckbox(opt, index, event->pos())) {
                     Qt::CheckState state = static_cast<Qt::CheckState>(index.data(Qt::CheckStateRole).toInt());
 
@@ -351,11 +340,10 @@ void
 TreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const
 {
     Q_UNUSED(rect);
-
     const bool hasChildren = model()->hasChildren(index);
     if (!hasChildren)
         return;
-
+    
     const bool expanded = isExpanded(index);
     QRect vr = visualRect(index);
     QRect r = p->branchRect(vr, index);
@@ -392,23 +380,24 @@ TreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const
         painter->fillRect(rowRect, app()->style()->color(Style::ColorRole::HighlightAlt));
     }
 
-    const qulonglong dropItemPtr = property(kDropItemPtrProperty).toULongLong();
-    const int dropMode = property(kDropModeProperty).toInt();
+    const qulonglong dropItemPtr = property(TreeWidgetPrivate::Data::dropItemPtrProperty).toULongLong();
+    const int dropMode = property(TreeWidgetPrivate::Data::dropModeProperty).toInt();
 
     if (item && dropItemPtr != 0 && reinterpret_cast<qulonglong>(item) == dropItemPtr) {
         painter->save();
-
-        QPen pen(QColor(255, 80, 80));
+        QPen pen(app()->style()->color(Style::ColorRole::Highlight));
         pen.setWidth(2);
         painter->setPen(pen);
         painter->setBrush(Qt::NoBrush);
 
         switch (dropMode) {
-        case DropAboveItem: painter->drawLine(rowRect.left(), rowRect.top(), rowRect.right(), rowRect.top()); break;
-        case DropBelowItem:
+        case TreeWidgetPrivate::DropAboveItem:
+            painter->drawLine(rowRect.left(), rowRect.top(), rowRect.right(), rowRect.top());
+            break;
+        case TreeWidgetPrivate::DropBelowItem:
             painter->drawLine(rowRect.left(), rowRect.bottom(), rowRect.right(), rowRect.bottom());
             break;
-        case DropOnItem: painter->drawRect(rowRect.adjusted(1, 1, -2, -2)); break;
+        case TreeWidgetPrivate::DropOnItem: painter->drawRect(rowRect.adjusted(1, 1, -2, -2)); break;
         default: break;
         }
 

@@ -1359,7 +1359,6 @@ ImagingGLWidget::updateMask(const QList<SdfPath>& paths)
 void
 ImagingGLWidget::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
-    qDebug() << "updatePrims: " << p->d.count;
     p->updatePrims(paths, invalidated);
 }
 

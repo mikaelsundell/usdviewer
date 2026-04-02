@@ -326,13 +326,8 @@ SessionPrivate::newStage(Session::LoadPolicy policy)
         initStage();
 
     endProgressBlock();
-    QMetaObject::invokeMethod(
-        d.session,
-        [this, mask]() {
-            setMask(mask);
-            updateStage();
-        },
-        Qt::QueuedConnection);
+    setMask(mask);
+    updateStage();
     return true;
 }
 
@@ -385,13 +380,8 @@ SessionPrivate::loadFromFile(const QString& filename, Session::LoadPolicy policy
     if (loaded)
         initStage();
 
-    QMetaObject::invokeMethod(
-        d.session,
-        [this, mask]() {
-            setMask(mask);
-            updateStage();
-        },
-        Qt::QueuedConnection);
+    setMask(mask);
+    updateStage();
     return true;
 }
 
@@ -605,46 +595,30 @@ SessionPrivate::close()
     d.commandStack->clear();
     d.selectionList->clear();
 
-    QMetaObject::invokeMethod(
-        d.session, [this]() { updateStage(); }, Qt::QueuedConnection);
+    updateStage();
     return true;
 }
 
 bool
 SessionPrivate::reload()
 {
-    QString currentFilename;
-    Session::LoadPolicy loadPolicy = Session::LoadPolicy::All;
+    QString filename;
+    Session::LoadPolicy loadPolicy;
 
     {
-        WRITE_LOCKER(locker, &d.stageLock, "stageLock");
+        READ_LOCKER(locker, &d.stageLock, "stageLock");
         if (!d.stage)
             return false;
 
-        currentFilename = d.filename;
+        filename = d.filename;
         loadPolicy = d.loadPolicy;
-
-        StageBlocker blocker(d.stageWatcher.data());
-        d.stage->Reload();
-        d.bboxCache.reset();
     }
 
-    if (loadPolicy == Session::LoadPolicy::None && !currentFilename.isEmpty()) {
-        const QString stateFilename = QFileInfo(currentFilename + ".session").absoluteFilePath();
-        if (!loadState(stateFilename))
-            return false;
-    }
+    if (filename.isEmpty())
+        return false;
 
-    const GfBBox3d bbox = boundingBox();
-    {
-        WRITE_LOCKER(locker, &d.stageLock, "stageLock");
-        d.bbox = bbox;
-    }
-
-    QMetaObject::invokeMethod(
-        d.session, [this]() { updateStage(); }, Qt::QueuedConnection);
-
-    return true;
+    close();
+    return loadFromFile(filename, loadPolicy);
 }
 
 bool
@@ -1076,8 +1050,7 @@ SessionPrivate::reduceInvalidated(const QList<SdfPath>& invalidated) const
             reduced.append(path);
     }
 
-    qDebug() << "SessionPrivate::reduceInvalidated: output" << reduced.size()
-             << qt::SdfPathListToQString(reduced);
+    qDebug() << "SessionPrivate::reduceInvalidated: output" << reduced.size() << qt::SdfPathListToQString(reduced);
     return reduced;
 }
 

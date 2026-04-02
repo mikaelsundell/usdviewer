@@ -37,12 +37,7 @@ namespace {
     static constexpr const char* kDropItemPtrProperty = "_usdviewer_drop_item_ptr";
     static constexpr const char* kDropModeProperty = "_usdviewer_drop_mode";
 
-    enum DropMode {
-        DropNone = 0,
-        DropAboveItem = 1,
-        DropOnItem = 2,
-        DropBelowItem = 3
-    };
+    enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
 
     void clearDropIndicator(QWidget* widget)
     {
@@ -106,6 +101,7 @@ public:
     void updatePrim(const SdfPath& path);
     void invalidatePrim(const SdfPath& path);
     void invalidatePrimImpl(const SdfPath& path, bool refreshParent);
+    void invalidateSubtree(PrimItem* item, const UsdPrim& prim);
     void invalidateChildren(PrimItem* parentItem, const UsdPrim& prim);
 
     PrimItem* addItem(PrimItem* parent, const SdfPath& parentPath);
@@ -527,13 +523,20 @@ StageTreePrivate::nameChanged(PrimItem* item)
     if (oldPath.IsEmpty())
         return;
 
-    const QString newName = item->text(PrimItem::Name).trimmed();
-    if (newName.isEmpty())
-        return;
-
     const QString oldName = qt::StringToQString(oldPath.GetName());
-    if (newName == oldName)
+    const QString newName = item->text(PrimItem::Name).trimmed();
+
+    if (newName.isEmpty() || newName == oldName) {
+        if (item->text(PrimItem::Name) != oldName)
+            item->setText(PrimItem::Name, oldName);
         return;
+    }
+
+    const SdfPath parentPath = oldPath.GetParentPath();
+    if (parentPath.IsEmpty() || parentPath == SdfPath::AbsoluteRootPath()) {
+        item->setText(PrimItem::Name, oldName);
+        return;
+    }
 
     d.context->run(new Command(renamePath(oldPath, newName)));
 }
@@ -688,6 +691,37 @@ StageTree::dropEvent(QDropEvent* event)
         return;
     }
 
+    // Adjust insertion index for same-parent reordering.
+    if (fromPath.GetParentPath() == newParentPath) {
+        QTreeWidgetItem* sourceItem = nullptr;
+
+        std::function<QTreeWidgetItem*(QTreeWidgetItem*)> findItem = [&](QTreeWidgetItem* item) -> QTreeWidgetItem* {
+            if (!item)
+                return nullptr;
+
+            if (item->data(0, PrimItem::PrimPath).toString() == fromPathString)
+                return item;
+
+            for (int i = 0; i < item->childCount(); ++i) {
+                if (QTreeWidgetItem* found = findItem(item->child(i)))
+                    return found;
+            }
+            return nullptr;
+        };
+
+        for (int i = 0; i < topLevelItemCount() && !sourceItem; ++i)
+            sourceItem = findItem(topLevelItem(i));
+
+        if (sourceItem) {
+            QTreeWidgetItem* oldParentItem = sourceItem->parent();
+            if (oldParentItem) {
+                const int oldRow = oldParentItem->indexOfChild(sourceItem);
+                if (oldRow >= 0 && oldRow < insertIndex)
+                    --insertIndex;
+            }
+        }
+    }
+
     if (context())
         context()->run(new Command(movePath(fromPath, newParentPath, insertIndex)));
 
@@ -814,17 +848,6 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         QString value;
     };
 
-    QMenu* copyMenu = menu.addMenu("Copy");
-    QAction* copyPath = copyMenu->addAction("Path");
-    QAction* copyName = copyMenu->addAction("Name");
-    QAction* copyPaths = nullptr;
-    QAction* copyNames = nullptr;
-
-    if (paths.size() > 1) {
-        copyPaths = copyMenu->addAction("Paths");
-        copyNames = copyMenu->addAction("Names");
-    }
-
     QMenu* loadVariantMenu = menu.addMenu("Load Variant");
     QMap<QAction*, VariantSelection> variantActions;
     {
@@ -874,8 +897,21 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     isolateAction->setChecked(isolateChecked);
 
     menu.addSeparator();
+    QMenu* copyMenu = menu.addMenu("Copy");
+    QAction* copyPath = copyMenu->addAction("Path");
+    QAction* copyName = copyMenu->addAction("Name");
+    QAction* copyPaths = nullptr;
+    QAction* copyNames = nullptr;
+
+    if (paths.size() > 1) {
+        copyPaths = copyMenu->addAction("Paths");
+        copyNames = copyMenu->addAction("Names");
+    }
+    
+    menu.addSeparator();
     QAction* newXform = menu.addAction("New xform");
     QAction* deleteSelected = menu.addAction("Delete");
+    
 
     QAction* chosen = menu.exec(d.tree->mapToGlobal(event->pos()));
     if (!chosen)
@@ -985,38 +1021,36 @@ StageTreePrivate::updateStage(UsdStageRefPtr stage)
 
 namespace {
 
-QString
-pathListString(const QList<SdfPath>& paths)
-{
-    QStringList values;
-    values.reserve(paths.size());
-    for (const SdfPath& path : paths)
-        values.append(qt::StringToQString(path.GetName()));
-    return QString("[%1]").arg(values.join(", "));
-}
-
-QString
-childListString(PrimItem* parentItem)
-{
-    if (!parentItem)
-        return "[]";
-
-    QStringList values;
-    values.reserve(parentItem->childCount());
-
-    for (int i = 0; i < parentItem->childCount(); ++i) {
-        auto* child = static_cast<PrimItem*>(parentItem->child(i));
-        if (!child) {
-            values.append("<null>");
-            continue;
-        }
-
-        const QString path = child->data(0, PrimItem::PrimPath).toString();
-        values.append(SdfPath(QStringToString(path)).GetName().c_str());
+    QString pathListString(const QList<SdfPath>& paths)
+    {
+        QStringList values;
+        values.reserve(paths.size());
+        for (const SdfPath& path : paths)
+            values.append(qt::StringToQString(path.GetName()));
+        return QString("[%1]").arg(values.join(", "));
     }
 
-    return QString("[%1]").arg(values.join(", "));
-}
+    QString childListString(PrimItem* parentItem)
+    {
+        if (!parentItem)
+            return "[]";
+
+        QStringList values;
+        values.reserve(parentItem->childCount());
+
+        for (int i = 0; i < parentItem->childCount(); ++i) {
+            auto* child = static_cast<PrimItem*>(parentItem->child(i));
+            if (!child) {
+                values.append("<null>");
+                continue;
+            }
+
+            const QString path = child->data(0, PrimItem::PrimPath).toString();
+            values.append(SdfPath(QStringToString(path)).GetName().c_str());
+        }
+
+        return QString("[%1]").arg(values.join(", "));
+    }
 
 }  // namespace
 
@@ -1028,8 +1062,8 @@ StageTreePrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>&
         return;
 
     qDebug() << "StageTreePrivate::updatePrims:"
-             << "paths" << paths.size() << pathListString(paths)
-             << "invalidated" << invalidated.size() << pathListString(invalidated);
+             << "paths" << paths.size() << pathListString(paths) << "invalidated" << invalidated.size()
+             << pathListString(invalidated);
 
     const QList<SdfPath> sortedChanged = sortPathsByDepth(paths);
     const QList<SdfPath> sortedInvalidated = sortPathsByDepth(invalidated);
@@ -1104,10 +1138,9 @@ StageTreePrivate::invalidatePrimImpl(const SdfPath& path, bool refreshParent)
         prim = d.stage->GetPrimAtPath(primPath);
     }
 
-    qDebug() << "StageTreePrivate::invalidatePrimImpl:" << qt::StringToQString(primPath.GetString())
-             << "existsInStage" << static_cast<bool>(prim)
-             << "existsInTree" << static_cast<bool>(primItem)
-             << "refreshParent" << refreshParent;
+    qDebug() << "StageTreePrivate::invalidatePrimImpl:" << qt::StringToQString(primPath.GetString()) << "existsInStage"
+             << static_cast<bool>(prim) << "existsInTree" << static_cast<bool>(primItem) << "refreshParent"
+             << refreshParent;
 
     if (!prim) {
         PrimItem* parentItem = itemFromPath(parentPath);
@@ -1150,8 +1183,7 @@ StageTreePrivate::invalidatePrimImpl(const SdfPath& path, bool refreshParent)
             return;
         }
 
-        qDebug() << "StageTreePrivate::invalidatePrimImpl: added item"
-                 << qt::StringToQString(primPath.GetString());
+        qDebug() << "StageTreePrivate::invalidatePrimImpl: added item" << qt::StringToQString(primPath.GetString());
 
         if (refreshParent) {
             qDebug() << "StageTreePrivate::invalidatePrimImpl: refreshing parent after add"
@@ -1161,6 +1193,17 @@ StageTreePrivate::invalidatePrimImpl(const SdfPath& path, bool refreshParent)
         }
     }
 
+    invalidateSubtree(primItem, prim);
+}
+
+void
+StageTreePrivate::invalidateSubtree(PrimItem* item, const UsdPrim& prim)
+{
+    if (!item || !prim)
+        return;
+
+    const SdfPath primPath = prim.GetPath();
+
     bool isPayload = false;
     {
         READ_LOCKER(locker, d.context->stageLock(), "stageLock");
@@ -1168,24 +1211,24 @@ StageTreePrivate::invalidatePrimImpl(const SdfPath& path, bool refreshParent)
             isPayload = stage::isPayload(d.stage, primPath);
     }
 
-    primItem->invalidate();
-    itemCheckState(primItem, d.payloadEnabled, false);
+    item->invalidate();
+    itemCheckState(item, d.payloadEnabled, false);
 
     if (isPayload) {
         const Qt::CheckState want = prim.IsLoaded() ? Qt::Checked : Qt::Unchecked;
-        if (primItem->checkState(0) != want)
-            primItem->setCheckState(0, want);
+        if (item->checkState(0) != want)
+            item->setCheckState(0, want);
 
-        qDebug() << "StageTreePrivate::invalidatePrimImpl: payload node, clearing children for"
+        qDebug() << "StageTreePrivate::invalidateSubtree: payload node, clearing children for"
                  << qt::StringToQString(primPath.GetString()) << "loaded" << prim.IsLoaded();
 
-        while (primItem->childCount() > 0)
-            delete primItem->child(0);
+        while (item->childCount() > 0)
+            delete item->child(0);
 
         return;
     }
 
-    invalidateChildren(primItem, prim);
+    invalidateChildren(item, prim);
 }
 
 void
@@ -1202,8 +1245,8 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
 
     const QString parentPathString = parentItem->data(0, PrimItem::PrimPath).toString();
 
-    qDebug() << "StageTreePrivate::invalidateChildren: parent" << parentPathString
-             << "tree before" << childListString(parentItem);
+    qDebug() << "StageTreePrivate::invalidateChildren: parent" << parentPathString << "tree before"
+             << childListString(parentItem);
 
     QHash<QString, PrimItem*> existing;
     existing.reserve(parentItem->childCount());
@@ -1228,8 +1271,7 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
         }
     }
 
-    qDebug() << "StageTreePrivate::invalidateChildren: stage order for" << parentPathString
-             << pathListString(ordered);
+    qDebug() << "StageTreePrivate::invalidateChildren: stage order for" << parentPathString << pathListString(ordered);
 
     for (auto it = existing.begin(); it != existing.end(); ++it) {
         if (!stageSet.contains(it.key())) {
@@ -1275,9 +1317,9 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
                                            : SdfPath();
 
             if (!child || treePath != ordered[i]) {
-                qDebug() << "StageTreePrivate::invalidateChildren: mismatch at index" << i
-                         << "tree" << (child ? qt::StringToQString(treePath.GetString()) : QString("<null>"))
-                         << "stage" << qt::StringToQString(ordered[i].GetString());
+                qDebug() << "StageTreePrivate::invalidateChildren: mismatch at index" << i << "tree"
+                         << (child ? qt::StringToQString(treePath.GetString()) : QString("<null>")) << "stage"
+                         << qt::StringToQString(ordered[i].GetString());
                 orderMatches = false;
                 break;
             }
@@ -1301,12 +1343,40 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
             }
         }
 
-        qDebug() << "StageTreePrivate::invalidateChildren: tree after reorder"
-                 << childListString(parentItem);
+        qDebug() << "StageTreePrivate::invalidateChildren: tree after reorder" << childListString(parentItem);
     }
     else {
-        qDebug() << "StageTreePrivate::invalidateChildren: order already matches for"
-                 << parentPathString;
+        qDebug() << "StageTreePrivate::invalidateChildren: order already matches for" << parentPathString;
+    }
+
+    for (int i = 0; i < parentItem->childCount(); ++i) {
+        auto* childItem = static_cast<PrimItem*>(parentItem->child(i));
+        if (!childItem)
+            continue;
+
+        const QString childPathString = childItem->data(0, PrimItem::PrimPath).toString();
+        if (childPathString.isEmpty())
+            continue;
+
+        const SdfPath childPath(QStringToString(childPathString));
+
+        UsdPrim childPrim;
+        {
+            READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+            if (!d.stage)
+                return;
+            childPrim = d.stage->GetPrimAtPath(childPath);
+        }
+
+        if (!childPrim) {
+            qDebug() << "StageTreePrivate::invalidateChildren: removing vanished child during subtree refresh"
+                     << childPathString;
+            delete childItem;
+            --i;
+            continue;
+        }
+
+        invalidateSubtree(childItem, childPrim);
     }
 }
 

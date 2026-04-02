@@ -57,7 +57,6 @@ PythonInterpreterPrivate::init()
     }
 
     Py_Initialize();
-    PyRun_SimpleString("print('[Python] Interpreter started')");
 
     PyObject* sysPath = PySys_GetObject("path");  // borrowed reference
     if (sysPath && PyList_Check(sysPath)) {
@@ -111,11 +110,6 @@ PythonInterpreterPrivate::init()
     PyObject* key = PyUnicode_FromString("session");
     int has = PyDict_Contains(d.globals, key);
     Py_DECREF(key);
-
-    PyRun_SimpleString(R"(
-print("[Python] globals after init:", list(globals().keys()))
-print("[Python] session exists:", 'session' in globals())
-)");
 
     d.initialized = true;
 }

@@ -23,13 +23,13 @@ class PrimItemPrivate;
  */
 class PrimItem : public TreeItem {
 public:
-    enum PrimRole { PrimPath = Qt::UserRole + 1 };
+    enum PrimRole { Path = Qt::UserRole + 1, EditName };
 
     /**
      * @brief Column indices used by the stage tree.
      */
     enum Column {
-        Name = 0,  ///< Prim name column.
+        Name = 0,  ///< Name column.
         Vis = 1    ///< Visibility state column.
     };
 

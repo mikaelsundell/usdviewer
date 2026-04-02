@@ -397,9 +397,6 @@ unloadPayloads(const QList<SdfPath>& paths)
                     [session, state, unloadedPaths]() {
                         session->selectionList()->updatePaths(
                             path::removeAffectedPaths(state->previousSelection, unloadedPaths));
-
-                        qDebug() << "mask" << state->previousMask.size();
-
                         session->setMask(path::removeAffectedPaths(state->previousMask, unloadedPaths));
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
@@ -461,9 +458,6 @@ unloadPayloads(const QList<SdfPath>& paths)
                             payload::flushResults(session, pending, completed);
 
                         session->selectionList()->updatePaths(state->previousSelection);
-
-                        qDebug() << "mask" << state->previousMask.size();
-
                         session->setMask(state->previousMask);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
@@ -866,17 +860,12 @@ deletePaths(const QList<SdfPath>& inPaths)
                         const QList<SdfPath> editable = stage::filterStrongestEditablePaths(stage, inPaths);
                         const QList<SdfPath> paths = path::minimalRootPaths(editable);
 
-                        qDebug() << "deletePaths redo: requested" << inPaths.size() << "editable" << editable.size()
-                                 << "root paths" << paths.size();
-
                         state->prims.clear();
                         state->parentOrders.clear();
 
                         QSet<SdfPath> changedSet;
 
                         for (const SdfPath& path : paths) {
-                            qDebug() << "deletePaths redo: candidate path" << qt::SdfPathToQString(path);
-
                             changedSet.insert(path);
 
                             const SdfPath parentPath = path.GetParentPath();
@@ -885,16 +874,8 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                                 if (!state->parentOrders.contains(parentPath)) {
                                     TfTokenVector order;
-                                    if (stage::captureChildOrder(stage, parentPath, order)) {
+                                    if (stage::captureChildOrder(stage, parentPath, order))
                                         state->parentOrders.insert(parentPath, order);
-                                        qDebug() << "deletePaths redo: captured parent order for"
-                                                 << qt::SdfPathToQString(parentPath) << "children"
-                                                 << static_cast<int>(order.size());
-                                    }
-                                    else {
-                                        qDebug() << "deletePaths redo: failed to capture parent order for"
-                                                 << qt::SdfPathToQString(parentPath);
-                                    }
                                 }
                             }
                         }
@@ -904,37 +885,21 @@ deletePaths(const QList<SdfPath>& inPaths)
                         if (editLayer) {
                             for (const SdfPath& path : paths) {
                                 snapshot::PrimState primState;
-                                if (!snapshot::capturePrimToLayer(stage, path, primState)) {
-                                    qDebug()
-                                        << "deletePaths redo: failed to capture prim" << qt::SdfPathToQString(path);
+                                if (!snapshot::capturePrimToLayer(stage, path, primState))
                                     continue;
-                                }
 
-                                qDebug() << "deletePaths redo: removing prim" << qt::SdfPathToQString(path)
-                                         << "spec path" << qt::SdfPathToQString(primState.specPath);
-
-                                if (!stage::removePrimSpec(editLayer, primState.specPath)) {
-                                    qDebug() << "deletePaths redo: failed to remove prim spec"
-                                             << qt::SdfPathToQString(primState.specPath);
+                                if (!stage::removePrimSpec(editLayer, primState.specPath))
                                     continue;
-                                }
 
                                 state->prims.append(primState);
                                 removedPaths.append(path);
                                 removedAny = true;
                             }
                         }
-                        else {
-                            qDebug() << "deletePaths redo: missing edit layer";
-                        }
-
-                        qDebug() << "deletePaths redo: captured prims" << state->prims.size()
-                                 << "captured parent orders" << state->parentOrders.size();
 
                         if (removedAny) {
                             changed = changedSet.values();
                             success = true;
-                            qDebug() << "deletePaths redo: prims removed";
                         }
                     }
                 }
@@ -970,18 +935,11 @@ deletePaths(const QList<SdfPath>& inPaths)
                     if (stage) {
                         const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
                         if (editLayer) {
-                            qDebug() << "deletePaths undo: restoring prims" << state->prims.size() << "parent orders"
-                                     << state->parentOrders.size();
-
                             snapshot::sortByHierarchy(state->prims);
 
                             QSet<SdfPath> changedSet;
 
                             for (const auto& primState : state->prims) {
-                                qDebug() << "deletePaths undo: restoring prim"
-                                         << qt::SdfPathToQString(primState.stagePath) << "from spec"
-                                         << qt::SdfPathToQString(primState.specPath);
-
                                 snapshot::restorePrimFromSnapshotLayer(editLayer, primState);
                                 changedSet.insert(primState.stagePath);
 
@@ -991,21 +949,12 @@ deletePaths(const QList<SdfPath>& inPaths)
                             }
 
                             for (auto it = state->parentOrders.cbegin(); it != state->parentOrders.cend(); ++it) {
-                                qDebug() << "deletePaths undo: restoring parent order for"
-                                         << qt::SdfPathToQString(it.key()) << "children"
-                                         << static_cast<int>(it.value().size());
-
                                 stage::restoreChildOrder(stage, it.key(), it.value());
                                 changedSet.insert(it.key());
                             }
 
-                            qDebug() << "deletePaths undo: restored paths" << state->prims.size();
-
                             changed = changedSet.values();
                             success = true;
-                        }
-                        else {
-                            qDebug() << "deletePaths undo: missing edit layer";
                         }
                     }
                 }
@@ -1043,25 +992,42 @@ renamePath(const SdfPath& path, const QString& newNameInput)
 
     auto state = std::make_shared<RenameState>();
 
-    auto buildNewPath = [](const UsdStageRefPtr& stage, const SdfPath& path, const QString& input) {
-        if (!stage || path.IsEmpty())
+    auto buildNewPath = [](const UsdStageRefPtr& stage, const SdfPath& path, const QString& input, QString& error) {
+        if (!stage || path.IsEmpty()) {
+            error = "Invalid stage or path";
             return SdfPath();
-
-        const SdfPath parentPath = path.GetParentPath();
-        if (parentPath.IsEmpty() || parentPath == SdfPath::AbsoluteRootPath())
-            return SdfPath();
+        }
 
         const QString trimmed = input.trimmed();
-        if (trimmed.isEmpty())
+        if (trimmed.isEmpty()) {
+            error = "Empty name";
             return SdfPath();
+        }
+
+        if (UsdPrim defaultPrim = stage->GetDefaultPrim()) {
+            if (path == defaultPrim.GetPath()) {
+                error = "Cannot rename default prim";
+                return SdfPath();
+            }
+        }
+
+        const SdfPath parentPath = path.GetParentPath();
+        if (parentPath.IsEmpty()) {
+            error = "Invalid parent";
+            return SdfPath();
+        }
 
         const QString safeName = name::makeSafeName(stage, parentPath, trimmed, path);
-        if (safeName.isEmpty())
+        if (safeName.isEmpty()) {
+            error = "Invalid name";
             return SdfPath();
+        }
 
         const std::string nameValue = qt::QStringToString(safeName);
-        if (!SdfPath::IsValidIdentifier(nameValue))
+        if (!SdfPath::IsValidIdentifier(nameValue)) {
+            error = "Invalid identifier";
             return SdfPath();
+        }
 
         return parentPath.AppendChild(TfToken(nameValue));
     };
@@ -1139,8 +1105,12 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         hadStage = false;
                     }
                     else {
-                        newPath = buildNewPath(stage, path, newNameInput);
-                        if (newPath.IsEmpty() || newPath == path) {
+                        newPath = buildNewPath(stage, path, newNameInput, error);
+
+                        if (newPath.IsEmpty()) {
+                            // failure, keep error
+                        }
+                        else if (newPath == path) {
                             noop = true;
                         }
                         else {
@@ -1178,19 +1148,25 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(Session::Notify("rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(Session::Notify("rename path failed", { path }, Status::Error),
+                                                          1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (noop) {
-                            session->updateProgressNotify(Session::Notify("rename skipped", {}, Status::Info), 1);
+                            session->updateProgressNotify(Session::Notify("rename skipped", { path }, Status::Info), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!renamed) {
-                            session->updateProgressNotify(Session::Notify("rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(
+                                Session::Notify(
+                                    error.isEmpty() ? "rename path failed"
+                                                    : QString("rename path failed: %1").arg(error),
+                                    { path }, Status::Error),
+                                1);
                             session->endProgressBlock();
                             return;
                         }
@@ -1416,7 +1392,8 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                     if (!stage) {
                         hadStage = false;
                     }
-                    else if (state->createdPath.IsEmpty()) {}
+                    else if (state->createdPath.IsEmpty()) {
+                    }
                     else {
                         const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
                         if (editLayer) {
@@ -1592,7 +1569,6 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                             noop = true;
                         }
                         else if (fromPath == targetPath) {
-                            // Same parent reorder path; newPath remains identical.
                             state->oldPath = fromPath;
                             state->newPath = fromPath;
                             state->oldParentPath = oldParentPath;
@@ -1705,7 +1681,6 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                         error = "invalid state";
                     }
                     else if (state->oldPath == state->newPath) {
-                        // Same-parent reorder undo.
                         if (!state->oldParentOrder.empty()) {
                             stage::restoreChildOrder(stage, state->oldParentPath, state->oldParentOrder);
                             restored = true;

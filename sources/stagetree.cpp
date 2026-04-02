@@ -406,7 +406,7 @@ StageTreePrivate::addChildren(PrimItem* parent, const SdfPath& path)
 void
 StageTreePrivate::toggleVisible(PrimItem* item)
 {
-    const SdfPath path(QStringToString(item->data(0, PrimItem::PrimPath).toString()));
+    const SdfPath path(QStringToString(item->data(0, PrimItem::Path).toString()));
     bool visible = false;
     {
         READ_LOCKER(locker, d.context->stageLock(), "stageLock");
@@ -453,7 +453,7 @@ StageTreePrivate::itemSelectionChanged()
     QList<SdfPath> paths;
     for (QTreeWidgetItem* baseItem : d.tree->selectedItems()) {
         PrimItem* item = static_cast<PrimItem*>(baseItem);
-        const QString pathString = item->data(0, PrimItem::PrimPath).toString();
+        const QString pathString = item->data(0, PrimItem::Path).toString();
         if (!pathString.isEmpty())
             paths.append(SdfPath(QStringToString(pathString)));
     }
@@ -464,7 +464,7 @@ void
 StageTreePrivate::checkStateChanged(PrimItem* item)
 {
     PrimItem* primItem = static_cast<PrimItem*>(item);
-    const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+    const QString pathString = primItem->data(0, PrimItem::Path).toString();
     if (pathString.isEmpty())
         return;
 
@@ -519,22 +519,17 @@ StageTreePrivate::checkStateChanged(PrimItem* item)
 void
 StageTreePrivate::nameChanged(PrimItem* item)
 {
-    const SdfPath oldPath(QStringToString(item->data(0, PrimItem::PrimPath).toString()));
+    const SdfPath oldPath(QStringToString(item->data(0, PrimItem::Path).toString()));
     if (oldPath.IsEmpty())
         return;
 
-    const QString oldName = qt::StringToQString(oldPath.GetName());
-    const QString newName = item->text(PrimItem::Name).trimmed();
-
-    if (newName.isEmpty() || newName == oldName) {
-        if (item->text(PrimItem::Name) != oldName)
-            item->setText(PrimItem::Name, oldName);
+    const QString newName = item->data(PrimItem::Name, PrimItem::EditName).toString().trimmed();
+    if (newName.isEmpty())
         return;
-    }
 
-    const SdfPath parentPath = oldPath.GetParentPath();
-    if (parentPath.IsEmpty() || parentPath == SdfPath::AbsoluteRootPath()) {
-        item->setText(PrimItem::Name, oldName);
+    const QString oldName = qt::StringToQString(oldPath.GetName());
+    if (newName == oldName) {
+        item->setData(PrimItem::Name, PrimItem::EditName, QString());
         return;
     }
 
@@ -550,7 +545,7 @@ StageTree::startDrag(Qt::DropActions supportedActions)
     if (!item)
         return;
 
-    const QString pathString = item->data(0, PrimItem::PrimPath).toString();
+    const QString pathString = item->data(0, PrimItem::Path).toString();
     if (pathString.isEmpty())
         return;
 
@@ -592,7 +587,7 @@ StageTree::dragMoveEvent(QDragMoveEvent* event)
 
     auto* primTarget = static_cast<PrimItem*>(target);
     const QString fromPathString = QString::fromUtf8(event->mimeData()->data(kPrimPathMime));
-    const QString targetPathString = primTarget->data(0, PrimItem::PrimPath).toString();
+    const QString targetPathString = primTarget->data(0, PrimItem::Path).toString();
 
     if (fromPathString.isEmpty() || targetPathString.isEmpty()) {
         clearDropIndicator(this);
@@ -640,7 +635,7 @@ StageTree::dropEvent(QDropEvent* event)
     }
 
     const QString fromPathString = QString::fromUtf8(event->mimeData()->data(kPrimPathMime));
-    const QString targetPathString = targetItem->data(0, PrimItem::PrimPath).toString();
+    const QString targetPathString = targetItem->data(0, PrimItem::Path).toString();
 
     if (fromPathString.isEmpty() || targetPathString.isEmpty()) {
         clearDropIndicator(this);
@@ -699,7 +694,7 @@ StageTree::dropEvent(QDropEvent* event)
             if (!item)
                 return nullptr;
 
-            if (item->data(0, PrimItem::PrimPath).toString() == fromPathString)
+            if (item->data(0, PrimItem::Path).toString() == fromPathString)
                 return item;
 
             for (int i = 0; i < item->childCount(); ++i) {
@@ -740,7 +735,7 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 
     for (QTreeWidgetItem* selected : d.tree->selectedItems()) {
         PrimItem* primItem = static_cast<PrimItem*>(selected);
-        const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+        const QString pathString = primItem->data(0, PrimItem::Path).toString();
         if (pathString.isEmpty())
             continue;
 
@@ -1045,7 +1040,7 @@ namespace {
                 continue;
             }
 
-            const QString path = child->data(0, PrimItem::PrimPath).toString();
+            const QString path = child->data(0, PrimItem::Path).toString();
             values.append(SdfPath(QStringToString(path)).GetName().c_str());
         }
 
@@ -1243,7 +1238,7 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
     if (!parentItem || !prim)
         return;
 
-    const QString parentPathString = parentItem->data(0, PrimItem::PrimPath).toString();
+    const QString parentPathString = parentItem->data(0, PrimItem::Path).toString();
 
     qDebug() << "StageTreePrivate::invalidateChildren: parent" << parentPathString << "tree before"
              << childListString(parentItem);
@@ -1255,7 +1250,7 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
         auto* child = static_cast<PrimItem*>(parentItem->child(i));
         if (!child)
             continue;
-        existing.insert(child->data(0, PrimItem::PrimPath).toString(), child);
+        existing.insert(child->data(0, PrimItem::Path).toString(), child);
     }
 
     QList<SdfPath> ordered;
@@ -1287,7 +1282,7 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
         auto* child = static_cast<PrimItem*>(parentItem->child(i));
         if (!child)
             continue;
-        existing.insert(child->data(0, PrimItem::PrimPath).toString(), child);
+        existing.insert(child->data(0, PrimItem::Path).toString(), child);
     }
 
     for (const SdfPath& childPath : ordered) {
@@ -1306,14 +1301,14 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
         auto* child = static_cast<PrimItem*>(parentItem->child(i));
         if (!child)
             continue;
-        existing.insert(child->data(0, PrimItem::PrimPath).toString(), child);
+        existing.insert(child->data(0, PrimItem::Path).toString(), child);
     }
 
     bool orderMatches = (parentItem->childCount() == ordered.size());
     if (orderMatches) {
         for (int i = 0; i < ordered.size(); ++i) {
             auto* child = static_cast<PrimItem*>(parentItem->child(i));
-            const SdfPath treePath = child ? SdfPath(QStringToString(child->data(0, PrimItem::PrimPath).toString()))
+            const SdfPath treePath = child ? SdfPath(QStringToString(child->data(0, PrimItem::Path).toString()))
                                            : SdfPath();
 
             if (!child || treePath != ordered[i]) {
@@ -1354,7 +1349,7 @@ StageTreePrivate::invalidateChildren(PrimItem* parentItem, const UsdPrim& prim)
         if (!childItem)
             continue;
 
-        const QString childPathString = childItem->data(0, PrimItem::PrimPath).toString();
+        const QString childPathString = childItem->data(0, PrimItem::Path).toString();
         if (childPathString.isEmpty())
             continue;
 
@@ -1388,7 +1383,7 @@ StageTreePrivate::updateSelection(const QList<SdfPath>& paths)
 
     std::function<void(QTreeWidgetItem*)> selectItems = [&](QTreeWidgetItem* baseItem) {
         PrimItem* primItem = static_cast<PrimItem*>(baseItem);
-        const QString pathString = primItem->data(0, PrimItem::PrimPath).toString();
+        const QString pathString = primItem->data(0, PrimItem::Path).toString();
         if (!pathString.isEmpty()) {
             const SdfPath itemPath(QStringToString(pathString));
             bool isSelected = selectedSet.contains(itemPath);
@@ -1423,7 +1418,7 @@ StageTreePrivate::itemFromPath(const SdfPath& path) const
         if (!item)
             return nullptr;
 
-        if (item->data(0, PrimItem::PrimPath).toString() == target)
+        if (item->data(0, PrimItem::Path).toString() == target)
             return item;
 
         for (int i = 0; i < item->childCount(); ++i) {

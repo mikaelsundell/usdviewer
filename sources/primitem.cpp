@@ -34,7 +34,7 @@ public:
         bool hasPayload = false;
         bool isEditTarget = true;
         bool isRoot = false;
-        QString pendingName;
+        QString editName;
         QString name;
         QString typeName;
     };
@@ -54,10 +54,12 @@ PrimItemPrivate::updateCache()
 {
     if (!d.dirty)
         return;
+
     d.visible = true;
     d.active = false;
     d.hasPayload = false;
     d.isEditTarget = true;
+    d.isRoot = false;
     d.name.clear();
     d.typeName.clear();
 
@@ -65,7 +67,8 @@ PrimItemPrivate::updateCache()
         d.dirty = false;
         return;
     }
-    UsdPrim prim = d.stage->GetPrimAtPath(d.path);
+
+    const UsdPrim prim = d.stage->GetPrimAtPath(d.path);
     d.isRoot = prim == d.stage->GetPseudoRoot();
 
     if (prim) {
@@ -74,13 +77,14 @@ PrimItemPrivate::updateCache()
         d.name = StringToQString(prim.GetName().GetString());
         d.typeName = StringToQString(prim.GetTypeName().GetString());
         d.isEditTarget = stage::isEditTarget(d.stage, d.path);
-        if (d.active && prim != d.stage->GetPseudoRoot()) {
+
+        if (d.active && prim != d.stage->GetPseudoRoot())
             d.visible = stage::isVisible(d.stage, d.path);
-        }
     }
     else {
         d.name = StringToQString(d.path.GetName());
     }
+
     d.dirty = false;
 }
 
@@ -110,7 +114,7 @@ void
 PrimItem::invalidate()
 {
     p->d.dirty = true;
-    p->d.pendingName.clear();
+    p->d.editName.clear();
 }
 
 QVariant
@@ -119,22 +123,31 @@ PrimItem::data(int column, int role) const
     p->updateCache();
     const SdfPath path = p->d.path;
 
+    if (column == Name) {
+        if (role == Qt::DisplayRole)
+            return p->d.name;
+
+        if (role == Qt::EditRole)
+            return p->d.editName.isEmpty() ? p->d.name : p->d.editName;
+
+        if (role == PrimItem::EditName)
+            return p->d.editName;
+    }
+
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
         switch (column) {
-        case Name:
-            if (!p->d.pendingName.isEmpty())
-                return p->d.pendingName;
-            return p->d.name;
         case Vis: return QString();
         default: break;
         }
     }
+
     if (role == Qt::ToolTipRole) {
         if (p->d.name.isEmpty())
             return QVariant();
 
         return QString("%1 (%2)").arg(StringToQString(path.GetString())).arg(p->d.typeName);
     }
+
     if (role == Qt::DecorationRole && column == Name) {
         Style::IconRole iconRole = Style::IconRole::Prim;
 
@@ -148,14 +161,17 @@ PrimItem::data(int column, int role) const
 
         return QIcon(style()->icon(iconRole, Style::UIScale::Medium));
     }
+
     if (role == Qt::DecorationRole && column == Vis) {
         if (!p->d.active || p->d.isRoot)
             return QVariant();
-        return style()->icon(p->d.visible ? Style::IconRole::Visible : Style::IconRole::Hidden, Style::UIScale::Medium);
+
+        return style()->icon(p->d.visible ? Style::IconRole::Visible : Style::IconRole::Hidden,
+                             Style::UIScale::Medium);
     }
-    if (role == PrimItem::PrimPath) {
+
+    if (role == PrimItem::Path)
         return StringToQString(path.GetString());
-    }
 
     return TreeItem::data(column, role);
 }
@@ -163,17 +179,22 @@ PrimItem::data(int column, int role) const
 void
 PrimItem::setData(int column, int role, const QVariant& value)
 {
-    if (column == Name && role == Qt::EditRole) {
+    if (column == Name && (role == Qt::EditRole || role == PrimItem::EditName)) {
         const QString newName = value.toString().trimmed();
-        if (newName.isEmpty())
-            return;
+
         p->updateCache();
-        if (newName == p->d.name)
+
+        if (newName.isEmpty() || newName == p->d.name) {
+            p->d.editName.clear();
+            TreeItem::setData(column, PrimItem::EditName, QString());
             return;
-        p->d.pendingName = newName;
-        TreeItem::setData(column, role, newName);
+        }
+
+        p->d.editName = newName;
+        TreeItem::setData(column, PrimItem::EditName, newName);
         return;
     }
+
     TreeItem::setData(column, role, value);
 }
 

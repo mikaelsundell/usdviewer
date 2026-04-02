@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "selectionlist.h"
 #include "notice.h"
+#include "selectionlist.h"
 #include "viewcamera.h"
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>

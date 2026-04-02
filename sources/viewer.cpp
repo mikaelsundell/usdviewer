@@ -1241,7 +1241,7 @@ ViewerPrivate::maskChanged(const QList<SdfPath>& paths)
 void
 ViewerPrivate::primsChanged(const NoticeBatch& batch)
 {
-   if (batch.entries.isEmpty())
+    if (batch.entries.isEmpty())
         return;
     ++d.changes;
     updateModified(true);

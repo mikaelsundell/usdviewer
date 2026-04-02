@@ -42,8 +42,7 @@ namespace payload {
         Session::Notify::Status status = Session::Notify::Status::Info;
     };
 
-    inline void
-    flushResults(Session* session, const QList<payload::Result>& results, int completed)
+    inline void flushResults(Session* session, const QList<payload::Result>& results, int completed)
     {
         if (!session || results.isEmpty())
             return;
@@ -55,9 +54,8 @@ namespace payload {
         }
     }
 
-    inline bool
-    applyLoad(UsdStageRefPtr stage, const SdfPath& path, bool useVariant, const std::string& variantSetName,
-              const std::string& variantSelection, UndoItem& undoItem, QString& error)
+    inline bool applyLoad(UsdStageRefPtr stage, const SdfPath& path, bool useVariant, const std::string& variantSetName,
+                          const std::string& variantSelection, UndoItem& undoItem, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -103,8 +101,7 @@ namespace payload {
         return true;
     }
 
-    inline bool
-    applyUnload(UsdStageRefPtr stage, const SdfPath& path, UndoItem& undoItem, QString& error)
+    inline bool applyUnload(UsdStageRefPtr stage, const SdfPath& path, UndoItem& undoItem, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -126,8 +123,7 @@ namespace payload {
         return true;
     }
 
-    inline bool
-    restoreState(UsdStageRefPtr stage, const UndoItem& item, QString& error)
+    inline bool restoreState(UsdStageRefPtr stage, const UndoItem& item, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -211,8 +207,8 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     try {
                         WRITE_LOCKER(locker, session->stageLock(), "stageLock");
                         const UsdStageRefPtr stage = session->stageUnsafe();
-                        result.success
-                            = payload::applyLoad(stage, path, useVariant, variantSetName, variantSelection, undoItem, error);
+                        result.success = payload::applyLoad(stage, path, useVariant, variantSetName, variantSelection,
+                                                            undoItem, error);
                     } catch (...) {
                         result.success = false;
                         error = "exception";
@@ -760,8 +756,7 @@ namespace snapshot {
 
     using PrimSnapshot = QVector<PrimState>;
 
-    inline void
-    ensureParentSpecs(const SdfLayerHandle& layer, const SdfPath& path)
+    inline void ensureParentSpecs(const SdfLayerHandle& layer, const SdfPath& path)
     {
         if (!layer)
             return;
@@ -776,8 +771,7 @@ namespace snapshot {
         }
     }
 
-    inline bool
-    capturePrimToLayer(UsdStageRefPtr stage, const SdfPath& stagePath, PrimState& out)
+    inline bool capturePrimToLayer(UsdStageRefPtr stage, const SdfPath& stagePath, PrimState& out)
     {
         if (!stage)
             return false;
@@ -819,8 +813,7 @@ namespace snapshot {
         return false;
     }
 
-    inline void
-    restorePrimFromSnapshotLayer(const SdfLayerHandle& dstLayer, const PrimState& state)
+    inline void restorePrimFromSnapshotLayer(const SdfLayerHandle& dstLayer, const PrimState& state)
     {
         if (!dstLayer || !state.snapshotLayer)
             return;
@@ -829,8 +822,7 @@ namespace snapshot {
         SdfCopySpec(state.snapshotLayer, state.specPath, dstLayer, state.stagePath);
     }
 
-    inline void
-    sortByHierarchy(PrimSnapshot& snapshot)
+    inline void sortByHierarchy(PrimSnapshot& snapshot)
     {
         std::sort(snapshot.begin(), snapshot.end(), [](const PrimState& a, const PrimState& b) {
             const size_t ac = a.stagePath.GetPathElementCount();
@@ -1117,8 +1109,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                     else {
                         newPath = buildNewPath(stage, path, newNameInput, error);
 
-                        if (newPath.IsEmpty()) {
-                        }
+                        if (newPath.IsEmpty()) {}
                         else if (newPath == path) {
                             noop = true;
                         }
@@ -1171,10 +1162,9 @@ renamePath(const SdfPath& path, const QString& newNameInput)
 
                         if (!renamed) {
                             session->updateProgressNotify(
-                                Session::Notify(
-                                    error.isEmpty() ? "rename path failed"
-                                                    : QString("rename path failed: %1").arg(error),
-                                    { path }, Status::Error),
+                                Session::Notify(error.isEmpty() ? "rename path failed"
+                                                                : QString("rename path failed: %1").arg(error),
+                                                { path }, Status::Error),
                                 1);
                             session->endProgressBlock();
                             return;
@@ -1634,8 +1624,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                                     stage::restoreChildOrder(stage, oldParentPath,
                                                              removeToken(state->oldParentOrder, movedName));
 
-                                state->newParentNewOrder
-                                    = insertTokenAt(state->newParentOldOrder, movedName, insertIndex);
+                                state->newParentNewOrder = insertTokenAt(state->newParentOldOrder, movedName,
+                                                                         insertIndex);
 
                                 if (!state->newParentNewOrder.empty())
                                     stage::restoreChildOrder(stage, newParentPath, state->newParentNewOrder);

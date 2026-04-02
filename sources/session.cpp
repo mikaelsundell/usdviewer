@@ -83,16 +83,12 @@ public:
 
         void objectsChanged(const UsdNotice::ObjectsChanged& notice, const UsdStageWeakPtr& sender)
         {
-            if (d.suppress.load()) {
-                qDebug() << "StageWatcher::objectsChanged: suppressed";
+            if (d.suppress.load())
                 return;
-            }
 
             UsdStageRefPtr senderStage = sender;
-            if (!d.stage || !senderStage || d.stage != senderStage) {
-                qDebug() << "StageWatcher::objectsChanged: ignoring stale notice from non-current stage";
+            if (!d.stage || !senderStage || d.stage != senderStage)
                 return;
-            }
 
             NoticeBatch batch;
 
@@ -119,17 +115,10 @@ public:
                 batch.entries.append(entry);
             }
 
-            qDebug() << "StageWatcher::objectsChanged:" << "entries" << batch.entries.size();
-
-            if (batch.entries.isEmpty()) {
-                qDebug() << "StageWatcher::objectsChanged: nothing to forward";
+            if (batch.entries.isEmpty())
                 return;
-            }
 
-            QMetaObject::invokeMethod(d.parent->d.session, [this, batch]() {
-                qDebug() << "StageWatcher::objectsChanged: invoke updatePrims";
-                d.parent->updatePrims(batch);
-            });
+            QMetaObject::invokeMethod(d.parent->d.session, [this, batch]() { d.parent->updatePrims(batch); });
         }
 
         void blockSignals(bool block) { d.suppress.store(block); }
@@ -189,10 +178,7 @@ public:
     Data d;
 };
 
-SessionPrivate::SessionPrivate()
-{
-    d.stageWatcher.reset(new StageWatcher(this));
-}
+SessionPrivate::SessionPrivate() { d.stageWatcher.reset(new StageWatcher(this)); }
 
 SessionPrivate::~SessionPrivate() = default;
 
@@ -746,19 +732,11 @@ SessionPrivate::needsBoundingBoxUpdate(const NoticeBatch& batch) const
 void
 SessionPrivate::updatePrims(const NoticeBatch& batch)
 {
-    qDebug() << "SessionPrivate::updatePrims: incoming"
-             << "entries" << batch.entries.size() << "changeDepth" << static_cast<qulonglong>(d.changeDepth)
-             << "primsUpdate" << (d.primsUpdate == Session::PrimsUpdate::Deferred ? "Deferred" : "Immediate");
-
-    if (batch.entries.isEmpty()) {
-        qDebug() << "SessionPrivate::updatePrims: nothing to emit";
+    if (batch.entries.isEmpty())
         return;
-    }
 
     if (d.changeDepth > 0 || d.primsUpdate == Session::PrimsUpdate::Deferred) {
         d.pendingNotices.entries.append(batch.entries);
-        qDebug() << "SessionPrivate::updatePrims: deferred"
-                 << "pending entries" << d.pendingNotices.entries.size();
         return;
     }
 
@@ -771,16 +749,10 @@ SessionPrivate::updatePrims(const NoticeBatch& batch)
             d.bbox = bbox;
         }
 
-        qDebug() << "SessionPrivate::updatePrims: emit primsChanged + boundingBoxChanged"
-                 << "entries" << batch.entries.size();
-
         Q_EMIT d.session->primsChanged(batch);
         Q_EMIT d.session->boundingBoxChanged(bbox);
     }
     else {
-        qDebug() << "SessionPrivate::updatePrims: emit primsChanged only"
-                 << "entries" << batch.entries.size();
-
         Q_EMIT d.session->primsChanged(batch);
     }
 }
@@ -788,13 +760,8 @@ SessionPrivate::updatePrims(const NoticeBatch& batch)
 void
 SessionPrivate::flushPrims()
 {
-    qDebug() << "SessionPrivate::flushPrims: incoming pending"
-             << "entries" << d.pendingNotices.entries.size();
-
-    if (d.pendingNotices.entries.isEmpty()) {
-        qDebug() << "SessionPrivate::flushPrims: nothing pending";
+    if (d.pendingNotices.entries.isEmpty())
         return;
-    }
 
     const NoticeBatch batch = d.pendingNotices;
     d.pendingNotices.entries.clear();
@@ -808,16 +775,10 @@ SessionPrivate::flushPrims()
             d.bbox = bbox;
         }
 
-        qDebug() << "SessionPrivate::flushPrims: emit primsChanged + boundingBoxChanged"
-                 << "entries" << batch.entries.size();
-
         Q_EMIT d.session->primsChanged(batch);
         Q_EMIT d.session->boundingBoxChanged(bbox);
     }
     else {
-        qDebug() << "SessionPrivate::flushPrims: emit primsChanged only"
-                 << "entries" << batch.entries.size();
-
         Q_EMIT d.session->primsChanged(batch);
     }
 }

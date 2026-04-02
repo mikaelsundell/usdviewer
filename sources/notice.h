@@ -6,9 +6,9 @@
 
 #include <QList>
 #include <QMetaType>
-#include <pxr/usd/usd/notice.h>
-#include <pxr/usd/sdf/path.h>
 #include <pxr/base/tf/token.h>
+#include <pxr/usd/sdf/path.h>
+#include <pxr/usd/usd/notice.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -36,8 +36,7 @@ struct NoticeEntry {
     SdfPath associatedPath;
 
     /// Classification for prim resyncs (from USD)
-    UsdNotice::ObjectsChanged::PrimResyncType primResyncType =
-        UsdNotice::ObjectsChanged::PrimResyncType::Invalid;
+    UsdNotice::ObjectsChanged::PrimResyncType primResyncType = UsdNotice::ObjectsChanged::PrimResyncType::Invalid;
 
     /// True if this path is in GetChangedInfoOnlyPaths()
     bool changedInfoOnly = false;
@@ -61,7 +60,7 @@ struct NoticeBatch {
     QList<NoticeEntry> entries;
 };
 
-} // namespace usdviewer
+}  // namespace usdviewer
 
 // Register for Qt signal/slot usage
 Q_DECLARE_METATYPE(usdviewer::NoticeEntry)

@@ -343,7 +343,7 @@ TreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex
     const bool hasChildren = model()->hasChildren(index);
     if (!hasChildren)
         return;
-    
+
     const bool expanded = isExpanded(index);
     QRect vr = visualRect(index);
     QRect r = p->branchRect(vr, index);

@@ -91,57 +91,6 @@ PySession_close(PySessionObject* self)
     Py_RETURN_NONE;
 }
 
-/*
-static PyObject*
-PySession_stage(PySessionObject*)
-{
-    Session* s = session();
-    if (!s) {
-        PyErr_SetString(PyExc_RuntimeError, "Session not available");
-        return nullptr;
-    }
-
-    UsdStageRefPtr stage = s->stage();
-    if (!stage)
-        Py_RETURN_NONE;
-
-    std::string identifier = stage->GetRootLayer()->GetIdentifier();
-    PyObject* usdModule = PyImport_ImportModule("pxr.Usd");
-    if (!usdModule) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to import pxr.Usd");
-        return nullptr;
-    }
-
-    PyObject* stageClass = PyObject_GetAttrString(usdModule, "Stage");
-    Py_DECREF(usdModule);
-
-    if (!stageClass) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to access Usd.Stage");
-        return nullptr;
-    }
-
-    PyObject* openFn = PyObject_GetAttrString(stageClass, "Open");
-    Py_DECREF(stageClass);
-
-    if (!openFn || !PyCallable_Check(openFn)) {
-        PyErr_SetString(PyExc_RuntimeError, "Usd.Stage.Open not callable");
-        Py_XDECREF(openFn);
-        return nullptr;
-    }
-    PyObject* arg = PyUnicode_FromString(identifier.c_str());
-    PyObject* pyStage = PyObject_CallFunctionObjArgs(openFn, arg, nullptr);
-
-    Py_DECREF(arg);
-    Py_DECREF(openFn);
-
-    if (!pyStage) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to open stage in Python");
-        return nullptr;
-    }
-    return pyStage;
-}
-*/
-
 static PyObject*
 PySession_stage(PySessionObject*)
 {
@@ -245,8 +194,6 @@ PySession_stage(PySessionObject*)
 
     return pyStage;
 }
-
-
 
 static PyObject*
 PySession_selection(PySessionObject* self)

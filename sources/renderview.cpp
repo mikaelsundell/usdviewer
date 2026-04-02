@@ -4,7 +4,7 @@
 
 #include "renderview.h"
 #include "application.h"
-#include "stageutils.h"
+#include "usdutils.h"
 #include "viewcontext.h"
 #include <QPointer>
 

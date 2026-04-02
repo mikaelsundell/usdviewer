@@ -22,7 +22,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace usdviewer {
 namespace qt {
-
+    
     /** @name Qt / USD Conversions */
     ///@{
 
@@ -45,6 +45,21 @@ namespace qt {
      * @brief Converts a USD TfToken to QString.
      */
     QString TfTokenToQString(const TfToken& token);
+
+    /**
+     * @brief Converts a USD SdfPath to QString.
+     */
+    QString SdfPathToQString(const SdfPath& path);
+
+    /**
+     * @brief Converts a QList of USD SdfPath values to a formatted QString list.
+     *
+     * The result is formatted as:
+     * @code
+     * [/World, /World/Geom, /World/Geom/Cube]
+     * @endcode
+     */
+    QString SdfPathListToQString(const QList<SdfPath>& paths);
 
     /**
      * @brief Converts a TfTokenVector to a QList of QString.

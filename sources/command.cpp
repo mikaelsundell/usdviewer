@@ -5,10 +5,11 @@
 #include "command.h"
 #include "commandstack.h"
 #include "qtutils.h"
-#include "stageutils.h"
+#include "usdutils.h"
 #include "tracelocks.h"
 #include <QPointer>
 #include <QThreadPool>
+#include <algorithm>
 #include <pxr/usd/sdf/copyUtils.h>
 #include <pxr/usd/usd/namespaceEditor.h>
 #include <pxr/usd/usd/prim.h>
@@ -18,58 +19,6 @@
 #include <pxr/usd/usdGeom/xform.h>
 
 namespace usdviewer {
-
-namespace selection {
-    inline bool isPathAffected(const SdfPath& selectedPath, const SdfPath& rootPath)
-    {
-        if (selectedPath.IsEmpty() || rootPath.IsEmpty())
-            return false;
-
-        const SdfPath selectedPrimPath = selectedPath.IsPropertyPath() ? selectedPath.GetPrimPath() : selectedPath;
-        const SdfPath rootPrimPath = rootPath.IsPropertyPath() ? rootPath.GetPrimPath() : rootPath;
-
-        return selectedPrimPath == rootPrimPath || selectedPrimPath.HasPrefix(rootPrimPath);
-    }
-
-    inline QList<SdfPath> removePaths(const QList<SdfPath>& selectedPaths, const QList<SdfPath>& removedPaths)
-    {
-        if (selectedPaths.isEmpty() || removedPaths.isEmpty())
-            return selectedPaths;
-
-        QList<SdfPath> result;
-        result.reserve(selectedPaths.size());
-
-        for (const SdfPath& selectedPath : selectedPaths) {
-            bool keep = true;
-            for (const SdfPath& removedPath : removedPaths) {
-                if (isPathAffected(selectedPath, removedPath)) {
-                    keep = false;
-                    break;
-                }
-            }
-
-            if (keep)
-                result.append(selectedPath);
-        }
-
-        return result;
-    }
-
-    inline QList<SdfPath> remapPaths(const QList<SdfPath>& selectedPaths, const SdfPath& oldPath, const SdfPath& newPath)
-    {
-        QList<SdfPath> result;
-        result.reserve(selectedPaths.size());
-
-        for (const SdfPath& selectedPath : selectedPaths) {
-            if (isPathAffected(selectedPath, oldPath))
-                result.append(newPath.AppendPath(selectedPath.MakeRelativePath(oldPath)));
-            else
-                result.append(selectedPath);
-        }
-
-        return result;
-    }
-}  // namespace selection
 
 namespace payload {
     struct UndoItem {
@@ -83,6 +32,7 @@ namespace payload {
     struct State {
         QList<UndoItem> undoItems;
         QList<SdfPath> previousSelection;
+        QList<SdfPath> previousMask;
     };
 
     struct Result {
@@ -220,20 +170,20 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
     auto state = std::make_shared<payload::State>();
 
     return Command(
-        // redo
         [paths, variantSet, variantValue, state](Session* session) {
             if (!session || paths.isEmpty())
                 return;
 
             state->previousSelection = session->selectionList()->paths();
+            state->previousMask = session->mask();
 
             session->beginProgressBlock("load payloads", paths.size());
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
             QThreadPool::globalInstance()->start([session, paths, variantSet, variantValue, state]() {
                 const bool useVariant = !variantSet.isEmpty() && !variantValue.isEmpty();
-                const std::string variantSetName = QStringToString(variantSet);
-                const std::string variantSelection = QStringToString(variantValue);
+                const std::string variantSetName = qt::QStringToString(variantSet);
+                const std::string variantSelection = qt::QStringToString(variantValue);
 
                 QList<payload::Result> pending;
                 pending.reserve(16);
@@ -301,7 +251,6 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [state](Session* session) {
             if (!session || state->undoItems.isEmpty())
                 return;
@@ -356,6 +305,7 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                             payload::flushResults(session, pending, completed);
 
                         session->selectionList()->updatePaths(state->previousSelection);
+                        session->setMask(state->previousMask);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
                     },
@@ -370,12 +320,12 @@ unloadPayloads(const QList<SdfPath>& paths)
     auto state = std::make_shared<payload::State>();
 
     return Command(
-        // redo
         [paths, state](Session* session) {
             if (!session || paths.isEmpty())
                 return;
 
             state->previousSelection = session->selectionList()->paths();
+            state->previousMask = session->mask();
 
             session->beginProgressBlock("unload payloads", paths.size());
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -445,15 +395,18 @@ unloadPayloads(const QList<SdfPath>& paths)
                 QMetaObject::invokeMethod(
                     session,
                     [session, state, unloadedPaths]() {
-                        session->selectionList()->updatePaths(selection::removePaths(state->previousSelection, unloadedPaths));
+                        session->selectionList()->updatePaths(
+                            path::removeAffectedPaths(state->previousSelection, unloadedPaths));
+                        
+                        qDebug() << "mask" << state->previousMask.size();
+                        
+                        session->setMask(path::removeAffectedPaths(state->previousMask, unloadedPaths));
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-
-        // undo
         [state](Session* session) {
             if (!session || state->undoItems.isEmpty())
                 return;
@@ -508,6 +461,10 @@ unloadPayloads(const QList<SdfPath>& paths)
                             payload::flushResults(session, pending, completed);
 
                         session->selectionList()->updatePaths(state->previousSelection);
+                        
+                        qDebug() << "mask" << state->previousMask.size();
+                        
+                        session->setMask(state->previousMask);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
                         session->endProgressBlock();
                     },
@@ -522,7 +479,6 @@ isolatePaths(const QList<SdfPath>& paths)
     auto state = std::make_shared<QList<SdfPath>>();
 
     return Command(
-        // redo
         [paths, state](Session* session) {
             session->beginProgressBlock("isolate paths", 1);
 
@@ -540,7 +496,6 @@ isolatePaths(const QList<SdfPath>& paths)
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [state](Session* session) {
             session->beginProgressBlock("undo isolate paths", 1);
 
@@ -563,8 +518,8 @@ Command
 selectPaths(const QList<SdfPath>& paths)
 {
     auto previous = std::make_shared<QList<SdfPath>>();
+
     return Command(
-        // redo
         [paths, previous](Session* session) {
             session->beginProgressBlock("select paths", 1);
 
@@ -576,14 +531,12 @@ selectPaths(const QList<SdfPath>& paths)
                     session,
                     [session, paths]() {
                         using Status = Session::Notify::Status;
-                        Session::Notify notify("paths selected", paths, Status::Info);
-                        session->updateProgressNotify(notify, 1);
+                        session->updateProgressNotify(Session::Notify("paths selected", paths, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [previous](Session* session) {
             session->beginProgressBlock("undo select paths", 1);
 
@@ -594,8 +547,7 @@ selectPaths(const QList<SdfPath>& paths)
                     session,
                     [session, previous]() {
                         using Status = Session::Notify::Status;
-                        Session::Notify notify("select undone", *previous, Status::Info);
-                        session->updateProgressNotify(notify, 1);
+                        session->updateProgressNotify(Session::Notify("select undone", *previous, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -607,8 +559,8 @@ Command
 showPaths(const QList<SdfPath>& paths, bool recursive)
 {
     auto state = std::make_shared<QHash<SdfPath, bool>>();
+
     return Command(
-        // redo
         [paths, recursive, state](Session* session) {
             session->beginProgressBlock("show paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -617,7 +569,6 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                 bool success = false;
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
-
                     const UsdStageRefPtr stage = session->stageUnsafe();
                     if (stage) {
                         state->clear();
@@ -633,16 +584,16 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                     session,
                     [session, paths, success]() {
                         using Status = Session::Notify::Status;
-                        Session::Notify notify(success ? "paths shown" : "show paths failed", paths,
-                                               success ? Status::Info : Status::Error);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
-                        session->updateProgressNotify(notify, 1);
+                        session->updateProgressNotify(
+                            Session::Notify(success ? "paths shown" : "show paths failed", paths,
+                                            success ? Status::Info : Status::Error),
+                            1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [state, recursive](Session* session) {
             session->beginProgressBlock("undo show paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -652,13 +603,11 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                 QList<SdfPath> restoredPaths;
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
-
                     const UsdStageRefPtr stage = session->stageUnsafe();
                     if (stage) {
                         restoredPaths = state->keys();
                         for (auto it = state->cbegin(); it != state->cend(); ++it)
                             stage::setVisible(stage, { it.key() }, it.value(), recursive);
-
                         success = true;
                     }
                 }
@@ -667,10 +616,11 @@ showPaths(const QList<SdfPath>& paths, bool recursive)
                     session,
                     [session, restoredPaths, success]() {
                         using Status = Session::Notify::Status;
-                        Session::Notify notify(success ? "show undone" : "undo show paths failed", restoredPaths,
-                                               success ? Status::Info : Status::Error);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
-                        session->updateProgressNotify(notify, 1);
+                        session->updateProgressNotify(
+                            Session::Notify(success ? "show undone" : "undo show paths failed", restoredPaths,
+                                            success ? Status::Info : Status::Error),
+                            1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -682,8 +632,8 @@ Command
 hidePaths(const QList<SdfPath>& paths, bool recursive)
 {
     auto state = std::make_shared<QHash<SdfPath, bool>>();
+
     return Command(
-        // redo
         [paths, recursive, state](Session* session) {
             session->beginProgressBlock("hide paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -692,7 +642,6 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
                 bool success = false;
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
-
                     const UsdStageRefPtr stage = session->stageUnsafe();
                     if (stage) {
                         state->clear();
@@ -708,16 +657,16 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
                     session,
                     [session, paths, success]() {
                         using Status = Session::Notify::Status;
-                        Session::Notify notify(success ? "paths hidden" : "hide paths failed", paths,
-                                               success ? Status::Info : Status::Error);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
-                        session->updateProgressNotify(notify, 1);
+                        session->updateProgressNotify(
+                            Session::Notify(success ? "paths hidden" : "hide paths failed", paths,
+                                            success ? Status::Info : Status::Error),
+                            1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [state, recursive](Session* session) {
             session->beginProgressBlock("undo hide paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -727,13 +676,11 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
                 QList<SdfPath> restoredPaths;
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
-
                     const UsdStageRefPtr stage = session->stageUnsafe();
                     if (stage) {
                         restoredPaths = state->keys();
                         for (auto it = state->cbegin(); it != state->cend(); ++it)
                             stage::setVisible(stage, { it.key() }, it.value(), recursive);
-
                         success = true;
                     }
                 }
@@ -742,10 +689,11 @@ hidePaths(const QList<SdfPath>& paths, bool recursive)
                     session,
                     [session, restoredPaths, success]() {
                         using Status = Session::Notify::Status;
-                        Session::Notify notify(success ? "hide undone" : "undo hide paths failed", restoredPaths,
-                                               success ? Status::Info : Status::Error);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
-                        session->updateProgressNotify(notify, 1);
+                        session->updateProgressNotify(
+                            Session::Notify(success ? "hide undone" : "undo hide paths failed", restoredPaths,
+                                            success ? Status::Info : Status::Error),
+                            1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -757,8 +705,8 @@ Command
 stageUp(Session::StageUp stageUp)
 {
     auto state = std::make_shared<Session::StageUp>(Session::StageUp::Y);
+
     return Command(
-        // redo
         [stageUp, state](Session* session) {
             session->beginProgressBlock("set stage up", 1);
 
@@ -771,28 +719,26 @@ stageUp(Session::StageUp stageUp)
                     [session, stageUp]() {
                         using Status = Session::Notify::Status;
                         const QString axis = (stageUp == Session::StageUp::Z) ? "Z" : "Y";
-                        session->updateProgressNotify(Session::Notify(QString("stage up set to %1").arg(axis), {},
-                                                                      Status::Info),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify(QString("stage up set to %1").arg(axis), {}, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [state](Session* session) {
             session->beginProgressBlock("undo set stage up", 1);
 
             QThreadPool::globalInstance()->start([session, state]() {
                 session->setStageUp(*state);
+
                 QMetaObject::invokeMethod(
                     session,
                     [session, state]() {
                         using Status = Session::Notify::Status;
                         const QString axis = (*state == Session::StageUp::Z) ? "Z" : "Y";
-                        session->updateProgressNotify(Session::Notify(QString("set stage up undone to %1").arg(axis),
-                                                                      {}, Status::Info),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify(QString("set stage up undone to %1").arg(axis), {}, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -811,6 +757,7 @@ namespace snapshot {
         QVector<PrimState> prims;
         QHash<SdfPath, TfTokenVector> parentOrders;
         QList<SdfPath> previousSelection;
+        QList<SdfPath> previousMask;
     };
 
     using PrimSnapshot = QVector<PrimState>;
@@ -881,114 +828,6 @@ namespace snapshot {
         SdfCopySpec(state.snapshotLayer, state.specPath, dstLayer, state.stagePath);
     }
 
-    inline bool isStrongestEditable(UsdStageRefPtr stage, const UsdPrim& prim)
-    {
-        if (!stage || !prim)
-            return false;
-
-        const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
-        if (!editLayer)
-            return false;
-
-        const auto& stack = prim.GetPrimStack();
-        if (stack.empty())
-            return false;
-
-        const SdfPrimSpecHandle& strongest = stack.front();
-        if (!strongest)
-            return false;
-
-        return strongest->GetLayer() == editLayer;
-    }
-
-    inline QList<SdfPath> filterEditablePaths(UsdStageRefPtr stage, const QList<SdfPath>& paths)
-    {
-        QList<SdfPath> result;
-        if (!stage)
-            return result;
-
-        for (const SdfPath& path : paths) {
-            const SdfPath primPath = path.IsPropertyPath() ? path.GetPrimPath() : path;
-            const UsdPrim prim = stage->GetPrimAtPath(primPath);
-            if (isStrongestEditable(stage, prim))
-                result.append(primPath);
-        }
-        return result;
-    }
-
-    inline QList<SdfPath> minimalRootPaths(QList<SdfPath> paths)
-    {
-        std::sort(paths.begin(), paths.end(),
-                  [](const SdfPath& a, const SdfPath& b) { return a.GetPathElementCount() < b.GetPathElementCount(); });
-
-        QList<SdfPath> result;
-        for (const SdfPath& path : paths) {
-            bool covered = false;
-            for (const SdfPath& existing : result) {
-                if (path == existing || path.HasPrefix(existing)) {
-                    covered = true;
-                    break;
-                }
-            }
-            if (!covered)
-                result.append(path);
-        }
-        return result;
-    }
-
-    inline bool captureParentOrder(UsdStageRefPtr stage, const SdfPath& parentPath, TfTokenVector& out)
-    {
-        if (!stage)
-            return false;
-
-        const UsdPrim parent = stage->GetPrimAtPath(parentPath);
-        if (!parent)
-            return false;
-
-        out.clear();
-        for (const UsdPrim& child : parent.GetAllChildren())
-            out.push_back(child.GetName());
-
-        return !out.empty();
-    }
-
-    inline void restoreParentOrder(UsdStageRefPtr stage, const SdfPath& parentPath, const TfTokenVector& childOrder)
-    {
-        if (!stage || childOrder.empty())
-            return;
-
-        const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
-        if (!editLayer)
-            return;
-
-        ensureParentSpecs(editLayer, parentPath);
-        if (!editLayer->GetPrimAtPath(parentPath))
-            SdfCreatePrimInLayer(editLayer, parentPath);
-
-        const UsdPrim parent = stage->GetPrimAtPath(parentPath);
-        if (!parent)
-            return;
-
-        parent.SetChildrenReorder(childOrder);
-    }
-
-    inline bool removePrimSpec(const SdfLayerHandle& layer, const SdfPath& specPath)
-    {
-        if (!layer || specPath.IsEmpty() || specPath == SdfPath::AbsoluteRootPath())
-            return false;
-
-        if (!layer->GetPrimAtPath(specPath))
-            return false;
-
-        SdfBatchNamespaceEdit edits;
-        edits.Add(specPath, SdfPath::EmptyPath());
-
-        if (!layer->CanApply(edits))
-            return false;
-
-        return layer->Apply(edits);
-    }
-
     inline void sortByHierarchy(PrimSnapshot& snapshot)
     {
         std::sort(snapshot.begin(), snapshot.end(), [](const PrimState& a, const PrimState& b) {
@@ -999,7 +838,6 @@ namespace snapshot {
             return a.stagePath.GetString() < b.stagePath.GetString();
         });
     }
-
 }  // namespace snapshot
 
 Command
@@ -1008,9 +846,9 @@ deletePaths(const QList<SdfPath>& inPaths)
     auto state = std::make_shared<snapshot::DeleteState>();
 
     return Command(
-        // redo
         [inPaths, state](Session* session) {
             state->previousSelection = session->selectionList()->paths();
+            state->previousMask = session->mask();
 
             session->beginProgressBlock("delete paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1025,8 +863,8 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                     const UsdStageRefPtr stage = session->stageUnsafe();
                     if (stage) {
-                        QList<SdfPath> editable = snapshot::filterEditablePaths(stage, inPaths);
-                        QList<SdfPath> paths = snapshot::minimalRootPaths(editable);
+                        const QList<SdfPath> editable = stage::filterStrongestEditablePaths(stage, inPaths);
+                        const QList<SdfPath> paths = path::minimalRootPaths(editable);
 
                         qDebug() << "deletePaths redo: requested" << inPaths.size() << "editable" << editable.size()
                                  << "root paths" << paths.size();
@@ -1037,7 +875,7 @@ deletePaths(const QList<SdfPath>& inPaths)
                         QSet<SdfPath> changedSet;
 
                         for (const SdfPath& path : paths) {
-                            qDebug() << "deletePaths redo: candidate path" << qt::StringToQString(path.GetString());
+                            qDebug() << "deletePaths redo: candidate path" << qt::SdfPathToQString(path);
 
                             changedSet.insert(path);
 
@@ -1047,15 +885,15 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                                 if (!state->parentOrders.contains(parentPath)) {
                                     TfTokenVector order;
-                                    if (snapshot::captureParentOrder(stage, parentPath, order)) {
+                                    if (stage::captureChildOrder(stage, parentPath, order)) {
                                         state->parentOrders.insert(parentPath, order);
                                         qDebug() << "deletePaths redo: captured parent order for"
-                                                 << qt::StringToQString(parentPath.GetString()) << "children"
+                                                 << qt::SdfPathToQString(parentPath) << "children"
                                                  << static_cast<int>(order.size());
                                     }
                                     else {
                                         qDebug() << "deletePaths redo: failed to capture parent order for"
-                                                 << qt::StringToQString(parentPath.GetString());
+                                                 << qt::SdfPathToQString(parentPath);
                                     }
                                 }
                             }
@@ -1068,16 +906,16 @@ deletePaths(const QList<SdfPath>& inPaths)
                                 snapshot::PrimState primState;
                                 if (!snapshot::capturePrimToLayer(stage, path, primState)) {
                                     qDebug() << "deletePaths redo: failed to capture prim"
-                                             << qt::StringToQString(path.GetString());
+                                             << qt::SdfPathToQString(path);
                                     continue;
                                 }
 
-                                qDebug() << "deletePaths redo: removing prim" << qt::StringToQString(path.GetString())
-                                         << "spec path" << qt::StringToQString(primState.specPath.GetString());
+                                qDebug() << "deletePaths redo: removing prim" << qt::SdfPathToQString(path)
+                                         << "spec path" << qt::SdfPathToQString(primState.specPath);
 
-                                if (!snapshot::removePrimSpec(editLayer, primState.specPath)) {
+                                if (!stage::removePrimSpec(editLayer, primState.specPath)) {
                                     qDebug() << "deletePaths redo: failed to remove prim spec"
-                                             << qt::StringToQString(primState.specPath.GetString());
+                                             << qt::SdfPathToQString(primState.specPath);
                                     continue;
                                 }
 
@@ -1105,17 +943,19 @@ deletePaths(const QList<SdfPath>& inPaths)
                     session,
                     [session, state, changed, removedPaths, success]() {
                         using Status = Session::Notify::Status;
-                        session->selectionList()->updatePaths(selection::removePaths(state->previousSelection, removedPaths));
+                        session->selectionList()->updatePaths(
+                            path::removeAffectedPaths(state->previousSelection, removedPaths));
+                        session->setMask(path::removeAffectedPaths(state->previousMask, removedPaths));
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
-                        session->updateProgressNotify(Session::Notify(success ? "paths deleted" : "delete paths failed",
-                                                                      changed, success ? Status::Info : Status::Error),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify(success ? "paths deleted" : "delete paths failed", changed,
+                                            success ? Status::Info : Status::Error),
+                            1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-        // undo
         [state](Session* session) {
             session->beginProgressBlock("undo delete paths", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1123,6 +963,7 @@ deletePaths(const QList<SdfPath>& inPaths)
             QThreadPool::globalInstance()->start([session, state]() {
                 bool success = false;
                 QList<SdfPath> changed;
+
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
 
@@ -1139,8 +980,8 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                             for (const auto& primState : state->prims) {
                                 qDebug() << "deletePaths undo: restoring prim"
-                                         << qt::StringToQString(primState.stagePath.GetString()) << "from spec"
-                                         << qt::StringToQString(primState.specPath.GetString());
+                                         << qt::SdfPathToQString(primState.stagePath) << "from spec"
+                                         << qt::SdfPathToQString(primState.specPath);
 
                                 snapshot::restorePrimFromSnapshotLayer(editLayer, primState);
                                 changedSet.insert(primState.stagePath);
@@ -1152,10 +993,10 @@ deletePaths(const QList<SdfPath>& inPaths)
 
                             for (auto it = state->parentOrders.cbegin(); it != state->parentOrders.cend(); ++it) {
                                 qDebug() << "deletePaths undo: restoring parent order for"
-                                         << qt::StringToQString(it.key().GetString()) << "children"
+                                         << qt::SdfPathToQString(it.key()) << "children"
                                          << static_cast<int>(it.value().size());
 
-                                snapshot::restoreParentOrder(stage, it.key(), it.value());
+                                stage::restoreChildOrder(stage, it.key(), it.value());
                                 changedSet.insert(it.key());
                             }
 
@@ -1175,76 +1016,18 @@ deletePaths(const QList<SdfPath>& inPaths)
                     [session, state, changed, success]() {
                         using Status = Session::Notify::Status;
                         session->selectionList()->updatePaths(state->previousSelection);
+                        session->setMask(state->previousMask);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
-                        session->updateProgressNotify(Session::Notify(success ? "delete undone"
-                                                                              : "undo delete paths failed",
-                                                                      changed, success ? Status::Info : Status::Error),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify(success ? "delete undone" : "undo delete paths failed", changed,
+                                            success ? Status::Info : Status::Error),
+                            1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         });
 }
-
-namespace names {
-    inline std::string makeUsdSafeName(const std::string& input)
-    {
-        if (input.empty())
-            return "Prim";
-
-        std::string result;
-        result.reserve(input.size());
-
-        for (char c : input) {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
-                result.push_back(c);
-            }
-            else {
-                result.push_back('_');
-            }
-        }
-        if (!result.empty() && (result[0] >= '0' && result[0] <= '9')) {
-            result[0] = '_';
-        }
-        bool allUnderscore = true;
-        for (char c : result) {
-            if (c != '_') {
-                allUnderscore = false;
-                break;
-            }
-        }
-
-        if (allUnderscore)
-            return "Prim";
-
-        if (!SdfPath::IsValidIdentifier(result))
-            return "Prim";
-
-        return result;
-    }
-
-    inline UsdStageLoadRules remapLoadRules(const UsdStageLoadRules& rules, const SdfPath& oldPath,
-                                            const SdfPath& newPath)
-    {
-        UsdStageLoadRules out;
-
-        for (const auto& r : rules.GetRules()) {
-            const SdfPath& p = r.first;
-            const auto& policy = r.second;
-
-            if (p.HasPrefix(oldPath)) {
-                SdfPath rel = p.MakeRelativePath(oldPath);
-                SdfPath mapped = newPath.AppendPath(rel);
-                out.AddRule(mapped, policy);
-            }
-            else {
-                out.AddRule(p, policy);
-            }
-        }
-        return out;
-    }
-}  // namespace names
 
 Command
 renamePath(const SdfPath& path, const QString& newNameInput)
@@ -1256,6 +1039,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
         TfTokenVector oldOrder;
         TfTokenVector newOrder;
         QList<SdfPath> previousSelection;
+        QList<SdfPath> previousMask;
     };
 
     auto state = std::make_shared<RenameState>();
@@ -1265,11 +1049,11 @@ renamePath(const SdfPath& path, const QString& newNameInput)
         if (trimmed.isEmpty())
             return SdfPath();
 
-        const std::string name = names::makeUsdSafeName(QStringToString(trimmed));
-        if (!SdfPath::IsValidIdentifier(name))
+        const std::string nameValue = name::makeUsdSafeName(qt::QStringToString(trimmed));
+        if (!SdfPath::IsValidIdentifier(nameValue))
             return SdfPath();
 
-        return path.GetParentPath().AppendChild(TfToken(name));
+        return path.GetParentPath().AppendChild(TfToken(nameValue));
     };
 
     auto remapChildOrder = [](const TfTokenVector& order, const TfToken& oldName, const TfToken& newName) {
@@ -1323,9 +1107,9 @@ renamePath(const SdfPath& path, const QString& newNameInput)
     };
 
     return Command(
-        // redo
         [path, newNameInput, buildNewPath, remapChildOrder, applyRename, state](Session* session) {
             state->previousSelection = session->selectionList()->paths();
+            state->previousMask = session->mask();
 
             session->beginProgressBlock("rename path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1357,17 +1141,17 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                             state->newOrder.clear();
 
                             if (!state->parentPath.IsEmpty() && state->parentPath != SdfPath::AbsoluteRootPath())
-                                snapshot::captureParentOrder(stage, state->parentPath, state->oldOrder);
+                                stage::captureChildOrder(stage, state->parentPath, state->oldOrder);
 
                             const UsdStageLoadRules rules = stage->GetLoadRules();
 
                             if (applyRename(stage, path, newPath, error)) {
-                                stage->SetLoadRules(names::remapLoadRules(rules, path, newPath));
+                                stage->SetLoadRules(stage::remapLoadRules(rules, path, newPath));
 
                                 if (!state->oldOrder.empty()) {
                                     state->newOrder = remapChildOrder(state->oldOrder, path.GetNameToken(),
                                                                       newPath.GetNameToken());
-                                    snapshot::restoreParentOrder(stage, state->parentPath, state->newOrder);
+                                    stage::restoreChildOrder(stage, state->parentPath, state->newOrder);
                                 }
 
                                 renamed = true;
@@ -1401,7 +1185,9 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                             return;
                         }
 
-                        session->selectionList()->updatePaths(selection::remapPaths(state->previousSelection, path, newPath));
+                        session->selectionList()->updatePaths(
+                            path::remapAffectedPaths(state->previousSelection, path, newPath));
+                        session->setMask(path::remapAffectedPaths(state->previousMask, path, newPath));
                         session->updateProgressNotify(Session::Notify("path renamed", { path, newPath }, Status::Info),
                                                       1);
                         session->endProgressBlock();
@@ -1409,8 +1195,6 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                     Qt::QueuedConnection);
             });
         },
-
-        // undo
         [applyRename, state](Session* session) {
             session->beginProgressBlock("undo rename path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1434,11 +1218,11 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         const UsdStageLoadRules rules = stage->GetLoadRules();
 
                         if (applyRename(stage, state->newPath, state->oldPath, error)) {
-                            stage->SetLoadRules(names::remapLoadRules(rules, state->newPath, state->oldPath));
+                            stage->SetLoadRules(stage::remapLoadRules(rules, state->newPath, state->oldPath));
 
                             if (!state->oldOrder.empty() && !state->parentPath.IsEmpty()
                                 && state->parentPath != SdfPath::AbsoluteRootPath()) {
-                                snapshot::restoreParentOrder(stage, state->parentPath, state->oldOrder);
+                                stage::restoreChildOrder(stage, state->parentPath, state->oldOrder);
                             }
 
                             restored = true;
@@ -1452,6 +1236,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         using Status = Session::Notify::Status;
 
                         session->selectionList()->updatePaths(state->previousSelection);
+                        session->setMask(state->previousMask);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
@@ -1485,6 +1270,7 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
         SdfPath createdPath;
         TfTokenVector oldOrder;
         TfTokenVector newOrder;
+        QList<SdfPath> previousMask;
     };
 
     auto state = std::make_shared<NewXformState>();
@@ -1497,16 +1283,17 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
         if (trimmed.isEmpty())
             return SdfPath();
 
-        const std::string name = names::makeUsdSafeName(QStringToString(trimmed));
-        if (!SdfPath::IsValidIdentifier(name))
+        const std::string nameValue = name::makeUsdSafeName(qt::QStringToString(trimmed));
+        if (!SdfPath::IsValidIdentifier(nameValue))
             return SdfPath();
 
-        return parentPath.AppendChild(TfToken(name));
+        return parentPath.AppendChild(TfToken(nameValue));
     };
 
     return Command(
-        // redo
         [parentPath, nameInput, buildNewPath, state](Session* session) {
+            state->previousMask = session->mask();
+
             session->beginProgressBlock("new xform", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -1540,7 +1327,7 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                                 error = "no edit layer";
                             }
                             else {
-                                UsdPrim parentPrim = stage->GetPrimAtPath(parentPath);
+                                const UsdPrim parentPrim = stage->GetPrimAtPath(parentPath);
                                 if (!parentPrim) {
                                     error = "invalid parent";
                                 }
@@ -1548,16 +1335,16 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                                     error = "target exists";
                                 }
                                 else {
-                                    snapshot::captureParentOrder(stage, parentPath, state->oldOrder);
+                                    stage::captureChildOrder(stage, parentPath, state->oldOrder);
 
-                                    UsdGeomXform xform = UsdGeomXform::Define(stage, newPath);
+                                    const UsdGeomXform xform = UsdGeomXform::Define(stage, newPath);
                                     if (!xform || !xform.GetPrim()) {
                                         error = "define failed";
                                     }
                                     else {
                                         state->newOrder = state->oldOrder;
                                         state->newOrder.push_back(newPath.GetNameToken());
-                                        snapshot::restoreParentOrder(stage, parentPath, state->newOrder);
+                                        stage::restoreChildOrder(stage, parentPath, state->newOrder);
                                         created = true;
                                     }
                                 }
@@ -1592,16 +1379,13 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                         }
 
                         session->selectionList()->updatePaths({ newPath });
-                        session->updateProgressNotify(Session::Notify("xform created", { parentPath, newPath },
-                                                                      Status::Info),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify("xform created", { parentPath, newPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-
-        // undo
         [state](Session* session) {
             session->beginProgressBlock("undo new xform", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1617,15 +1401,16 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                     if (!stage) {
                         hadStage = false;
                     }
-                    else if (state->createdPath.IsEmpty()) {}
+                    else if (state->createdPath.IsEmpty()) {
+                    }
                     else {
                         const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
                         if (editLayer) {
-                            removed = snapshot::removePrimSpec(editLayer, state->createdPath);
+                            removed = stage::removePrimSpec(editLayer, state->createdPath);
 
                             if (removed && !state->oldOrder.empty() && !state->parentPath.IsEmpty()
                                 && state->parentPath != SdfPath::AbsoluteRootPath()) {
-                                snapshot::restoreParentOrder(stage, state->parentPath, state->oldOrder);
+                                stage::restoreChildOrder(stage, state->parentPath, state->oldOrder);
                             }
                         }
                     }
@@ -1659,9 +1444,9 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                         }
 
                         session->selectionList()->updatePaths(updated);
-                        session->updateProgressNotify(Session::Notify("new xform undone", { state->createdPath },
-                                                                      Status::Info),
-                                                      1);
+                        session->setMask(path::removeAffectedPaths(state->previousMask, { state->createdPath }));
+                        session->updateProgressNotify(
+                            Session::Notify("new xform undone", { state->createdPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1681,6 +1466,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
         TfTokenVector newParentOldOrder;
         TfTokenVector newParentNewOrder;
         QList<SdfPath> previousSelection;
+        QList<SdfPath> previousMask;
     };
 
     auto state = std::make_shared<MoveState>();
@@ -1708,13 +1494,13 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
             return false;
         }
 
-        UsdPrim prim = stage->GetPrimAtPath(from);
+        const UsdPrim prim = stage->GetPrimAtPath(from);
         if (!prim) {
             error = "Invalid prim";
             return false;
         }
 
-        UsdPrim newParent = stage->GetPrimAtPath(toParent);
+        const UsdPrim newParent = stage->GetPrimAtPath(toParent);
         if (!newParent) {
             error = "Invalid parent";
             return false;
@@ -1752,9 +1538,9 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
     };
 
     return Command(
-        // redo
         [fromPath, newParentPath, removeToken, appendTokenIfMissing, applyMove, state](Session* session) {
             state->previousSelection = session->selectionList()->paths();
+            state->previousMask = session->mask();
 
             session->beginProgressBlock("move path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1792,20 +1578,20 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                             state->newParentOldOrder.clear();
                             state->newParentNewOrder.clear();
 
-                            snapshot::captureParentOrder(stage, oldParentPath, state->oldParentOrder);
-                            snapshot::captureParentOrder(stage, newParentPath, state->newParentOldOrder);
+                            stage::captureChildOrder(stage, oldParentPath, state->oldParentOrder);
+                            stage::captureChildOrder(stage, newParentPath, state->newParentOldOrder);
 
                             if (applyMove(stage, fromPath, newParentPath, error)) {
                                 const TfToken movedName = fromPath.GetNameToken();
 
                                 if (!state->oldParentOrder.empty())
-                                    snapshot::restoreParentOrder(stage, oldParentPath,
-                                                                 removeToken(state->oldParentOrder, movedName));
+                                    stage::restoreChildOrder(stage, oldParentPath,
+                                                             removeToken(state->oldParentOrder, movedName));
 
                                 state->newParentNewOrder = appendTokenIfMissing(state->newParentOldOrder, movedName);
 
                                 if (!state->newParentNewOrder.empty())
-                                    snapshot::restoreParentOrder(stage, newParentPath, state->newParentNewOrder);
+                                    stage::restoreChildOrder(stage, newParentPath, state->newParentNewOrder);
 
                                 moved = true;
                             }
@@ -1838,17 +1624,16 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                             return;
                         }
 
-                        session->selectionList()->updatePaths(selection::remapPaths(state->previousSelection, fromPath, state->newPath));
-                        session->updateProgressNotify(Session::Notify("path moved", { state->oldPath, state->newPath },
-                                                                      Status::Info),
-                                                      1);
+                        session->selectionList()->updatePaths(
+                            path::remapAffectedPaths(state->previousSelection, fromPath, state->newPath));
+                        session->setMask(path::remapAffectedPaths(state->previousMask, fromPath, state->newPath));
+                        session->updateProgressNotify(
+                            Session::Notify("path moved", { state->oldPath, state->newPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
             });
         },
-
-        // undo
         [applyMove, state](Session* session) {
             session->beginProgressBlock("undo move path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
@@ -1872,10 +1657,10 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                     else {
                         if (applyMove(stage, state->newPath, state->oldParentPath, error)) {
                             if (!state->oldParentOrder.empty())
-                                snapshot::restoreParentOrder(stage, state->oldParentPath, state->oldParentOrder);
+                                stage::restoreChildOrder(stage, state->oldParentPath, state->oldParentOrder);
 
                             if (!state->newParentOldOrder.empty())
-                                snapshot::restoreParentOrder(stage, state->newParentPath, state->newParentOldOrder);
+                                stage::restoreChildOrder(stage, state->newParentPath, state->newParentOldOrder);
 
                             restored = true;
                         }
@@ -1888,6 +1673,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                         using Status = Session::Notify::Status;
 
                         session->selectionList()->updatePaths(state->previousSelection);
+                        session->setMask(state->previousMask);
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {

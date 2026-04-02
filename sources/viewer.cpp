@@ -14,9 +14,10 @@
 #include "renderview.h"
 #include "selectionlist.h"
 #include "session.h"
+#include "signalguard.h"
 #include "settings.h"
-#include "stageutils.h"
 #include "style.h"
+#include "usdutils.h"
 #include "tracelocks.h"
 #include <QActionGroup>
 #include <QClipboard>
@@ -38,7 +39,7 @@
 #include "ui_viewer.h"
 
 namespace usdviewer {
-class ViewerPrivate : public QObject {
+class ViewerPrivate : public QObject, public SignalGuard {
     Q_OBJECT
 public:
     ViewerPrivate();
@@ -105,6 +106,7 @@ public Q_SLOTS:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths);
+    void maskChanged(const QList<SdfPath>& paths);
     void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void stageUpChanged(Session::StageUp stageUp);
@@ -153,6 +155,7 @@ ViewerPrivate::init()
     os::setDarkTheme();
     d.ui.reset(new Ui_Viewer());
     d.ui->setupUi(d.viewer.data());
+    attach(d.ui->displayIsolate);
     // background color
     d.backgroundColor = QColor(settings()->value("backgroundColor", "#4f4f4f").toString());
     d.ui->backgroundColor->setStyleSheet("background-color: " + d.backgroundColor.name() + ";");
@@ -172,6 +175,8 @@ ViewerPrivate::init()
     d.ui->fileOpen->setIcon(style()->icon(Style::IconRole::Open));
     d.ui->fileExportAll->setIcon(style()->icon(Style::IconRole::Export));
     d.ui->fileExportImage->setIcon(style()->icon(Style::IconRole::ExportImage));
+    d.ui->editUndo->setIcon(style()->icon(Style::IconRole::Undo));
+    d.ui->editRedo->setIcon(style()->icon(Style::IconRole::Redo));
     d.ui->displayFrameAll->setIcon(style()->icon(Style::IconRole::FrameAll));
     d.ui->renderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
     d.ui->renderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
@@ -260,6 +265,8 @@ ViewerPrivate::init()
         d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
         d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
         d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
+        d.ui->redo->setDefaultAction(d.ui->editRedo);
+        d.ui->undo->setDefaultAction(d.ui->editUndo);
         d.ui->wireframe->setDefaultAction(d.ui->renderShaded);
         d.ui->shaded->setDefaultAction(d.ui->renderWireframe);
     }
@@ -276,6 +283,7 @@ ViewerPrivate::init()
     }
     // models
     connect(session(), &Session::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
+    connect(session(), &Session::maskChanged, this, &ViewerPrivate::maskChanged);
     connect(session(), &Session::primsChanged, this, &ViewerPrivate::primsChanged);
     connect(session(), &Session::stageChanged, this, &ViewerPrivate::stageChanged);
     connect(session(), &Session::stageUpChanged, this, &ViewerPrivate::stageUpChanged);
@@ -1168,7 +1176,6 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
     QMap<QString, QList<QString>> variantSets;
     bool canLoadSelected = false;
     bool canUnloadSelected = false;
-
     {
         READ_LOCKER(locker, session()->stageLock(), "stageLock");
         const UsdStageRefPtr stage = session()->stageUnsafe();
@@ -1221,6 +1228,16 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
             ++index;
         }
     }
+}
+
+void
+ViewerPrivate::maskChanged(const QList<SdfPath>& paths)
+{
+    SignalGuard::Scope guard(this);
+    if (paths.isEmpty())
+        d.ui->displayIsolate->setChecked(false);
+    else
+        d.ui->displayIsolate->setChecked(true);
 }
 
 void

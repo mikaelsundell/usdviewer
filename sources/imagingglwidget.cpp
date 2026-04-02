@@ -8,9 +8,9 @@
 #include "os.h"
 #include "qtutils.h"
 #include "signalguard.h"
-#include "stageutils.h"
 #include "style.h"
 #include "tracelocks.h"
+#include "usdutils.h"
 #include "viewcamera.h"
 #include "viewcontext.h"
 #include <QApplication>
@@ -25,6 +25,8 @@
 #include <QPen>
 #include <QPoint>
 #include <QPointer>
+#include <algorithm>
+#include <limits>
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/diagnostic.h>
@@ -75,6 +77,9 @@ public:
     void drawAxis(QPainter& painter);
     void updateSceneTree();
     void updateGpuPerformance();
+    bool isPathMaskedIn(const SdfPath& path) const;
+    bool pickMaskedIntersection(const UsdImagingGLEngine::PickParams& pickParams, const GfFrustum& pickFrustum,
+                                UsdImagingGLEngine::IntersectionResultVector* results);
     struct Data {
         size_t count;
         qint64 frame;
@@ -389,6 +394,75 @@ ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
     drawBorder(painter);
 }
 
+bool
+ImagingGLWidgetPrivate::isPathMaskedIn(const SdfPath& path) const
+{
+    if (path.IsEmpty())
+        return false;
+
+    if (d.mask.isEmpty())
+        return true;
+
+    const SdfPath primPath = path.IsPropertyPath() ? path.GetPrimPath() : path;
+    for (const SdfPath& maskedPath : d.mask) {
+        const SdfPath maskedPrimPath = maskedPath.IsPropertyPath() ? maskedPath.GetPrimPath() : maskedPath;
+        if (primPath == maskedPrimPath || primPath.HasPrefix(maskedPrimPath))
+            return true;
+    }
+
+    return false;
+}
+
+bool
+ImagingGLWidgetPrivate::pickMaskedIntersection(const UsdImagingGLEngine::PickParams& pickParams,
+                                               const GfFrustum& pickFrustum,
+                                               UsdImagingGLEngine::IntersectionResultVector* results)
+{
+    if (!results)
+        return false;
+
+    results->clear();
+
+    if (!d.stage || !d.glEngine)
+        return false;
+
+    const GfMatrix4d viewMatrix = pickFrustum.ComputeViewMatrix();
+    const GfMatrix4d projectionMatrix = pickFrustum.ComputeProjectionMatrix();
+
+    READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+
+    if (!d.stage)
+        return false;
+
+    if (d.mask.isEmpty()) {
+        return d.glEngine->TestIntersection(pickParams, viewMatrix, projectionMatrix, d.stage->GetPseudoRoot(),
+                                            d.params, results);
+    }
+
+    bool hitAny = false;
+    for (const SdfPath& maskPath : d.mask) {
+        UsdPrim root = d.stage->GetPrimAtPath(maskPath);
+        if (!root)
+            continue;
+
+        UsdImagingGLEngine::IntersectionResultVector localResults;
+        const bool hit = d.glEngine->TestIntersection(pickParams, viewMatrix, projectionMatrix, root, d.params,
+                                                      &localResults);
+        if (!hit)
+            continue;
+
+        for (const auto& item : localResults) {
+            if (!item.hitPrimPath.IsEmpty() && isPathMaskedIn(item.hitPrimPath))
+                results->push_back(item);
+        }
+
+        if (!localResults.empty())
+            hitAny = true;
+    }
+
+    return hitAny && !results->empty();
+}
+
 void
 ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
 {
@@ -415,18 +489,58 @@ ImagingGLWidgetPrivate::focusEvent(QMouseEvent* event)
     GfFrustum frustum = camera.GetFrustum();
     GfFrustum pickFrustum = frustum.ComputeNarrowedFrustum(pos, size);
 
-    GfVec3d hitPoint, hitNormal;
-    SdfPath hitPrimPath, hitInstancerPath;
-    bool hit = false;
+    const GfMatrix4d viewMatrix = pickFrustum.ComputeViewMatrix();
+    const GfMatrix4d projectionMatrix = pickFrustum.ComputeProjectionMatrix();
+    const GfVec3d cameraPos = camera.GetTransform().ExtractTranslation();
+
+    GfVec3d bestHitPoint;
+    double bestDistance = std::numeric_limits<double>::max();
+    bool found = false;
+
     {
         READ_LOCKER(locker, d.context->stageLock(), "stageLock");
-        hit = d.glEngine->TestIntersection(pickFrustum.ComputeViewMatrix(), pickFrustum.ComputeProjectionMatrix(),
-                                           d.stage->GetPseudoRoot(), d.params, &hitPoint, &hitNormal, &hitPrimPath,
-                                           &hitInstancerPath);
+        if (!d.stage)
+            return;
+
+        if (d.mask.isEmpty()) {
+            GfVec3d hitPoint, hitNormal;
+            SdfPath hitPrimPath, hitInstancerPath;
+            const bool hit = d.glEngine->TestIntersection(viewMatrix, projectionMatrix, d.stage->GetPseudoRoot(),
+                                                          d.params, &hitPoint, &hitNormal, &hitPrimPath,
+                                                          &hitInstancerPath);
+            if (hit && !hitPrimPath.IsEmpty()) {
+                d.viewCamera.setFocusPoint(hitPoint);
+                d.glwidget->update();
+            }
+            return;
+        }
+
+        for (const SdfPath& maskPath : d.mask) {
+            UsdPrim root = d.stage->GetPrimAtPath(maskPath);
+            if (!root)
+                continue;
+
+            GfVec3d hitPoint, hitNormal;
+            SdfPath hitPrimPath, hitInstancerPath;
+            const bool hit = d.glEngine->TestIntersection(viewMatrix, projectionMatrix, root, d.params, &hitPoint,
+                                                          &hitNormal, &hitPrimPath, &hitInstancerPath);
+            if (!hit || hitPrimPath.IsEmpty())
+                continue;
+
+            if (!isPathMaskedIn(hitPrimPath))
+                continue;
+
+            const double distance = (hitPoint - cameraPos).GetLength();
+            if (!found || distance < bestDistance) {
+                bestDistance = distance;
+                bestHitPoint = hitPoint;
+                found = true;
+            }
+        }
     }
 
-    if (hit) {
-        d.viewCamera.setFocusPoint(hitPoint);
+    if (found) {
+        d.viewCamera.setFocusPoint(bestHitPoint);
         d.glwidget->update();
     }
 }
@@ -555,15 +669,8 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
     GfFrustum pickFr = fr.ComputeNarrowedFrustum(center, size);
 
     UsdImagingGLEngine::IntersectionResultVector results;
-    bool hit = false;
-    {
-        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
-        if (!d.stage)
-            return;
+    const bool hit = pickMaskedIntersection(pickParams, pickFr, &results);
 
-        hit = d.glEngine->TestIntersection(pickParams, pickFr.ComputeViewMatrix(), pickFr.ComputeProjectionMatrix(),
-                                           d.stage->GetPseudoRoot(), d.params, &results);
-    }
     QList<SdfPath> selectedPaths;
     if (hit) {
         for (const auto& rItem : results) {
@@ -571,6 +678,16 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
                 selectedPaths.append(rItem.hitPrimPath);
         }
     }
+
+    {
+        QList<SdfPath> unique;
+        for (const SdfPath& path : selectedPaths) {
+            if (!unique.contains(path))
+                unique.append(path);
+        }
+        selectedPaths = unique;
+    }
+
     bool update = false;
     if (!selectedPaths.isEmpty()) {
         if (event->modifiers() & Qt::ShiftModifier) {

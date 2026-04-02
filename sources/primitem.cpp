@@ -6,7 +6,7 @@
 #include "application.h"
 #include "command.h"
 #include "qtutils.h"
-#include "stageutils.h"
+#include "usdutils.h"
 #include "style.h"
 #include <QIcon>
 #include <QPixmap>

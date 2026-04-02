@@ -15,6 +15,9 @@
 extern "C" PyObject*
 PyInit_usdviewer_wrapper();
 
+extern "C" PyObject*
+PyInit__usdviewer_native_wrapper();
+
 namespace usdviewer {
 
 class PythonInterpreterPrivate {
@@ -53,6 +56,9 @@ PythonInterpreterPrivate::init()
     if (PyImport_AppendInittab("usdviewer", PyInit_usdviewer_wrapper) == -1) {
         qFatal("Failed to add usdviewer module");
     }
+    if (PyImport_AppendInittab("_usdviewer_native", PyInit__usdviewer_native_wrapper) == -1)
+        qFatal("Failed to add _usdviewer_native module");
+
     Py_Initialize();
     PyRun_SimpleString("print('[Python] Interpreter started')");
 

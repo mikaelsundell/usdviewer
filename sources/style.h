@@ -70,9 +70,11 @@ public:
         Open,
         Payload,
         Prim,
+        Redo,
         Right,
         Run,
         Shaded,
+        Undo,
         Wireframe
     };
     Q_ENUM(IconRole)

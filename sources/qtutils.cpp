@@ -19,6 +19,20 @@ namespace qt {
 
     QString TfTokenToQString(const TfToken& token) { return StringToQString(token.GetString()); }
 
+    QString SdfPathToQString(const SdfPath& path)
+    {
+        return StringToQString(path.GetString());
+    }
+
+    QString SdfPathListToQString(const QList<SdfPath>& paths)
+    {
+        QStringList values;
+        values.reserve(paths.size());
+        for (const SdfPath& path : paths)
+            values.append(SdfPathToQString(path));
+        return QString("[%1]").arg(values.join(", "));
+    }
+
     QList<QString> TfTokenVectorToQList(const TfTokenVector& tokens)
     {
         QList<QString> list;
@@ -28,6 +42,7 @@ namespace qt {
         }
         return list;
     }
+
     SdfPathVector QListToSdfPathVector(const QList<SdfPath>& paths)
     {
         SdfPathVector vec;
@@ -37,6 +52,7 @@ namespace qt {
         }
         return vec;
     }
+
     GfVec4f QColorToGfVec4f(const QColor& color)
     {
         return GfVec4f(color.redF(), color.greenF(), color.blueF(), color.alphaF());

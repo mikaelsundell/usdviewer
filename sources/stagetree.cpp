@@ -9,9 +9,9 @@
 #include "qtutils.h"
 #include "selectionlist.h"
 #include "signalguard.h"
-#include "stageutils.h"
 #include "style.h"
 #include "tracelocks.h"
+#include "usdutils.h"
 #include "viewcontext.h"
 #include <QApplication>
 #include <QDrag>
@@ -584,7 +584,7 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     if (paths.isEmpty())
         return;
 
-    const QList<SdfPath> topLevelPaths = stage::topLevelPaths(paths);
+    const QList<SdfPath> topLevelPaths = path::topLevelPaths(paths);
 
     SdfPath createParentPath;
     if (!topLevelPaths.isEmpty())

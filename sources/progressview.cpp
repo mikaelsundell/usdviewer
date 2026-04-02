@@ -240,6 +240,7 @@ ProgressViewPrivate::progressBlockChanged(const QString& name, Session::Progress
     }
 
     d.ui->status->setText(QString("Finished: %1 (Time: %2)").arg(name).arg(timeStr));
+    d.ui->progress->setValue(0);
     d.ui->cancel->setEnabled(false);
     d.ui->clear->setEnabled(progressTree()->topLevelItemCount() > 0);
 

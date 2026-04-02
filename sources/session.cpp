@@ -6,8 +6,8 @@
 #include "commandstack.h"
 #include "qtutils.h"
 #include "selectionlist.h"
-#include "stageutils.h"
 #include "tracelocks.h"
+#include "usdutils.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -27,22 +27,6 @@
 #include <stack>
 
 namespace usdviewer {
-
-namespace {
-
-    QString pathToQString(const SdfPath& path) { return qt::StringToQString(path.GetString()); }
-
-    QString pathListToQString(const QList<SdfPath>& paths)
-    {
-        QStringList values;
-        values.reserve(paths.size());
-        for (const SdfPath& path : paths)
-            values.append(pathToQString(path));
-        return QString("[%1]").arg(values.join(", "));
-    }
-
-}  // namespace
-
 class SessionPrivate : public QSharedData {
 public:
     SessionPrivate();
@@ -59,22 +43,16 @@ public:
     bool saveToFile(const QString& filename);
     bool copyToFile(const QString& filename);
     bool flattenPathsToFile(const QList<SdfPath>& paths, const QString& filename);
+    bool loadState(const QString& filename);
+    bool saveState(const QString& filename);
     bool close();
     bool reload();
     bool isLoaded() const;
     void setMask(const QList<SdfPath>& paths);
+    void setPayloads(const QList<SdfPath>& paths, bool loaded);
     Session::StageUp stageUp();
     void setStageUp(Session::StageUp stageUp);
     GfBBox3d boundingBox();
-
-public:
-    bool needsBoundingBoxUpdate(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated) const;
-    void cleanupMask();
-    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
-    void flushPrimsUpdates();
-
-    void updateStage();
-
 
 public:
     class StageWatcher : public TfWeakBase {
@@ -82,20 +60,22 @@ public:
         StageWatcher(SessionPrivate* parent)
             : d { false, TfNotice::Key(), parent, UsdStageRefPtr() }
         {}
+
         void init()
         {
             if (d.key.IsValid())
                 TfNotice::Revoke(d.key);
             d.stage = nullptr;
         }
+
         void watch(const UsdStageRefPtr& stage)
         {
             init();
             d.stage = stage;
-            if (stage) {
+            if (stage)
                 d.key = TfNotice::Register(TfWeakPtr<StageWatcher>(this), &StageWatcher::objectsChanged, stage);
-            }
         }
+
         void objectsChanged(const UsdNotice::ObjectsChanged& notice, const UsdStageWeakPtr& sender)
         {
             if (d.suppress.load()) {
@@ -111,6 +91,7 @@ public:
 
             QList<SdfPath> paths;
             QList<SdfPath> invalidated;
+
             for (const auto& p : notice.GetResyncedPaths())
                 invalidated.append(p);
 
@@ -118,8 +99,8 @@ public:
                 paths.append(p);
 
             qDebug() << "StageWatcher::objectsChanged:"
-                     << "changed" << paths.size() << pathListToQString(paths) << "resynced" << invalidated.size()
-                     << pathListToQString(invalidated);
+                     << "changed" << paths.size() << qt::SdfPathListToQString(paths) << "resynced" << invalidated.size()
+                     << qt::SdfPathListToQString(invalidated);
 
             if (invalidated.isEmpty() && paths.isEmpty()) {
                 qDebug() << "StageWatcher::objectsChanged: nothing to forward";
@@ -131,8 +112,10 @@ public:
                 d.parent->updatePrims(paths, invalidated);
             });
         }
+
         void blockSignals(bool block) { d.suppress.store(block); }
         bool signalsBlocked() const { return d.suppress.load(); }
+
         struct Data {
             std::atomic<bool> suppress { false };
             TfNotice::Key key;
@@ -141,6 +124,7 @@ public:
         };
         Data d;
     };
+
     class StageBlocker {
     public:
         explicit StageBlocker(StageWatcher* w)
@@ -149,6 +133,7 @@ public:
             if (watcher)
                 watcher->blockSignals(true);
         }
+
         ~StageBlocker()
         {
             if (watcher)
@@ -158,16 +143,18 @@ public:
     private:
         StageWatcher* watcher = nullptr;
     };
+
     QList<SdfPath> uniquePaths(const QList<SdfPath>& paths) const;
     QList<SdfPath> collapseDescendants(const QList<SdfPath>& paths) const;
     QList<SdfPath> removeDescendantsOf(const QList<SdfPath>& paths, const QList<SdfPath>& ancestors) const;
 
 public:
-    QString payloadFilename(const QString& stageFilename) const;
-    QList<SdfPath> loadedPayloadPaths() const;
-    bool writePayloadFile(const QString& stageFilename);
-    bool readPayloadFile(const QString& stageFilename, QList<SdfPath>* loadedPaths) const;
-    void applyPayloadFile(const QList<SdfPath>& loadedPaths);
+    bool needsBoundingBoxUpdate(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated) const;
+
+    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    void flushPrims();
+    void updateStage();
+
     struct Data {
         UsdStageRefPtr stage;
         Session::LoadPolicy loadPolicy;
@@ -224,10 +211,12 @@ SessionPrivate::initStage()
 {
     UsdStageRefPtr stage;
     const GfBBox3d bbox = boundingBox();
+
     {
         READ_LOCKER(locker, &d.stageLock, "stageLock");
         stage = d.stage;
     }
+
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
         d.stageStatus = Session::StageStatus::Loaded;
@@ -236,6 +225,7 @@ SessionPrivate::initStage()
         d.pendingPaths.clear();
         d.pendingInvalidated.clear();
     }
+
     d.stageWatcher->watch(stage);
 }
 
@@ -290,7 +280,7 @@ SessionPrivate::endProgressBlock()
     if (d.pendingPaths.isEmpty() && d.pendingInvalidated.isEmpty())
         return;
 
-    flushPrimsUpdates();
+    flushPrims();
 }
 
 bool
@@ -327,6 +317,7 @@ SessionPrivate::newStage(Session::LoadPolicy policy)
         mask = d.mask;
         created = true;
     }
+
     d.commandStack->clear();
     d.selectionList->clear();
 
@@ -348,7 +339,6 @@ bool
 SessionPrivate::loadFromFile(const QString& filename, Session::LoadPolicy policy)
 {
     QList<SdfPath> mask;
-    QList<SdfPath> sidecarPayloads;
     bool loaded = false;
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
@@ -377,8 +367,15 @@ SessionPrivate::loadFromFile(const QString& filename, Session::LoadPolicy policy
     }
 
     if (loaded && policy == Session::LoadPolicy::None) {
-        if (readPayloadFile(filename, &sidecarPayloads))
-            applyPayloadFile(sidecarPayloads);
+        const QString stateFilename = QFileInfo(d.filename + ".session").absoluteFilePath();
+        if (!loadState(stateFilename)) {
+            WRITE_LOCKER(locker, &d.stageLock, "stageLock");
+            d.stage = nullptr;
+            d.stageStatus = Session::StageStatus::Failed;
+            d.bboxCache.reset();
+            d.filename.clear();
+            return false;
+        }
     }
 
     d.commandStack->clear();
@@ -400,77 +397,81 @@ SessionPrivate::loadFromFile(const QString& filename, Session::LoadPolicy policy
 bool
 SessionPrivate::saveToFile(const QString& filename)
 {
-    bool saved = false;
-    QString targetFile;
+    QString stageFilename;
     Session::LoadPolicy loadPolicy = Session::LoadPolicy::All;
-
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
-        if (!d.stage)
-            return false;
-
         try {
+            if (!d.stage)
+                return false;
+
             const SdfLayerHandle rootLayer = d.stage->GetRootLayer();
             if (!rootLayer)
                 return false;
 
-            targetFile = QFileInfo(filename).absoluteFilePath();
+            stageFilename = QFileInfo(filename).absoluteFilePath();
 
             QString currentFile;
             if (!rootLayer->IsAnonymous())
                 currentFile = QFileInfo(qt::StringToQString(rootLayer->GetRealPath())).absoluteFilePath();
 
-            if (!rootLayer->IsAnonymous() && currentFile == targetFile) {
+            if (!rootLayer->IsAnonymous() && currentFile == stageFilename) {
                 d.stage->Save();
             }
             else {
-                if (!rootLayer->Export(QStringToString(targetFile)))
+                if (!rootLayer->Export(QStringToString(stageFilename)))
                     return false;
             }
 
-            d.filename = targetFile;
+            d.filename = stageFilename;
             loadPolicy = d.loadPolicy;
-            saved = true;
         } catch (const std::exception&) {
             return false;
         }
     }
 
-    if (saved && loadPolicy == Session::LoadPolicy::None)
-        writePayloadFile(targetFile);
+    if (loadPolicy == Session::LoadPolicy::None) {
+        const QString stateFilename = QFileInfo(stageFilename + ".session").absoluteFilePath();
+        if (!saveState(stateFilename))
+            return false;
+    }
 
-    return saved;
+    return true;
 }
 
 bool
 SessionPrivate::copyToFile(const QString& filename)
 {
-    bool copied = false;
-    QString targetFile;
+    QString stageFilename;
     Session::LoadPolicy loadPolicy = Session::LoadPolicy::All;
-
     {
         READ_LOCKER(locker, &d.stageLock, "stageLock");
-        if (!d.stage)
-            return false;
-
         try {
+            if (!d.stage)
+                return false;
+
             const SdfLayerHandle rootLayer = d.stage->GetRootLayer();
             if (!rootLayer)
                 return false;
 
-            targetFile = QFileInfo(filename).absoluteFilePath();
-            copied = rootLayer->Export(QStringToString(targetFile));
+            stageFilename = QFileInfo(filename).absoluteFilePath();
+
+            if (!rootLayer->Export(QStringToString(stageFilename)))
+                return false;
+
             loadPolicy = d.loadPolicy;
         } catch (const std::exception&) {
             return false;
         }
     }
 
-    if (copied && loadPolicy == Session::LoadPolicy::None)
-        writePayloadFile(targetFile);
+    if (loadPolicy == Session::LoadPolicy::None) {
+        const QString stateFilename = QFileInfo(stageFilename + ".session").absoluteFilePath();
+        if (!saveState(stateFilename))
+            return false;
+    }
 
-    return copied;
+    return true;
 }
 
 bool
@@ -481,17 +482,9 @@ SessionPrivate::flattenPathsToFile(const QList<SdfPath>& paths, const QString& f
         return false;
 
     UsdStagePopulationMask mask;
-    for (const SdfPath& path : paths) {
-        bool isChildOfAnother = false;
-        for (const SdfPath& other : paths) {
-            if (path.HasPrefix(other) && path != other) {
-                isChildOfAnother = true;
-                break;
-            }
-        }
-        if (!isChildOfAnother)
-            mask.Add(path);
-    }
+    const QList<SdfPath> roots = path::topLevelPaths(paths);
+    for (const SdfPath& path : roots)
+        mask.Add(path);
 
     if (mask.GetPaths().empty())
         return false;
@@ -502,6 +495,90 @@ SessionPrivate::flattenPathsToFile(const QList<SdfPath>& paths, const QString& f
 
     maskedStage->ExpandPopulationMask();
     return maskedStage->Export(QStringToString(QFileInfo(filename).absoluteFilePath()));
+}
+
+bool
+SessionPrivate::loadState(const QString& filename)
+{
+    QFile file(QFileInfo(filename).absoluteFilePath());
+    if (!file.exists())
+        return true;
+    if (!file.open(QIODevice::ReadOnly))
+        return false;
+
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject())
+        return false;
+
+    const QJsonObject root = doc.object();
+    const QJsonArray payloads = root.value("loadedPayloads").toArray();
+
+    WRITE_LOCKER(locker, &d.stageLock, "stageLock");
+    if (!d.stage)
+        return false;
+
+    for (const QJsonValue& value : payloads) {
+        const QString pathString = value.toString().trimmed();
+        if (pathString.isEmpty())
+            continue;
+
+        const SdfPath path(qt::QStringToString(pathString));
+        if (!path.IsAbsolutePath())
+            continue;
+
+        const UsdPrim prim = d.stage->GetPrimAtPath(path);
+        if (!prim || !prim.IsValid())
+            continue;
+        if (!stage::isPayload(d.stage, path))
+            continue;
+
+        prim.Load();
+    }
+
+    return true;
+}
+
+bool
+SessionPrivate::saveState(const QString& filename)
+{
+    QString stageFilename;
+    QJsonArray payloads;
+    {
+        READ_LOCKER(locker, &d.stageLock, "stageLock");
+        if (!d.stage)
+            return false;
+
+        stageFilename = QFileInfo(d.filename).absoluteFilePath();
+
+        std::stack<UsdPrim> stack;
+        stack.push(d.stage->GetPseudoRoot());
+
+        while (!stack.empty()) {
+            const UsdPrim prim = stack.top();
+            stack.pop();
+
+            if (!prim || !prim.IsValid())
+                continue;
+
+            if (stage::isPayload(d.stage, prim.GetPath()) && prim.IsLoaded())
+                payloads.append(qt::SdfPathToQString(prim.GetPath()));
+
+            for (const UsdPrim& child : prim.GetChildren())
+                stack.push(child);
+        }
+    }
+
+    QJsonObject root;
+    root["version"] = 1;
+    root["stageFile"] = stageFilename;
+    root["loadedPayloads"] = payloads;
+
+    QFile file(QFileInfo(filename).absoluteFilePath());
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+
+    const QJsonDocument doc(root);
+    return file.write(doc.toJson(QJsonDocument::Indented)) != -1;
 }
 
 bool
@@ -517,8 +594,13 @@ SessionPrivate::close()
         d.pendingPaths.clear();
         d.pendingInvalidated.clear();
         d.changeDepth = 0;
+        d.expectedChanges = 0;
+        d.completedChanges = 0;
+        d.changeName.clear();
+        d.changeCancelled.store(false);
         d.filename.clear();
     }
+
     d.commandStack->clear();
     d.selectionList->clear();
 
@@ -532,7 +614,6 @@ SessionPrivate::reload()
 {
     QString currentFilename;
     Session::LoadPolicy loadPolicy = Session::LoadPolicy::All;
-    QList<SdfPath> sidecarPayloads;
 
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
@@ -548,8 +629,9 @@ SessionPrivate::reload()
     }
 
     if (loadPolicy == Session::LoadPolicy::None && !currentFilename.isEmpty()) {
-        if (readPayloadFile(currentFilename, &sidecarPayloads))
-            applyPayloadFile(sidecarPayloads);
+        const QString stateFilename = QFileInfo(currentFilename + ".session").absoluteFilePath();
+        if (!loadState(stateFilename))
+            return false;
     }
 
     const GfBBox3d bbox = boundingBox();
@@ -557,8 +639,10 @@ SessionPrivate::reload()
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
         d.bbox = bbox;
     }
+
     QMetaObject::invokeMethod(
         d.session, [this]() { updateStage(); }, Qt::QueuedConnection);
+
     return true;
 }
 
@@ -579,12 +663,43 @@ SessionPrivate::setMask(const QList<SdfPath>& paths)
     Q_EMIT d.session->maskChanged(paths);
 }
 
+void
+SessionPrivate::setPayloads(const QList<SdfPath>& paths, bool loaded)
+{
+    WRITE_LOCKER(locker, &d.stageLock, "stageLock");
+    if (!d.stage)
+        return;
+
+    StageBlocker blocker(d.stageWatcher.data());
+
+    for (const SdfPath& path : paths) {
+        const SdfPath primPath = path.IsPropertyPath() ? path.GetPrimPath() : path;
+        UsdPrim prim = d.stage->GetPrimAtPath(primPath);
+        if (!prim || !prim.IsValid())
+            continue;
+        if (!stage::isPayload(d.stage, primPath))
+            continue;
+
+        if (loaded) {
+            if (!prim.IsLoaded())
+                prim.Load();
+        }
+        else {
+            if (prim.IsLoaded())
+                prim.Unload();
+        }
+    }
+
+    d.bboxCache.reset();
+}
+
 Session::StageUp
 SessionPrivate::stageUp()
 {
     READ_LOCKER(locker, &d.stageLock, "stageLock");
     if (!d.stage)
         return Session::StageUp::Z;
+
     const TfToken upAxis = UsdGeomGetStageUpAxis(d.stage);
     return (upAxis == UsdGeomTokens->y) ? Session::StageUp::Y : Session::StageUp::Z;
 }
@@ -594,25 +709,30 @@ SessionPrivate::setStageUp(Session::StageUp stageUp)
 {
     bool changed = false;
     GfBBox3d bbox;
+
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
         if (!d.stage)
             return;
-        const TfToken upAxis = (stageUp == Session::StageUp::Y) ? UsdGeomTokens->y : UsdGeomTokens->z;
 
+        const TfToken upAxis = (stageUp == Session::StageUp::Y) ? UsdGeomTokens->y : UsdGeomTokens->z;
         if (UsdGeomGetStageUpAxis(d.stage) == upAxis)
             return;
+
         UsdGeomSetStageUpAxis(d.stage, upAxis);
         d.bboxCache.reset();
         changed = true;
     }
+
     if (!changed)
         return;
+
     bbox = boundingBox();
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
         d.bbox = bbox;
     }
+
     Q_EMIT d.session->stageUpChanged(stageUp);
     Q_EMIT d.session->boundingBoxChanged(bbox);
 }
@@ -627,13 +747,16 @@ SessionPrivate::boundingBox()
         stage = d.stage;
         mask = d.mask;
     }
-    Q_ASSERT("stage is not loaded" && stage);
+
+    Q_ASSERT(stage && "stage is not loaded");
     if (!stage)
         return GfBBox3d();
+
     if (mask.isEmpty()) {
         UsdGeomBBoxCache bboxCache(UsdTimeCode::Default(), UsdGeomImageable::GetOrderedPurposeTokens(), true);
         return bboxCache.ComputeWorldBound(stage->GetPseudoRoot());
     }
+
     return stage::boundingBox(stage, mask);
 }
 
@@ -642,67 +765,27 @@ SessionPrivate::needsBoundingBoxUpdate(const QList<SdfPath>& changed, const QLis
 {
     if (!invalidated.isEmpty()) {
         qDebug() << "SessionPrivate::needsBoundingBoxUpdate: true because of invalidated paths"
-                 << pathListToQString(invalidated);
+                 << qt::SdfPathListToQString(invalidated);
         return true;
     }
 
     for (const SdfPath& path : changed) {
         if (!path.IsPropertyPath()) {
-            qDebug() << "SessionPrivate::needsBoundingBoxUpdate: true because prim path changed" << pathToQString(path);
+            qDebug() << "SessionPrivate::needsBoundingBoxUpdate: true because prim path changed" << qt::SdfPathToQString(path);
             return true;
         }
     }
 
-    qDebug() << "SessionPrivate::needsBoundingBoxUpdate: false for property-only changes" << pathListToQString(changed);
+    qDebug() << "SessionPrivate::needsBoundingBoxUpdate: false for property-only changes" << qt::SdfPathListToQString(changed);
     return false;
-}
-
-void
-SessionPrivate::cleanupMask()
-{
-    QList<SdfPath> mask;
-    {
-        READ_LOCKER(locker, &d.stageLock, "stageLock");
-        mask = d.mask;
-    }
-
-    if (mask.isEmpty())
-        return;
-
-    QList<SdfPath> newMask;
-    bool updated = false;
-    {
-        READ_LOCKER(locker, &d.stageLock, "stageLock");
-        if (d.stage) {
-            for (const SdfPath& path : d.mask) {
-                UsdPrim prim = d.stage->GetPrimAtPath(path);
-                if (prim && prim.IsValid() && prim.IsActive())
-                    newMask.append(path);
-                else
-                    updated = true;
-            }
-        }
-        else {
-            updated = true;
-        }
-    }
-
-    if (updated) {
-        qDebug() << "SessionPrivate::cleanupMask: mask updated" << pathListToQString(newMask);
-        {
-            WRITE_LOCKER(locker, &d.stageLock, "stageLock");
-            d.mask = newMask;
-        }
-        Q_EMIT d.session->maskChanged(newMask);
-    }
 }
 
 void
 SessionPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
 {
     qDebug() << "SessionPrivate::updatePrims: incoming"
-             << "changed" << paths.size() << pathListToQString(paths) << "invalidated" << invalidated.size()
-             << pathListToQString(invalidated) << "changeDepth" << static_cast<qulonglong>(d.changeDepth)
+             << "changed" << paths.size() << qt::SdfPathListToQString(paths) << "invalidated" << invalidated.size()
+             << qt::SdfPathListToQString(invalidated) << "changeDepth" << static_cast<qulonglong>(d.changeDepth)
              << "primsUpdate" << (d.primsUpdate == Session::Deferred ? "Deferred" : "Immediate");
 
     if (d.changeDepth > 0 || d.primsUpdate == Session::Deferred) {
@@ -710,8 +793,8 @@ SessionPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& i
         d.pendingInvalidated.append(invalidated);
 
         qDebug() << "SessionPrivate::updatePrims: deferred"
-                 << "pending changed" << d.pendingPaths.size() << pathListToQString(d.pendingPaths)
-                 << "pending invalidated" << d.pendingInvalidated.size() << pathListToQString(d.pendingInvalidated);
+                 << "pending changed" << d.pendingPaths.size() << qt::SdfPathListToQString(d.pendingPaths)
+                 << "pending invalidated" << d.pendingInvalidated.size() << qt::SdfPathListToQString(d.pendingInvalidated);
         return;
     }
 
@@ -724,12 +807,13 @@ SessionPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& i
         if (!parent.IsEmpty() && parent != SdfPath::AbsoluteRootPath())
             parentPaths.append(parent);
     }
+
     uniqueChanged.append(parentPaths);
     uniqueChanged = collapseDescendants(uniquePaths(uniqueChanged));
 
     qDebug() << "SessionPrivate::updatePrims: reduced"
-             << "changed" << uniqueChanged.size() << pathListToQString(uniqueChanged) << "invalidated"
-             << uniqueInvalidated.size() << pathListToQString(uniqueInvalidated);
+             << "changed" << uniqueChanged.size() << qt::SdfPathListToQString(uniqueChanged) << "invalidated"
+             << uniqueInvalidated.size() << qt::SdfPathListToQString(uniqueInvalidated);
 
     if (uniqueChanged.isEmpty() && uniqueInvalidated.isEmpty()) {
         qDebug() << "SessionPrivate::updatePrims: nothing to emit after reduction";
@@ -751,32 +835,30 @@ SessionPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& i
         }
 
         qDebug() << "SessionPrivate::updatePrims: emit primsChanged + boundingBoxChanged"
-                 << "changed" << uniqueChanged.size() << pathListToQString(uniqueChanged) << "invalidated"
-                 << uniqueInvalidated.size() << pathListToQString(uniqueInvalidated);
+                 << "changed" << uniqueChanged.size() << qt::SdfPathListToQString(uniqueChanged) << "invalidated"
+                 << uniqueInvalidated.size() << qt::SdfPathListToQString(uniqueInvalidated);
 
         Q_EMIT d.session->primsChanged(uniqueChanged, uniqueInvalidated);
         Q_EMIT d.session->boundingBoxChanged(bbox);
     }
     else {
         qDebug() << "SessionPrivate::updatePrims: emit primsChanged only (property-only fast path)"
-                 << "changed" << uniqueChanged.size() << pathListToQString(uniqueChanged) << "invalidated"
-                 << uniqueInvalidated.size() << pathListToQString(uniqueInvalidated);
+                 << "changed" << uniqueChanged.size() << qt::SdfPathListToQString(uniqueChanged) << "invalidated"
+                 << uniqueInvalidated.size() << qt::SdfPathListToQString(uniqueInvalidated);
 
         Q_EMIT d.session->primsChanged(uniqueChanged, uniqueInvalidated);
     }
-
-    cleanupMask();
 }
 
 void
-SessionPrivate::flushPrimsUpdates()
+SessionPrivate::flushPrims()
 {
-    qDebug() << "SessionPrivate::flushPrimsUpdates: incoming pending"
-             << "changed" << d.pendingPaths.size() << pathListToQString(d.pendingPaths) << "invalidated"
-             << d.pendingInvalidated.size() << pathListToQString(d.pendingInvalidated);
+    qDebug() << "SessionPrivate::flushPrims: incoming pending"
+             << "changed" << d.pendingPaths.size() << qt::SdfPathListToQString(d.pendingPaths) << "invalidated"
+             << d.pendingInvalidated.size() << qt::SdfPathListToQString(d.pendingInvalidated);
 
     if (d.pendingPaths.isEmpty() && d.pendingInvalidated.isEmpty()) {
-        qDebug() << "SessionPrivate::flushPrimsUpdates: nothing pending";
+        qDebug() << "SessionPrivate::flushPrims: nothing pending";
         return;
     }
 
@@ -800,8 +882,8 @@ SessionPrivate::flushPrimsUpdates()
     QList<SdfPath> changed = collapseDescendants(removeDescendantsOf(d.pendingPaths, invalidated));
 
     qDebug() << "SessionPrivate::flushPrimsUpdates: reduced"
-             << "changed" << changed.size() << pathListToQString(changed) << "invalidated" << invalidated.size()
-             << pathListToQString(invalidated);
+             << "changed" << changed.size() << qt::SdfPathListToQString(changed) << "invalidated" << invalidated.size()
+             << qt::SdfPathListToQString(invalidated);
 
     d.pendingPaths.clear();
     d.pendingInvalidated.clear();
@@ -826,21 +908,19 @@ SessionPrivate::flushPrimsUpdates()
         }
 
         qDebug() << "SessionPrivate::flushPrimsUpdates: emit primsChanged + boundingBoxChanged"
-                 << "changed" << changed.size() << pathListToQString(changed) << "invalidated" << invalidated.size()
-                 << pathListToQString(invalidated);
+                 << "changed" << changed.size() << qt::SdfPathListToQString(changed) << "invalidated" << invalidated.size()
+                 << qt::SdfPathListToQString(invalidated);
 
         Q_EMIT d.session->primsChanged(changed, invalidated);
         Q_EMIT d.session->boundingBoxChanged(bbox);
     }
     else {
         qDebug() << "SessionPrivate::flushPrimsUpdates: emit primsChanged only (property-only fast path)"
-                 << "changed" << changed.size() << pathListToQString(changed) << "invalidated" << invalidated.size()
-                 << pathListToQString(invalidated);
+                 << "changed" << changed.size() << qt::SdfPathListToQString(changed) << "invalidated" << invalidated.size()
+                 << qt::SdfPathListToQString(invalidated);
 
         Q_EMIT d.session->primsChanged(changed, invalidated);
     }
-
-    cleanupMask();
 }
 
 void
@@ -850,6 +930,7 @@ SessionPrivate::updateStage()
     Session::LoadPolicy loadPolicy;
     Session::StageStatus stageStatus;
     GfBBox3d bbox;
+
     {
         READ_LOCKER(locker, &d.stageLock, "stageLock");
         stage = d.stage;
@@ -857,6 +938,7 @@ SessionPrivate::updateStage()
         stageStatus = d.stageStatus;
         bbox = d.bbox;
     }
+
     Q_EMIT d.session->stageChanged(stage, loadPolicy, stageStatus);
     Q_EMIT d.session->stageUpChanged(stageUp());
     Q_EMIT d.session->boundingBoxChanged(bbox);
@@ -865,7 +947,7 @@ SessionPrivate::updateStage()
 QList<SdfPath>
 SessionPrivate::uniquePaths(const QList<SdfPath>& paths) const
 {
-    qDebug() << "SessionPrivate::uniquePaths: input" << paths.size() << pathListToQString(paths);
+    qDebug() << "SessionPrivate::uniquePaths: input" << paths.size() << qt::SdfPathListToQString(paths);
 
     QList<SdfPath> result;
     QSet<SdfPath> seen;
@@ -877,15 +959,14 @@ SessionPrivate::uniquePaths(const QList<SdfPath>& paths) const
         }
     }
 
-    qDebug() << "SessionPrivate::uniquePaths: output" << result.size() << pathListToQString(result);
-
+    qDebug() << "SessionPrivate::uniquePaths: output" << result.size() << qt::SdfPathListToQString(result);
     return result;
 }
 
 QList<SdfPath>
 SessionPrivate::collapseDescendants(const QList<SdfPath>& paths) const
 {
-    qDebug() << "SessionPrivate::collapseDescendants: input" << paths.size() << pathListToQString(paths);
+    qDebug() << "SessionPrivate::collapseDescendants: input" << paths.size() << qt::SdfPathListToQString(paths);
 
     QList<SdfPath> result;
     QList<SdfPath> unique = uniquePaths(paths);
@@ -893,26 +974,25 @@ SessionPrivate::collapseDescendants(const QList<SdfPath>& paths) const
     std::sort(unique.begin(), unique.end(),
               [](const SdfPath& a, const SdfPath& b) { return a.GetPathElementCount() < b.GetPathElementCount(); });
 
-    qDebug() << "SessionPrivate::collapseDescendants: sorted" << unique.size() << pathListToQString(unique);
+    qDebug() << "SessionPrivate::collapseDescendants: sorted" << unique.size() << qt::SdfPathListToQString(unique);
 
     for (const SdfPath& path : unique) {
         bool covered = false;
         for (const SdfPath& existing : result) {
             if (path.HasPrefix(existing)) {
-                qDebug() << "SessionPrivate::collapseDescendants: dropping descendant" << pathToQString(path)
-                         << "because of" << pathToQString(existing);
+                qDebug() << "SessionPrivate::collapseDescendants: dropping descendant" << qt::SdfPathToQString(path)
+                         << "because of" << qt::SdfPathToQString(existing);
                 covered = true;
                 break;
             }
         }
         if (!covered) {
-            qDebug() << "SessionPrivate::collapseDescendants: keeping" << pathToQString(path);
+            qDebug() << "SessionPrivate::collapseDescendants: keeping" << qt::SdfPathToQString(path);
             result.append(path);
         }
     }
 
-    qDebug() << "SessionPrivate::collapseDescendants: output" << result.size() << pathListToQString(result);
-
+    qDebug() << "SessionPrivate::collapseDescendants: output" << result.size() << qt::SdfPathListToQString(result);
     return result;
 }
 
@@ -920,147 +1000,27 @@ QList<SdfPath>
 SessionPrivate::removeDescendantsOf(const QList<SdfPath>& changedPaths, const QList<SdfPath>& ancestors) const
 {
     qDebug() << "SessionPrivate::removeDescendantsOf: input changed" << changedPaths.size()
-             << pathListToQString(changedPaths) << "ancestors" << ancestors.size() << pathListToQString(ancestors);
+             << qt::SdfPathListToQString(changedPaths) << "ancestors" << ancestors.size() << qt::SdfPathListToQString(ancestors);
 
     QList<SdfPath> result;
     for (const SdfPath& path : changedPaths) {
         bool covered = false;
         for (const SdfPath& resynced : ancestors) {
             if (path.HasPrefix(resynced)) {
-                qDebug() << "SessionPrivate::removeDescendantsOf: dropping" << pathToQString(path)
-                         << "because it is under" << pathToQString(resynced);
+                qDebug() << "SessionPrivate::removeDescendantsOf: dropping" << qt::SdfPathToQString(path)
+                         << "because it is under" << qt::SdfPathToQString(resynced);
                 covered = true;
                 break;
             }
         }
         if (!covered) {
-            qDebug() << "SessionPrivate::removeDescendantsOf: keeping" << pathToQString(path);
+            qDebug() << "SessionPrivate::removeDescendantsOf: keeping" << qt::SdfPathToQString(path);
             result.append(path);
         }
     }
 
-    qDebug() << "SessionPrivate::removeDescendantsOf: output" << result.size() << pathListToQString(result);
-
+    qDebug() << "SessionPrivate::removeDescendantsOf: output" << result.size() << qt::SdfPathListToQString(result);
     return result;
-}
-
-QString
-SessionPrivate::payloadFilename(const QString& stageFilename) const
-{
-    return QFileInfo(stageFilename).absoluteFilePath() + ".payloads";
-}
-
-QList<SdfPath>
-SessionPrivate::loadedPayloadPaths() const
-{
-    QList<SdfPath> result;
-
-    READ_LOCKER(locker, &d.stageLock, "stageLock");
-    if (!d.stage)
-        return result;
-
-    std::stack<UsdPrim> stack;
-    stack.push(d.stage->GetPseudoRoot());
-
-    while (!stack.empty()) {
-        const UsdPrim prim = stack.top();
-        stack.pop();
-
-        if (!prim || !prim.IsValid())
-            continue;
-
-        if (prim.HasPayload() && prim.IsLoaded())
-            result.append(prim.GetPath());
-
-        for (const UsdPrim& child : prim.GetChildren())
-            stack.push(child);
-    }
-
-    return result;
-}
-
-bool
-SessionPrivate::writePayloadFile(const QString& stageFilename)
-{
-    if (stageFilename.isEmpty())
-        return false;
-
-    const QList<SdfPath> loadedPaths = loadedPayloadPaths();
-
-    QJsonArray payloads;
-    for (const SdfPath& path : loadedPaths)
-        payloads.append(pathToQString(path));
-
-    QJsonObject root;
-    root["version"] = 1;
-    root["stageFile"] = QFileInfo(stageFilename).absoluteFilePath();
-    root["loadedPayloads"] = payloads;
-
-    QFile file(payloadFilename(stageFilename));
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        return false;
-
-    const QJsonDocument doc(root);
-    return file.write(doc.toJson(QJsonDocument::Indented)) != -1;
-}
-
-bool
-SessionPrivate::readPayloadFile(const QString& stageFilename, QList<SdfPath>* loadedPaths) const
-{
-    if (!loadedPaths)
-        return false;
-
-    loadedPaths->clear();
-
-    QFile file(payloadFilename(stageFilename));
-    if (!file.exists())
-        return false;
-    if (!file.open(QIODevice::ReadOnly))
-        return false;
-
-    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    if (!doc.isObject())
-        return false;
-
-    const QJsonObject root = doc.object();
-    const QJsonArray payloads = root.value("loadedPayloads").toArray();
-
-    for (const QJsonValue& value : payloads) {
-        const QString pathString = value.toString().trimmed();
-        if (pathString.isEmpty())
-            continue;
-
-        const SdfPath path(QStringToString(pathString));
-        if (!path.IsAbsolutePath())
-            continue;
-
-        loadedPaths->append(path);
-    }
-
-    *loadedPaths = uniquePaths(*loadedPaths);
-    return true;
-}
-
-void
-SessionPrivate::applyPayloadFile(const QList<SdfPath>& loadedPaths)
-{
-    WRITE_LOCKER(locker, &d.stageLock, "stageLock");
-    if (!d.stage)
-        return;
-
-    StageBlocker blocker(d.stageWatcher.data());
-
-    for (const SdfPath& path : loadedPaths) {
-        UsdPrim prim = d.stage->GetPrimAtPath(path);
-        if (!prim || !prim.IsValid())
-            continue;
-        if (!prim.HasPayload())
-            continue;
-
-        prim.Load();
-    }
-
-    d.bboxCache.reset();
 }
 
 Session::Session()
@@ -1099,7 +1059,7 @@ Session::updateProgressNotify(const Notify& notify, size_t completed)
 void
 Session::cancelProgressBlock()
 {
-    return p->cancelProgressBlock();
+    p->cancelProgressBlock();
 }
 
 void
@@ -1231,7 +1191,7 @@ UsdStageRefPtr
 Session::stage() const
 {
     READ_LOCKER(locker, stageLock(), "stageLock");
-    Q_ASSERT("stage is not loaded" && p->d.stage);
+    Q_ASSERT(p->d.stage && "stage is not loaded");
     return p->d.stage;
 }
 
@@ -1278,14 +1238,15 @@ Session::setPrimsUpdate(PrimsUpdate update)
         p->d.primsUpdate = update;
         flush = (update == Immediate);
     }
+
     if (flush)
-        p->flushPrimsUpdates();
+        p->flushPrims();
 }
 
 void
 Session::flushPrimsUpdates()
 {
-    p->flushPrimsUpdates();
+    p->flushPrims();
 }
 
 }  // namespace usdviewer

@@ -1130,6 +1130,7 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                 bool noop = false;
                 QString error;
                 SdfPath newPath;
+
                 {
                     WRITE_LOCKER(locker, session->stageLock(), "stageLock");
                     const UsdStageRefPtr stage = session->stageUnsafe();
@@ -1158,8 +1159,8 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                                 stage->SetLoadRules(stage::remapLoadRules(rules, path, newPath));
 
                                 if (!state->oldOrder.empty()) {
-                                    state->newOrder = remapChildOrder(state->oldOrder, path.GetNameToken(),
-                                                                      newPath.GetNameToken());
+                                    state->newOrder = remapChildOrder(
+                                        state->oldOrder, path.GetNameToken(), newPath.GetNameToken());
                                     stage::restoreChildOrder(stage, state->parentPath, state->newOrder);
                                 }
 
@@ -1177,28 +1178,32 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(Session::Notify("rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(
+                                Session::Notify("rename path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (noop) {
-                            session->updateProgressNotify(Session::Notify("rename skipped", {}, Status::Info), 1);
+                            session->updateProgressNotify(
+                                Session::Notify("rename skipped", {}, Status::Info), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!renamed) {
-                            session->updateProgressNotify(Session::Notify("rename path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(
+                                Session::Notify("rename path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         session->selectionList()->updatePaths(
                             path::remapAffectedPaths(state->previousSelection, path, newPath));
-                        session->setMask(path::remapAffectedPaths(state->previousMask, path, newPath));
-                        session->updateProgressNotify(Session::Notify("path renamed", { path, newPath }, Status::Info),
-                                                      1);
+                        session->setMask(
+                            path::remapAffectedPaths(state->previousMask, path, newPath));
+                        session->updateProgressNotify(
+                            Session::Notify("path renamed", { path, newPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1227,7 +1232,8 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         const UsdStageLoadRules rules = stage->GetLoadRules();
 
                         if (applyRename(stage, state->newPath, state->oldPath, error)) {
-                            stage->SetLoadRules(stage::remapLoadRules(rules, state->newPath, state->oldPath));
+                            stage->SetLoadRules(
+                                stage::remapLoadRules(rules, state->newPath, state->oldPath));
 
                             if (!state->oldOrder.empty() && !state->parentPath.IsEmpty()
                                 && state->parentPath != SdfPath::AbsoluteRootPath()) {
@@ -1249,21 +1255,21 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(Session::Notify("undo rename path failed", {}, Status::Error),
-                                                          1);
+                            session->updateProgressNotify(
+                                Session::Notify("undo rename path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!restored) {
-                            session->updateProgressNotify(Session::Notify("undo rename path failed", {}, Status::Error),
-                                                          1);
+                            session->updateProgressNotify(
+                                Session::Notify("undo rename path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
-                        session->updateProgressNotify(Session::Notify("rename undone", { state->oldPath }, Status::Info),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify("rename undone", { state->oldPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1469,13 +1475,14 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
 }
 
 Command
-movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
+movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
 {
     struct MoveState {
         SdfPath oldPath;
         SdfPath newPath;
         SdfPath oldParentPath;
         SdfPath newParentPath;
+        int insertIndex = -1;
         TfTokenVector oldParentOrder;
         TfTokenVector newParentOldOrder;
         TfTokenVector newParentNewOrder;
@@ -1495,10 +1502,19 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
         return out;
     };
 
-    auto appendTokenIfMissing = [](const TfTokenVector& order, const TfToken& name) {
-        TfTokenVector out = order;
-        if (std::find(out.begin(), out.end(), name) == out.end())
-            out.push_back(name);
+    auto insertTokenAt = [](const TfTokenVector& order, const TfToken& name, int index) {
+        TfTokenVector out;
+        out.reserve(order.size() + 1);
+
+        for (const TfToken& token : order) {
+            if (token != name)
+                out.push_back(token);
+        }
+
+        if (index < 0 || index > static_cast<int>(out.size()))
+            index = static_cast<int>(out.size());
+
+        out.insert(out.begin() + index, name);
         return out;
     };
 
@@ -1552,7 +1568,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
     };
 
     return Command(
-        [fromPath, newParentPath, removeToken, appendTokenIfMissing, applyMove, state](Session* session) {
+        [fromPath, newParentPath, insertIndex, removeToken, insertTokenAt, applyMove, state](Session* session) {
             state->previousSelection = session->selectionList()->paths();
             state->previousMask = session->mask();
 
@@ -1580,14 +1596,37 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                             || oldParentPath == SdfPath::AbsoluteRootPath()) {
                             noop = true;
                         }
-                        else if (oldParentPath == newParentPath) {
-                            noop = true;
+                        else if (fromPath == targetPath) {
+                            // Same parent reorder path; newPath remains identical.
+                            state->oldPath = fromPath;
+                            state->newPath = fromPath;
+                            state->oldParentPath = oldParentPath;
+                            state->newParentPath = newParentPath;
+                            state->insertIndex = insertIndex;
+                            state->oldParentOrder.clear();
+                            state->newParentOldOrder.clear();
+                            state->newParentNewOrder.clear();
+
+                            stage::captureChildOrder(stage, oldParentPath, state->oldParentOrder);
+
+                            const TfToken movedName = fromPath.GetNameToken();
+                            state->newParentOldOrder = state->oldParentOrder;
+                            state->newParentNewOrder = insertTokenAt(state->oldParentOrder, movedName, insertIndex);
+
+                            if (state->newParentNewOrder != state->oldParentOrder) {
+                                stage::restoreChildOrder(stage, oldParentPath, state->newParentNewOrder);
+                                moved = true;
+                            }
+                            else {
+                                noop = true;
+                            }
                         }
                         else {
                             state->oldPath = fromPath;
                             state->newPath = targetPath;
                             state->oldParentPath = oldParentPath;
                             state->newParentPath = newParentPath;
+                            state->insertIndex = insertIndex;
                             state->oldParentOrder.clear();
                             state->newParentOldOrder.clear();
                             state->newParentNewOrder.clear();
@@ -1602,7 +1641,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                                     stage::restoreChildOrder(stage, oldParentPath,
                                                              removeToken(state->oldParentOrder, movedName));
 
-                                state->newParentNewOrder = appendTokenIfMissing(state->newParentOldOrder, movedName);
+                                state->newParentNewOrder = insertTokenAt(
+                                    state->newParentOldOrder, movedName, insertIndex);
 
                                 if (!state->newParentNewOrder.empty())
                                     stage::restoreChildOrder(stage, newParentPath, state->newParentNewOrder);
@@ -1640,10 +1680,10 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
 
                         session->selectionList()->updatePaths(
                             path::remapAffectedPaths(state->previousSelection, fromPath, state->newPath));
-                        session->setMask(path::remapAffectedPaths(state->previousMask, fromPath, state->newPath));
-                        session->updateProgressNotify(Session::Notify("path moved", { state->oldPath, state->newPath },
-                                                                      Status::Info),
-                                                      1);
+                        session->setMask(
+                            path::remapAffectedPaths(state->previousMask, fromPath, state->newPath));
+                        session->updateProgressNotify(
+                            Session::Notify("path moved", { state->oldPath, state->newPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -1665,9 +1705,16 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                     if (!stage) {
                         hadStage = false;
                     }
-                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty() || state->oldParentPath.IsEmpty()
-                             || state->newParentPath.IsEmpty()) {
+                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty()
+                             || state->oldParentPath.IsEmpty() || state->newParentPath.IsEmpty()) {
                         error = "invalid state";
+                    }
+                    else if (state->oldPath == state->newPath) {
+                        // Same-parent reorder undo.
+                        if (!state->oldParentOrder.empty()) {
+                            stage::restoreChildOrder(stage, state->oldParentPath, state->oldParentOrder);
+                            restored = true;
+                        }
                     }
                     else {
                         if (applyMove(stage, state->newPath, state->oldParentPath, error)) {
@@ -1692,21 +1739,21 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath)
                         session->setPrimsUpdate(Session::PrimsUpdate::Immediate);
 
                         if (!hadStage) {
-                            session->updateProgressNotify(Session::Notify("undo move path failed", {}, Status::Error),
-                                                          1);
+                            session->updateProgressNotify(
+                                Session::Notify("undo move path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
                         if (!restored) {
-                            session->updateProgressNotify(Session::Notify("undo move path failed", {}, Status::Error),
-                                                          1);
+                            session->updateProgressNotify(
+                                Session::Notify("undo move path failed", {}, Status::Error), 1);
                             session->endProgressBlock();
                             return;
                         }
 
-                        session->updateProgressNotify(Session::Notify("move undone", { state->oldPath }, Status::Info),
-                                                      1);
+                        session->updateProgressNotify(
+                            Session::Notify("move undone", { state->oldPath }, Status::Info), 1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);

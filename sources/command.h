@@ -157,7 +157,7 @@ Command
 newXformPath(const SdfPath& parentPath, const QString& nameInput);
 
 Command
-movePath(const SdfPath& fromPath, const SdfPath& newParentPath);
+movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex);
 
 ///@}
 

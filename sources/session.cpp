@@ -147,6 +147,7 @@ public:
     QList<SdfPath> uniquePaths(const QList<SdfPath>& paths) const;
     QList<SdfPath> collapseDescendants(const QList<SdfPath>& paths) const;
     QList<SdfPath> removeDescendantsOf(const QList<SdfPath>& paths, const QList<SdfPath>& ancestors) const;
+    QList<SdfPath> reduceInvalidated(const QList<SdfPath>& invalidated) const;
 
 public:
     bool needsBoundingBoxUpdate(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated) const;
@@ -265,7 +266,7 @@ SessionPrivate::endProgressBlock()
     if (d.changeDepth > 0)
         return;
 
-    bool cancelled = d.changeCancelled.load();
+    const bool cancelled = d.changeCancelled.load();
     d.changeCancelled.store(false);
 
     Q_EMIT d.session->progressBlockChanged(d.changeName, Session::ProgressMode::Idle);
@@ -801,34 +802,19 @@ SessionPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& i
         return;
     }
 
-    QList<SdfPath> uniqueInvalidated = uniquePaths(invalidated);
-
-    const bool hasSpecificInvalidation
-        = std::any_of(uniqueInvalidated.begin(), uniqueInvalidated.end(),
-                      [](const SdfPath& path) { return path != SdfPath::AbsoluteRootPath(); });
-
-    if (hasSpecificInvalidation) {
-        QList<SdfPath> filtered;
-        filtered.reserve(uniqueInvalidated.size());
-        for (const SdfPath& path : uniqueInvalidated) {
-            if (path != SdfPath::AbsoluteRootPath())
-                filtered.append(path);
-        }
-        uniqueInvalidated = filtered;
-    }
-
-    QList<SdfPath> uniqueChanged = collapseDescendants(removeDescendantsOf(paths, uniqueInvalidated));
+    const QList<SdfPath> reducedInvalidated = reduceInvalidated(invalidated);
+    const QList<SdfPath> reducedChanged = collapseDescendants(removeDescendantsOf(paths, reducedInvalidated));
 
     qDebug() << "SessionPrivate::updatePrims: reduced"
-             << "changed" << uniqueChanged.size() << qt::SdfPathListToQString(uniqueChanged) << "invalidated"
-             << uniqueInvalidated.size() << qt::SdfPathListToQString(uniqueInvalidated);
+             << "changed" << reducedChanged.size() << qt::SdfPathListToQString(reducedChanged) << "invalidated"
+             << reducedInvalidated.size() << qt::SdfPathListToQString(reducedInvalidated);
 
-    if (uniqueChanged.isEmpty() && uniqueInvalidated.isEmpty()) {
+    if (reducedChanged.isEmpty() && reducedInvalidated.isEmpty()) {
         qDebug() << "SessionPrivate::updatePrims: nothing to emit after reduction";
         return;
     }
 
-    const bool updateBBox = needsBoundingBoxUpdate(uniqueChanged, uniqueInvalidated);
+    const bool updateBBox = needsBoundingBoxUpdate(reducedChanged, reducedInvalidated);
 
     if (updateBBox) {
         {
@@ -843,18 +829,18 @@ SessionPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& i
         }
 
         qDebug() << "SessionPrivate::updatePrims: emit primsChanged + boundingBoxChanged"
-                 << "changed" << uniqueChanged.size() << qt::SdfPathListToQString(uniqueChanged) << "invalidated"
-                 << uniqueInvalidated.size() << qt::SdfPathListToQString(uniqueInvalidated);
+                 << "changed" << reducedChanged.size() << qt::SdfPathListToQString(reducedChanged) << "invalidated"
+                 << reducedInvalidated.size() << qt::SdfPathListToQString(reducedInvalidated);
 
-        Q_EMIT d.session->primsChanged(uniqueChanged, uniqueInvalidated);
+        Q_EMIT d.session->primsChanged(reducedChanged, reducedInvalidated);
         Q_EMIT d.session->boundingBoxChanged(bbox);
     }
     else {
         qDebug() << "SessionPrivate::updatePrims: emit primsChanged only (property-only fast path)"
-                 << "changed" << uniqueChanged.size() << qt::SdfPathListToQString(uniqueChanged) << "invalidated"
-                 << uniqueInvalidated.size() << qt::SdfPathListToQString(uniqueInvalidated);
+                 << "changed" << reducedChanged.size() << qt::SdfPathListToQString(reducedChanged) << "invalidated"
+                 << reducedInvalidated.size() << qt::SdfPathListToQString(reducedInvalidated);
 
-        Q_EMIT d.session->primsChanged(uniqueChanged, uniqueInvalidated);
+        Q_EMIT d.session->primsChanged(reducedChanged, reducedInvalidated);
     }
 }
 
@@ -870,38 +856,22 @@ SessionPrivate::flushPrims()
         return;
     }
 
-    QList<SdfPath> invalidatedInput = uniquePaths(d.pendingInvalidated);
+    const QList<SdfPath> reducedInvalidated = reduceInvalidated(d.pendingInvalidated);
+    const QList<SdfPath> reducedChanged = collapseDescendants(removeDescendantsOf(d.pendingPaths, reducedInvalidated));
 
-    const bool hasSpecificInvalidation
-        = std::any_of(invalidatedInput.begin(), invalidatedInput.end(),
-                      [](const SdfPath& path) { return path != SdfPath::AbsoluteRootPath(); });
-
-    if (hasSpecificInvalidation) {
-        QList<SdfPath> filtered;
-        filtered.reserve(invalidatedInput.size());
-        for (const SdfPath& path : invalidatedInput) {
-            if (path != SdfPath::AbsoluteRootPath())
-                filtered.append(path);
-        }
-        invalidatedInput = filtered;
-    }
-
-    QList<SdfPath> invalidated = invalidatedInput;
-    QList<SdfPath> changed = collapseDescendants(removeDescendantsOf(d.pendingPaths, invalidated));
-
-    qDebug() << "SessionPrivate::flushPrimsUpdates: reduced"
-             << "changed" << changed.size() << qt::SdfPathListToQString(changed) << "invalidated" << invalidated.size()
-             << qt::SdfPathListToQString(invalidated);
+    qDebug() << "SessionPrivate::flushPrims: reduced"
+             << "changed" << reducedChanged.size() << qt::SdfPathListToQString(reducedChanged) << "invalidated"
+             << reducedInvalidated.size() << qt::SdfPathListToQString(reducedInvalidated);
 
     d.pendingPaths.clear();
     d.pendingInvalidated.clear();
 
-    if (changed.isEmpty() && invalidated.isEmpty()) {
-        qDebug() << "SessionPrivate::flushPrimsUpdates: nothing to emit after reduction";
+    if (reducedChanged.isEmpty() && reducedInvalidated.isEmpty()) {
+        qDebug() << "SessionPrivate::flushPrims: nothing to emit after reduction";
         return;
     }
 
-    const bool updateBBox = needsBoundingBoxUpdate(changed, invalidated);
+    const bool updateBBox = needsBoundingBoxUpdate(reducedChanged, reducedInvalidated);
 
     if (updateBBox) {
         {
@@ -915,19 +885,19 @@ SessionPrivate::flushPrims()
             d.bbox = bbox;
         }
 
-        qDebug() << "SessionPrivate::flushPrimsUpdates: emit primsChanged + boundingBoxChanged"
-                 << "changed" << changed.size() << qt::SdfPathListToQString(changed) << "invalidated"
-                 << invalidated.size() << qt::SdfPathListToQString(invalidated);
+        qDebug() << "SessionPrivate::flushPrims: emit primsChanged + boundingBoxChanged"
+                 << "changed" << reducedChanged.size() << qt::SdfPathListToQString(reducedChanged) << "invalidated"
+                 << reducedInvalidated.size() << qt::SdfPathListToQString(reducedInvalidated);
 
-        Q_EMIT d.session->primsChanged(changed, invalidated);
+        Q_EMIT d.session->primsChanged(reducedChanged, reducedInvalidated);
         Q_EMIT d.session->boundingBoxChanged(bbox);
     }
     else {
-        qDebug() << "SessionPrivate::flushPrimsUpdates: emit primsChanged only (property-only fast path)"
-                 << "changed" << changed.size() << qt::SdfPathListToQString(changed) << "invalidated"
-                 << invalidated.size() << qt::SdfPathListToQString(invalidated);
+        qDebug() << "SessionPrivate::flushPrims: emit primsChanged only (property-only fast path)"
+                 << "changed" << reducedChanged.size() << qt::SdfPathListToQString(reducedChanged) << "invalidated"
+                 << reducedInvalidated.size() << qt::SdfPathListToQString(reducedInvalidated);
 
-        Q_EMIT d.session->primsChanged(changed, invalidated);
+        Q_EMIT d.session->primsChanged(reducedChanged, reducedInvalidated);
     }
 }
 
@@ -959,6 +929,7 @@ SessionPrivate::uniquePaths(const QList<SdfPath>& paths) const
 
     QList<SdfPath> result;
     QSet<SdfPath> seen;
+    result.reserve(paths.size());
 
     for (const SdfPath& path : paths) {
         if (!seen.contains(path)) {
@@ -979,8 +950,13 @@ SessionPrivate::collapseDescendants(const QList<SdfPath>& paths) const
     QList<SdfPath> result;
     QList<SdfPath> unique = uniquePaths(paths);
 
-    std::sort(unique.begin(), unique.end(),
-              [](const SdfPath& a, const SdfPath& b) { return a.GetPathElementCount() < b.GetPathElementCount(); });
+    std::sort(unique.begin(), unique.end(), [](const SdfPath& a, const SdfPath& b) {
+        const size_t aCount = a.GetPathElementCount();
+        const size_t bCount = b.GetPathElementCount();
+        if (aCount != bCount)
+            return aCount < bCount;
+        return a.GetString() < b.GetString();
+    });
 
     qDebug() << "SessionPrivate::collapseDescendants: sorted" << unique.size() << qt::SdfPathListToQString(unique);
 
@@ -1012,12 +988,14 @@ SessionPrivate::removeDescendantsOf(const QList<SdfPath>& changedPaths, const QL
              << qt::SdfPathListToQString(ancestors);
 
     QList<SdfPath> result;
+    result.reserve(changedPaths.size());
+
     for (const SdfPath& path : changedPaths) {
         bool covered = false;
-        for (const SdfPath& resynced : ancestors) {
-            if (path.HasPrefix(resynced)) {
+        for (const SdfPath& ancestor : ancestors) {
+            if (path.HasPrefix(ancestor)) {
                 qDebug() << "SessionPrivate::removeDescendantsOf: dropping" << qt::SdfPathToQString(path)
-                         << "because it is under" << qt::SdfPathToQString(resynced);
+                         << "because it is under" << qt::SdfPathToQString(ancestor);
                 covered = true;
                 break;
             }
@@ -1030,6 +1008,77 @@ SessionPrivate::removeDescendantsOf(const QList<SdfPath>& changedPaths, const QL
 
     qDebug() << "SessionPrivate::removeDescendantsOf: output" << result.size() << qt::SdfPathListToQString(result);
     return result;
+}
+
+QList<SdfPath>
+SessionPrivate::reduceInvalidated(const QList<SdfPath>& invalidated) const
+{
+    qDebug() << "SessionPrivate::reduceInvalidated: input" << invalidated.size()
+             << qt::SdfPathListToQString(invalidated);
+
+    QList<SdfPath> filtered = uniquePaths(invalidated);
+
+    const bool hasSpecificInvalidation = std::any_of(filtered.begin(), filtered.end(), [](const SdfPath& path) {
+        return path != SdfPath::AbsoluteRootPath();
+    });
+
+    if (hasSpecificInvalidation) {
+        QList<SdfPath> withoutRoot;
+        withoutRoot.reserve(filtered.size());
+        for (const SdfPath& path : filtered) {
+            if (path != SdfPath::AbsoluteRootPath())
+                withoutRoot.append(path);
+        }
+        filtered = withoutRoot;
+    }
+
+    std::sort(filtered.begin(), filtered.end(), [](const SdfPath& a, const SdfPath& b) {
+        const size_t aCount = a.GetPathElementCount();
+        const size_t bCount = b.GetPathElementCount();
+        if (aCount != bCount)
+            return aCount < bCount;
+        return a.GetString() < b.GetString();
+    });
+
+    QList<SdfPath> reduced;
+    reduced.reserve(filtered.size());
+
+    for (int i = 0; i < filtered.size(); ++i) {
+        const SdfPath& path = filtered[i];
+
+        bool hasAncestorInSet = false;
+        bool hasDescendantInSet = false;
+
+        for (int j = 0; j < filtered.size(); ++j) {
+            if (i == j)
+                continue;
+
+            const SdfPath& other = filtered[j];
+
+            if (path.HasPrefix(other)) {
+                hasAncestorInSet = true;
+            }
+            else if (other.HasPrefix(path)) {
+                hasDescendantInSet = true;
+            }
+
+            if (hasAncestorInSet && hasDescendantInSet)
+                break;
+        }
+
+        // Keep:
+        // 1) top-level invalidated roots
+        // 2) intermediate invalidated containers that also have deeper invalidations
+        //
+        // Drop:
+        // - leaf invalidations already covered by an ancestor invalidation
+        if (!hasAncestorInSet || hasDescendantInSet)
+            reduced.append(path);
+    }
+
+    qDebug() << "SessionPrivate::reduceInvalidated: output" << reduced.size()
+             << qt::SdfPathListToQString(reduced);
+    return reduced;
 }
 
 Session::Session()

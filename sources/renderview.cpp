@@ -4,6 +4,7 @@
 
 #include "renderview.h"
 #include "application.h"
+#include "notice.h"
 #include "usdutils.h"
 #include "viewcontext.h"
 #include <QPointer>
@@ -24,7 +25,7 @@ public:
 public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void maskChanged(const QList<SdfPath>& paths);
-    void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    void primsChanged(const NoticeBatch& batch);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void renderReady(qint64 elapsed);
@@ -105,9 +106,9 @@ RenderViewPrivate::maskChanged(const QList<SdfPath>& paths)
 }
 
 void
-RenderViewPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+RenderViewPrivate::primsChanged(const NoticeBatch& batch)
 {
-    imageGLWidget()->updatePrims(paths, invalidated);
+    imageGLWidget()->updatePrims(batch);
 }
 
 void

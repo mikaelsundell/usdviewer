@@ -153,15 +153,14 @@ public:
     void updateStage(UsdStageRefPtr stage);
 
     /**
-     * @brief Updates tree items for the specified prim paths.
-     *
-     * Typically used when prim properties change and the
-     * corresponding items must be refreshed.
-     *
-     * @param paths Prim paths to update.
-     * @param invalidated Invalidated prim paths.
-     */
-    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    * @brief Updates prims using a USD notice batch.
+    *
+    * Entries follow UsdNotice::ObjectsChanged semantics:
+    * info-only changes, asset resyncs, and structural resyncs.
+    *
+    * @param batch Batched USD change entries.
+    */
+    void updatePrims(const NoticeBatch& batch);
 
     /**
      * @brief Updates the tree selection.

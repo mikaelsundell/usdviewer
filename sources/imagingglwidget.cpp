@@ -5,6 +5,7 @@
 #include "imagingglwidget.h"
 #include "application.h"
 #include "command.h"
+#include "notice.h"
 #include "os.h"
 #include "qtutils.h"
 #include "signalguard.h"
@@ -64,7 +65,7 @@ public:
     void updateStage(UsdStageRefPtr stage);
     void updateBoundingBox(const GfBBox3d& bbox);
     void updateMask(const QList<SdfPath>& paths);
-    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    void updatePrims(const NoticeBatch& batch);
     void updateSelection(const QList<SdfPath>& paths);
 
 public:
@@ -757,7 +758,7 @@ ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
 }
 
 void
-ImagingGLWidgetPrivate::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+ImagingGLWidgetPrivate::updatePrims(const NoticeBatch& batch)
 {
     SignalGuard::Scope guard(this);
     if (d.sceneTreeEnabled) {
@@ -1357,9 +1358,9 @@ ImagingGLWidget::updateMask(const QList<SdfPath>& paths)
 }
 
 void
-ImagingGLWidget::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+ImagingGLWidget::updatePrims(const NoticeBatch& batch)
 {
-    p->updatePrims(paths, invalidated);
+    p->updatePrims(batch);
 }
 
 void

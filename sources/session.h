@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "notice.h"
 #include <QExplicitlySharedDataPointer>
 #include <QMap>
 #include <QObject>
@@ -19,7 +20,6 @@ namespace usdviewer {
 class CommandStack;
 class SelectionList;
 class SessionPrivate;
-
 
 /**
  * @class Session
@@ -57,7 +57,7 @@ public:
      * @brief Controls how prim changes are propagated.
      */
     enum PrimsUpdate {
-        Immediate,  ///< Emit primsChanged() immediately.
+        Immediate,  ///< Emit prim changes immediately.
         Deferred    ///< Buffer and emit changes on flush.
     };
 
@@ -192,17 +192,17 @@ public:
     bool saveToFile(const QString& filename);
 
     /**
-     * @brief Copy  the current stage to file.
+     * @brief Copies the current stage to file.
      */
     bool copyToFile(const QString& filename);
 
     /**
-     * @brief Flatten the entire stage to a file.
+     * @brief Flattens the entire stage to a file.
      */
     bool flattenToFile(const QString& filename);
 
     /**
-     * @brief Flatten specific prim paths to a file.
+     * @brief Flattens specific prim paths to a file.
      */
     bool flattenPathsToFile(const QList<SdfPath>& paths, const QString& filename);
 
@@ -319,7 +319,6 @@ public:
     void setStatus(const QString& status);
 
 Q_SIGNALS:
-
     /**
      * @brief Emitted when a progress block begins or ends.
      */
@@ -341,9 +340,9 @@ Q_SIGNALS:
     void maskChanged(const QList<SdfPath>& paths);
 
     /**
-     * @brief Emitted when prims are modified.
+     * @brief Emitted when prims are modified using a structured USD notice batch.
      */
-    void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    void primsChanged(const NoticeBatch& batch);
 
     /**
      * @brief Emitted when the stage changes.

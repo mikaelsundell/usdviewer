@@ -71,6 +71,16 @@ public:
      */
     void setData(int column, int role, const QVariant& value) override;
 
+   /**
+     * @brief Returns the prim path for this item.
+     */
+    SdfPath path() const;
+
+    /**
+     * @brief Sets the prim path and invalidates cached state.
+     */
+    void setPath(const SdfPath& path);
+    
     /**
       * @brief Marks the item's cached data as invalid.
       *

@@ -4,6 +4,7 @@
 
 #include "outlinerview.h"
 #include "application.h"
+#include "notice.h"
 #include "propertytree.h"
 #include "signalguard.h"
 #include "stagetree.h"
@@ -35,7 +36,7 @@ public Q_SLOTS:
     void expand();
     void follow(bool enabled);
     void filterChanged(const QString& filter);
-    void primsChanged(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated);
+    void primsChanged(const NoticeBatch& batch);
     void maskChanged(const QList<SdfPath>& paths);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
@@ -173,10 +174,10 @@ OutlinerViewPrivate::filterChanged(const QString& filter)
 }
 
 void
-OutlinerViewPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+OutlinerViewPrivate::primsChanged(const NoticeBatch& batch)
 {
-    propertyTree()->updatePrims(paths, invalidated);
-    stageTree()->updatePrims(paths, invalidated);
+    propertyTree()->updatePrims(batch);
+    stageTree()->updatePrims(batch);
 }
 
 void

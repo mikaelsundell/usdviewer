@@ -6,6 +6,7 @@
 #include "application.h"
 #include "commandstack.h"
 #include "mouseevent.h"
+#include "notice.h"
 #include "os.h"
 #include "outlinerview.h"
 #include "progressview.h"
@@ -107,7 +108,7 @@ public Q_SLOTS:
     void boundingBoxChanged(const GfBBox3d& bbox);
     void selectionChanged(const QList<SdfPath>& paths);
     void maskChanged(const QList<SdfPath>& paths);
-    void primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    void primsChanged(const NoticeBatch& batch);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void stageUpChanged(Session::StageUp stageUp);
     void statusChanged(const QString& status);
@@ -1238,9 +1239,9 @@ ViewerPrivate::maskChanged(const QList<SdfPath>& paths)
 }
 
 void
-ViewerPrivate::primsChanged(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+ViewerPrivate::primsChanged(const NoticeBatch& batch)
 {
-    if (paths.isEmpty() && invalidated.isEmpty())
+   if (batch.entries.isEmpty())
         return;
     ++d.changes;
     updateModified(true);

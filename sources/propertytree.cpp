@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "propertytree.h"
+#include "notice.h"
 #include "propertyitem.h"
 #include "qtutils.h"
 #include "selectionlist.h"
@@ -36,11 +37,12 @@ public:
     void init();
     void close();
     void updateStage(UsdStageRefPtr stage);
-    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    void updatePrims(const NoticeBatch& batch);
     void updateSelection(const QList<SdfPath>& paths);
 
 public:
     std::string matrixString(const GfMatrix4d& matrix);
+
     struct Data {
         UsdStageRefPtr stage;
         SdfPath path;
@@ -69,41 +71,110 @@ void
 PropertyTreePrivate::updateStage(UsdStageRefPtr stage)
 {
     SignalGuard::Scope guard(this);
+
     close();
     d.stage = stage;
+    if (!stage)
+        return;
+
     PropertyItem* stageItem = new PropertyItem(d.tree.data());
     stageItem->setText(PropertyItem::Name, "Stage");
     d.tree->addTopLevelItem(stageItem);
     stageItem->setExpanded(true);
+
     auto addChild = [&](const QString& name, const QString& value) {
         PropertyItem* item = new PropertyItem(stageItem);
         item->setText(PropertyItem::Name, name);
         item->setText(PropertyItem::Value, value);
     };
+
     addChild("metersPerUnit", QString::number(UsdGeomGetStageMetersPerUnit(stage)));
     addChild("upAxis", StringToQString(UsdGeomGetStageUpAxis(stage).GetString()));
     addChild("timeCodesPerSecond", QString::number(stage->GetTimeCodesPerSecond()));
     addChild("startTimeCode", QString::number(stage->GetStartTimeCode()));
     addChild("endTimeCode", QString::number(stage->GetEndTimeCode()));
-    std::string comment = stage->GetRootLayer()->GetComment();
+
+    const std::string comment = stage->GetRootLayer()->GetComment();
     if (!comment.empty())
         addChild("comment", StringToQString(comment));
-    std::string filePath = stage->GetRootLayer()->GetRealPath();
+
+    const std::string filePath = stage->GetRootLayer()->GetRealPath();
     addChild("filePath", QFileInfo(StringToQString(filePath)).fileName());
 }
 
 void
-PropertyTreePrivate::updatePrims(const QList<SdfPath>& changed, const QList<SdfPath>& invalidated)
+PropertyTreePrivate::updatePrims(const NoticeBatch& batch)
 {
     SignalGuard::Scope guard(this);
-    if (changed.contains(d.path)) {
-        updateSelection({ d.path });
+
+    if (d.path.IsEmpty() || batch.entries.isEmpty())
         return;
-    }
-    for (const SdfPath& p : invalidated) {
-        if (d.path.HasPrefix(p)) {
-            updateSelection({ d.path });
-            return;
+
+    for (const NoticeEntry& entry : batch.entries) {
+        if (entry.path.IsEmpty())
+            continue;
+
+        const SdfPath entryPath = entry.path.IsPropertyPath() ? entry.path.GetPrimPath() : entry.path;
+
+        if (entry.changedInfoOnly) {
+            if (entryPath == d.path) {
+                updateSelection({ d.path });
+                return;
+            }
+            continue;
+        }
+
+        if (entry.resolvedAssetPathsResynced) {
+            if (d.path == entryPath || d.path.HasPrefix(entryPath)) {
+                updateSelection({ d.path });
+                return;
+            }
+            continue;
+        }
+
+        switch (entry.primResyncType) {
+        case UsdNotice::ObjectsChanged::PrimResyncType::RenameDestination:
+        case UsdNotice::ObjectsChanged::PrimResyncType::ReparentDestination:
+        case UsdNotice::ObjectsChanged::PrimResyncType::RenameAndReparentDestination:
+            if (!entry.associatedPath.IsEmpty() && d.path == entry.associatedPath) {
+                updateSelection({ entryPath });
+                return;
+            }
+            if (d.path == entryPath || d.path.HasPrefix(entryPath)) {
+                updateSelection({ d.path });
+                return;
+            }
+            break;
+
+        case UsdNotice::ObjectsChanged::PrimResyncType::RenameSource:
+        case UsdNotice::ObjectsChanged::PrimResyncType::ReparentSource:
+        case UsdNotice::ObjectsChanged::PrimResyncType::RenameAndReparentSource:
+            if (d.path == entryPath || d.path.HasPrefix(entryPath)) {
+                if (!entry.associatedPath.IsEmpty()) {
+                    updateSelection({ entry.associatedPath });
+                    return;
+                }
+                updateSelection({});
+                return;
+            }
+            break;
+
+        case UsdNotice::ObjectsChanged::PrimResyncType::Delete:
+            if (d.path == entryPath || d.path.HasPrefix(entryPath)) {
+                updateSelection({});
+                return;
+            }
+            break;
+
+        case UsdNotice::ObjectsChanged::PrimResyncType::UnchangedPrimStack:
+        case UsdNotice::ObjectsChanged::PrimResyncType::Other:
+        case UsdNotice::ObjectsChanged::PrimResyncType::Invalid:
+        default:
+            if (d.path == entryPath || d.path.HasPrefix(entryPath)) {
+                updateSelection({ d.path });
+                return;
+            }
+            break;
         }
     }
 }
@@ -113,16 +184,22 @@ PropertyTreePrivate::updateSelection(const QList<SdfPath>& paths)
 {
     SignalGuard::Scope guard(this);
     d.tree->clear();
-    if (paths.size()) {
+
+    if (!paths.isEmpty()) {
         if (paths.size() > 1) {
             PropertyItem* multiItem = new PropertyItem(d.tree.data());
             multiItem->setText(PropertyItem::Name, "[Multiple selection]");
             d.tree->addTopLevelItem(multiItem);
             multiItem->setExpanded(true);
+            d.path = SdfPath();
             return;
         }
-        SdfPath path = paths.first();
-        UsdPrim prim = d.stage->GetPrimAtPath(path);
+
+        const SdfPath path = paths.first();
+        if (!d.stage)
+            return;
+
+        const UsdPrim prim = d.stage->GetPrimAtPath(path);
         if (!prim)
             return;
 
@@ -136,21 +213,22 @@ PropertyTreePrivate::updateSelection(const QList<SdfPath>& paths)
             item->setText(PropertyItem::Name, name);
             item->setText(PropertyItem::Value, value);
         };
+
         for (const UsdAttribute& attr : prim.GetAttributes()) {
-            std::string name = attr.GetName().GetString();
+            const std::string name = attr.GetName().GetString();
             VtValue value;
-            if (attr.Get(&value)) {
+            if (attr.Get(&value))
                 addChild(StringToQString(name), StringToQString(value.GetTypeName()));
-            }
         }
+
         d.tree->expandAll();
         d.path = path;
+        return;
     }
-    else {
-        if (d.stage) {
-            updateStage(d.stage);
-        }
-    }
+
+    d.path = SdfPath();
+    if (d.stage)
+        updateStage(d.stage);
 }
 
 std::string
@@ -192,9 +270,8 @@ PropertyTree::context() const
 void
 PropertyTree::setContext(ViewContext* context)
 {
-    if (p->d.context != context) {
+    if (p->d.context != context)
         p->d.context = context;
-    }
 }
 
 void
@@ -210,9 +287,9 @@ PropertyTree::updateStage(UsdStageRefPtr stage)
 }
 
 void
-PropertyTree::updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated)
+PropertyTree::updatePrims(const NoticeBatch& batch)
 {
-    p->updatePrims(paths, invalidated);
+    p->updatePrims(batch);
 }
 
 void
@@ -220,4 +297,5 @@ PropertyTree::updateSelection(const QList<SdfPath>& paths)
 {
     p->updateSelection(paths);
 }
+
 }  // namespace usdviewer

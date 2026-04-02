@@ -42,7 +42,8 @@ namespace payload {
         Session::Notify::Status status = Session::Notify::Status::Info;
     };
 
-    inline void flushResults(Session* session, const QList<payload::Result>& results, int completed)
+    inline void
+    flushResults(Session* session, const QList<payload::Result>& results, int completed)
     {
         if (!session || results.isEmpty())
             return;
@@ -54,8 +55,9 @@ namespace payload {
         }
     }
 
-    inline bool applyLoad(UsdStageRefPtr stage, const SdfPath& path, bool useVariant, const std::string& variantSetName,
-                          const std::string& variantSelection, UndoItem& undoItem, QString& error)
+    inline bool
+    applyLoad(UsdStageRefPtr stage, const SdfPath& path, bool useVariant, const std::string& variantSetName,
+              const std::string& variantSelection, UndoItem& undoItem, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -101,7 +103,8 @@ namespace payload {
         return true;
     }
 
-    inline bool applyUnload(UsdStageRefPtr stage, const SdfPath& path, UndoItem& undoItem, QString& error)
+    inline bool
+    applyUnload(UsdStageRefPtr stage, const SdfPath& path, UndoItem& undoItem, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -123,7 +126,8 @@ namespace payload {
         return true;
     }
 
-    inline bool restoreState(UsdStageRefPtr stage, const UndoItem& item, QString& error)
+    inline bool
+    restoreState(UsdStageRefPtr stage, const UndoItem& item, QString& error)
     {
         if (!stage) {
             error = "stage missing";
@@ -207,8 +211,8 @@ loadPayloads(const QList<SdfPath>& paths, const QString& variantSet, const QStri
                     try {
                         WRITE_LOCKER(locker, session->stageLock(), "stageLock");
                         const UsdStageRefPtr stage = session->stageUnsafe();
-                        result.success = payload::applyLoad(stage, path, useVariant, variantSetName, variantSelection,
-                                                            undoItem, error);
+                        result.success
+                            = payload::applyLoad(stage, path, useVariant, variantSetName, variantSelection, undoItem, error);
                     } catch (...) {
                         result.success = false;
                         error = "exception";
@@ -756,7 +760,8 @@ namespace snapshot {
 
     using PrimSnapshot = QVector<PrimState>;
 
-    inline void ensureParentSpecs(const SdfLayerHandle& layer, const SdfPath& path)
+    inline void
+    ensureParentSpecs(const SdfLayerHandle& layer, const SdfPath& path)
     {
         if (!layer)
             return;
@@ -771,7 +776,8 @@ namespace snapshot {
         }
     }
 
-    inline bool capturePrimToLayer(UsdStageRefPtr stage, const SdfPath& stagePath, PrimState& out)
+    inline bool
+    capturePrimToLayer(UsdStageRefPtr stage, const SdfPath& stagePath, PrimState& out)
     {
         if (!stage)
             return false;
@@ -813,7 +819,8 @@ namespace snapshot {
         return false;
     }
 
-    inline void restorePrimFromSnapshotLayer(const SdfLayerHandle& dstLayer, const PrimState& state)
+    inline void
+    restorePrimFromSnapshotLayer(const SdfLayerHandle& dstLayer, const PrimState& state)
     {
         if (!dstLayer || !state.snapshotLayer)
             return;
@@ -822,7 +829,8 @@ namespace snapshot {
         SdfCopySpec(state.snapshotLayer, state.specPath, dstLayer, state.stagePath);
     }
 
-    inline void sortByHierarchy(PrimSnapshot& snapshot)
+    inline void
+    sortByHierarchy(PrimSnapshot& snapshot)
     {
         std::sort(snapshot.begin(), snapshot.end(), [](const PrimState& a, const PrimState& b) {
             const size_t ac = a.stagePath.GetPathElementCount();
@@ -994,38 +1002,38 @@ renamePath(const SdfPath& path, const QString& newNameInput)
 
     auto buildNewPath = [](const UsdStageRefPtr& stage, const SdfPath& path, const QString& input, QString& error) {
         if (!stage || path.IsEmpty()) {
-            error = "Invalid stage or path";
+            error = "invalid stage or path";
             return SdfPath();
         }
 
         const QString trimmed = input.trimmed();
         if (trimmed.isEmpty()) {
-            error = "Empty name";
+            error = "empty name";
             return SdfPath();
         }
 
         if (UsdPrim defaultPrim = stage->GetDefaultPrim()) {
             if (path == defaultPrim.GetPath()) {
-                error = "Cannot rename default prim";
+                error = "cannot rename default prim";
                 return SdfPath();
             }
         }
 
         const SdfPath parentPath = path.GetParentPath();
-        if (parentPath.IsEmpty()) {
-            error = "Invalid parent";
+        if (parentPath.IsEmpty() || parentPath == SdfPath::AbsoluteRootPath()) {
+            error = "invalid parent";
             return SdfPath();
         }
 
         const QString safeName = name::makeSafeName(stage, parentPath, trimmed, path);
         if (safeName.isEmpty()) {
-            error = "Invalid name";
+            error = "invalid name";
             return SdfPath();
         }
 
         const std::string nameValue = qt::QStringToString(safeName);
         if (!SdfPath::IsValidIdentifier(nameValue)) {
-            error = "Invalid identifier";
+            error = "invalid identifier";
             return SdfPath();
         }
 
@@ -1045,45 +1053,47 @@ renamePath(const SdfPath& path, const QString& newNameInput)
 
     auto applyRename = [](UsdStageRefPtr stage, const SdfPath& from, const SdfPath& to, QString& error) -> bool {
         if (!stage) {
-            error = "Invalid stage";
+            error = "invalid stage";
             return false;
         }
 
-        UsdPrim prim = stage->GetPrimAtPath(from);
+        const UsdPrim prim = stage->GetPrimAtPath(from);
         if (!prim) {
-            error = "Invalid prim";
+            error = "invalid prim";
             return false;
         }
 
-        const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
-        if (!editLayer) {
-            error = "No edit layer";
-            return false;
-        }
-
-        if (!editLayer->GetPrimAtPath(from)) {
-            error = "Path not in edit layer";
+        const SdfPath parentPath = from.GetParentPath();
+        if (parentPath.IsEmpty() || parentPath != to.GetParentPath()) {
+            error = "invalid rename target";
             return false;
         }
 
         if (stage->GetPrimAtPath(to)) {
-            error = "Target exists";
+            error = "target exists";
             return false;
         }
 
-        SdfBatchNamespaceEdit edits;
-        edits.Add(SdfNamespaceEdit(from, to));
-
-        if (!editLayer->CanApply(edits)) {
-            error = "CanApply failed";
+        UsdNamespaceEditor editor(stage);
+        if (!editor.RenamePrim(prim, to.GetNameToken())) {
+            error = "RenamePrim failed";
             return false;
         }
 
-        return editLayer->Apply(edits);
+        std::string whyNot;
+        if (!editor.CanApplyEdits(&whyNot)) {
+            error = qt::StringToQString(whyNot);
+            return false;
+        }
+
+        return editor.ApplyEdits();
     };
 
     return Command(
         [path, newNameInput, buildNewPath, remapChildOrder, applyRename, state](Session* session) {
+            if (!session || path.IsEmpty())
+                return;
+
             state->previousSelection = session->selectionList()->paths();
             state->previousMask = session->mask();
 
@@ -1108,7 +1118,6 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         newPath = buildNewPath(stage, path, newNameInput, error);
 
                         if (newPath.IsEmpty()) {
-                            // failure, keep error
                         }
                         else if (newPath == path) {
                             noop = true;
@@ -1182,6 +1191,9 @@ renamePath(const SdfPath& path, const QString& newNameInput)
             });
         },
         [applyRename, state](Session* session) {
+            if (!session || state->oldPath.IsEmpty() || state->newPath.IsEmpty())
+                return;
+
             session->beginProgressBlock("undo rename path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -1196,9 +1208,6 @@ renamePath(const SdfPath& path, const QString& newNameInput)
 
                     if (!stage) {
                         hadStage = false;
-                    }
-                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty()) {
-                        error = "invalid state";
                     }
                     else {
                         const UsdStageLoadRules rules = stage->GetLoadRules();
@@ -1233,8 +1242,11 @@ renamePath(const SdfPath& path, const QString& newNameInput)
                         }
 
                         if (!restored) {
-                            session->updateProgressNotify(Session::Notify("undo rename path failed", {}, Status::Error),
-                                                          1);
+                            session->updateProgressNotify(
+                                Session::Notify(error.isEmpty() ? "undo rename path failed"
+                                                                : QString("undo rename path failed: %1").arg(error),
+                                                {}, Status::Error),
+                                1);
                             session->endProgressBlock();
                             return;
                         }
@@ -1282,6 +1294,9 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
 
     return Command(
         [parentPath, nameInput, buildNewPath, state](Session* session) {
+            if (!session || parentPath.IsEmpty())
+                return;
+
             state->previousMask = session->mask();
 
             session->beginProgressBlock("new xform", 1);
@@ -1363,7 +1378,11 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
                         }
 
                         if (!created) {
-                            session->updateProgressNotify(Session::Notify("new xform failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(
+                                Session::Notify(error.isEmpty() ? "new xform failed"
+                                                                : QString("new xform failed: %1").arg(error),
+                                                {}, Status::Error),
+                                1);
                             session->endProgressBlock();
                             return;
                         }
@@ -1378,6 +1397,9 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
             });
         },
         [state](Session* session) {
+            if (!session || state->createdPath.IsEmpty())
+                return;
+
             session->beginProgressBlock("undo new xform", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -1391,8 +1413,6 @@ newXformPath(const SdfPath& parentPath, const QString& nameInput)
 
                     if (!stage) {
                         hadStage = false;
-                    }
-                    else if (state->createdPath.IsEmpty()) {
                     }
                     else {
                         const SdfLayerHandle editLayer = stage->GetEditTarget().GetLayer();
@@ -1492,35 +1512,35 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
 
     auto applyMove = [](UsdStageRefPtr stage, const SdfPath& from, const SdfPath& toParent, QString& error) -> bool {
         if (!stage) {
-            error = "Invalid stage";
+            error = "invalid stage";
             return false;
         }
 
         const UsdPrim prim = stage->GetPrimAtPath(from);
         if (!prim) {
-            error = "Invalid prim";
+            error = "invalid prim";
             return false;
         }
 
         const UsdPrim newParent = stage->GetPrimAtPath(toParent);
         if (!newParent) {
-            error = "Invalid parent";
+            error = "invalid parent";
             return false;
         }
 
         if (from.IsEmpty() || toParent.IsEmpty()) {
-            error = "Invalid path";
+            error = "invalid path";
             return false;
         }
 
         if (from == toParent || toParent.HasPrefix(from)) {
-            error = "Invalid hierarchy";
+            error = "invalid hierarchy";
             return false;
         }
 
         const SdfPath newPath = toParent.AppendChild(from.GetNameToken());
         if (stage->GetPrimAtPath(newPath)) {
-            error = "Target exists";
+            error = "target exists";
             return false;
         }
 
@@ -1541,6 +1561,9 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
 
     return Command(
         [fromPath, newParentPath, insertIndex, removeToken, insertTokenAt, applyMove, state](Session* session) {
+            if (!session || fromPath.IsEmpty() || newParentPath.IsEmpty())
+                return;
+
             state->previousSelection = session->selectionList()->paths();
             state->previousMask = session->mask();
 
@@ -1564,8 +1587,7 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                         const SdfPath oldParentPath = fromPath.GetParentPath();
                         const SdfPath targetPath = newParentPath.AppendChild(fromPath.GetNameToken());
 
-                        if (fromPath.IsEmpty() || newParentPath.IsEmpty() || oldParentPath.IsEmpty()
-                            || oldParentPath == SdfPath::AbsoluteRootPath()) {
+                        if (oldParentPath.IsEmpty() || oldParentPath == SdfPath::AbsoluteRootPath()) {
                             noop = true;
                         }
                         else if (fromPath == targetPath) {
@@ -1612,8 +1634,8 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                                     stage::restoreChildOrder(stage, oldParentPath,
                                                              removeToken(state->oldParentOrder, movedName));
 
-                                state->newParentNewOrder = insertTokenAt(state->newParentOldOrder, movedName,
-                                                                         insertIndex);
+                                state->newParentNewOrder
+                                    = insertTokenAt(state->newParentOldOrder, movedName, insertIndex);
 
                                 if (!state->newParentNewOrder.empty())
                                     stage::restoreChildOrder(stage, newParentPath, state->newParentNewOrder);
@@ -1644,7 +1666,11 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                         }
 
                         if (!moved) {
-                            session->updateProgressNotify(Session::Notify("move path failed", {}, Status::Error), 1);
+                            session->updateProgressNotify(
+                                Session::Notify(error.isEmpty() ? "move path failed"
+                                                                : QString("move path failed: %1").arg(error),
+                                                {}, Status::Error),
+                                1);
                             session->endProgressBlock();
                             return;
                         }
@@ -1661,6 +1687,9 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
             });
         },
         [applyMove, state](Session* session) {
+            if (!session || state->oldPath.IsEmpty() || state->newPath.IsEmpty())
+                return;
+
             session->beginProgressBlock("undo move path", 1);
             session->setPrimsUpdate(Session::PrimsUpdate::Deferred);
 
@@ -1675,10 +1704,6 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
 
                     if (!stage) {
                         hadStage = false;
-                    }
-                    else if (state->oldPath.IsEmpty() || state->newPath.IsEmpty() || state->oldParentPath.IsEmpty()
-                             || state->newParentPath.IsEmpty()) {
-                        error = "invalid state";
                     }
                     else if (state->oldPath == state->newPath) {
                         if (!state->oldParentOrder.empty()) {
@@ -1716,8 +1741,11 @@ movePath(const SdfPath& fromPath, const SdfPath& newParentPath, int insertIndex)
                         }
 
                         if (!restored) {
-                            session->updateProgressNotify(Session::Notify("undo move path failed", {}, Status::Error),
-                                                          1);
+                            session->updateProgressNotify(
+                                Session::Notify(error.isEmpty() ? "undo move path failed"
+                                                                : QString("undo move path failed: %1").arg(error),
+                                                {}, Status::Error),
+                                1);
                             session->endProgressBlock();
                             return;
                         }

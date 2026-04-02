@@ -110,13 +110,6 @@ PrimItem::PrimItem(QTreeWidgetItem* parent, const UsdStageRefPtr& stage, const S
 
 PrimItem::~PrimItem() = default;
 
-void
-PrimItem::invalidate()
-{
-    p->d.dirty = true;
-    p->d.editName.clear();
-}
-
 QVariant
 PrimItem::data(int column, int role) const
 {
@@ -196,6 +189,30 @@ PrimItem::setData(int column, int role, const QVariant& value)
     }
 
     TreeItem::setData(column, role, value);
+}
+
+SdfPath
+PrimItem::path() const
+{
+    return p->d.path;
+}
+
+void
+PrimItem::setPath(const SdfPath& path)
+{
+    if (p->d.path == path)
+        return;
+
+    p->d.path = path;
+    p->d.dirty = true;
+    p->d.editName.clear();
+}
+
+void
+PrimItem::invalidate()
+{
+    p->d.dirty = true;
+    p->d.editName.clear();
 }
 
 TreeItem::ItemStates

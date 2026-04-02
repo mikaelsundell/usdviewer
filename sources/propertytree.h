@@ -5,6 +5,7 @@
 #pragma once
 
 #include "treewidget.h"
+#include "notice.h"
 #include <QTreeWidget>
 #include <pxr/usd/usd/stage.h>
 
@@ -79,12 +80,14 @@ public:
     void updateStage(UsdStageRefPtr stage);
 
     /**
-     * @brief Updates properties for the specified prim paths.
-     *
-     * @param paths Prim paths to refresh.
-     * @param invalidated Invalidated prim paths.
-     */
-    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    * @brief Updates prims using a USD notice batch.
+    *
+    * Entries follow UsdNotice::ObjectsChanged semantics:
+    * info-only changes, asset resyncs, and structural resyncs.
+    *
+    * @param batch Batched USD change entries.
+    */
+    void updatePrims(const NoticeBatch& batch);
 
     /**
      * @brief Updates the tree to reflect the current selection.

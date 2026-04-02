@@ -5,7 +5,7 @@
 #pragma once
 
 #include "selectionlist.h"
-#include "session.h"
+#include "notice.h"
 #include "viewcamera.h"
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
@@ -257,12 +257,14 @@ public:
     void updateMask(const QList<SdfPath>& paths);
 
     /**
-     * @brief Updates specific prims in the renderer.
-     *
-     * @param paths Prim paths to refresh.
-     * @param invalidated  Prim paths requiring structural refresh.
-     */
-    void updatePrims(const QList<SdfPath>& paths, const QList<SdfPath>& invalidated);
+    * @brief Updates prims using a USD notice batch.
+    *
+    * Entries follow UsdNotice::ObjectsChanged semantics:
+    * info-only changes, asset resyncs, and structural resyncs.
+    *
+    * @param batch Batched USD change entries.
+    */
+    void updatePrims(const NoticeBatch& batch);
 
     /**
      * @brief Updates the current selection.

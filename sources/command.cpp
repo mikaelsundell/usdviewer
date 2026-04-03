@@ -13,6 +13,7 @@
 #include <pxr/usd/sdf/copyUtils.h>
 #include <pxr/usd/usd/namespaceEditor.h>
 #include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/variantSets.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/tokens.h>
@@ -468,6 +469,173 @@ unloadPayloads(const QList<SdfPath>& paths)
 }
 
 Command
+selectInvertPayload()
+{
+    struct SelectInvertPayloadState {
+        QList<SdfPath> previousSelection;
+    };
+
+    auto state = std::make_shared<SelectInvertPayloadState>();
+
+    auto collectStagePayloadPaths = [](const UsdStageRefPtr& stage) {
+        QList<SdfPath> payloads;
+        if (!stage)
+            return payloads;
+
+        for (const UsdPrim& prim : stage->TraverseAll()) {
+            if (!prim || !prim.IsValid())
+                continue;
+
+            const SdfPath path = prim.GetPath();
+            if (path.IsEmpty() || path == SdfPath::AbsoluteRootPath())
+                continue;
+
+            if (stage::isPayload(stage, path)) {
+                qDebug() << "selectInvertPayload: stage payload found:" << qt::StringToQString(path.GetString());
+                payloads.append(path);
+            }
+        }
+
+        const QList<SdfPath> topLevel = path::topLevelPaths(payloads);
+        qDebug() << "selectInvertPayload: collected stage payload count =" << payloads.size()
+                 << "top-level count =" << topLevel.size();
+
+        for (const SdfPath& payloadPath : topLevel)
+            qDebug() << "selectInvertPayload: top-level stage payload:" << qt::StringToQString(payloadPath.GetString());
+
+        return topLevel;
+    };
+
+    return Command(
+        [state, collectStagePayloadPaths](Session* session) {
+            if (!session)
+                return;
+
+            qDebug() << "selectInvertPayload: execute";
+            session->beginProgressBlock("invert payload selection", 1);
+
+            QThreadPool::globalInstance()->start([session, state, collectStagePayloadPaths]() {
+                bool hadStage = true;
+                QList<SdfPath> previousSelection;
+                QList<SdfPath> selectedPayloads;
+                QList<SdfPath> stagePayloads;
+                QList<SdfPath> invertedPayloads;
+
+                {
+                    READ_LOCKER(locker, session->stageLock(), "stageLock");
+                    const UsdStageRefPtr stage = session->stageUnsafe();
+
+                    if (!stage) {
+                        hadStage = false;
+                        qDebug() << "selectInvertPayload: no stage";
+                    }
+                    else {
+                        previousSelection = session->selectionList()->paths();
+
+                        qDebug() << "selectInvertPayload: previous selection count =" << previousSelection.size();
+                        for (const SdfPath& selectedPath : previousSelection)
+                            qDebug() << "selectInvertPayload: selected path:"
+                                     << qt::StringToQString(selectedPath.GetString());
+
+                        selectedPayloads = stage::selectionPayloadPaths(stage, previousSelection);
+
+                        qDebug() << "selectInvertPayload: resolved selected payload count =" << selectedPayloads.size();
+                        for (const SdfPath& payloadPath : selectedPayloads)
+                            qDebug() << "selectInvertPayload: resolved selected payload:"
+                                     << qt::StringToQString(payloadPath.GetString());
+
+                        stagePayloads = collectStagePayloadPaths(stage);
+
+                        qDebug() << "selectInvertPayload: all stage payload count =" << stagePayloads.size();
+                    }
+                }
+
+                state->previousSelection = previousSelection;
+
+                if (hadStage) {
+                    const QSet<SdfPath> selectedSet(selectedPayloads.begin(), selectedPayloads.end());
+                    for (const SdfPath& path : stagePayloads) {
+                        const bool selected = selectedSet.contains(path);
+                        qDebug() << "selectInvertPayload: test payload:" << qt::StringToQString(path.GetString())
+                                 << "selected =" << selected;
+
+                        if (!selected)
+                            invertedPayloads.append(path);
+                    }
+
+                    qDebug() << "selectInvertPayload: inverted payload count =" << invertedPayloads.size();
+                    for (const SdfPath& payloadPath : invertedPayloads)
+                        qDebug() << "selectInvertPayload: inverted payload:"
+                                 << qt::StringToQString(payloadPath.GetString());
+                }
+
+                QMetaObject::invokeMethod(
+                    session,
+                    [session, hadStage, selectedPayloads, invertedPayloads]() {
+                        using Status = Session::Notify::Status;
+
+                        qDebug() << "selectInvertPayload: apply on main thread"
+                                 << "hadStage =" << hadStage << "selectedPayloads =" << selectedPayloads.size()
+                                 << "invertedPayloads =" << invertedPayloads.size();
+
+                        if (!hadStage) {
+                            qDebug() << "selectInvertPayload: failed, stage missing";
+                            session->updateProgressNotify(Session::Notify("invert payload selection failed", {},
+                                                                          Status::Error),
+                                                          1);
+                            session->endProgressBlock();
+                            return;
+                        }
+
+                        if (selectedPayloads.isEmpty()) {
+                            qDebug() << "selectInvertPayload: skipped, no selected payloads resolved";
+                            session->updateProgressNotify(Session::Notify("invert payload selection skipped", {},
+                                                                          Status::Info),
+                                                          1);
+                            session->endProgressBlock();
+                            return;
+                        }
+
+                        qDebug() << "selectInvertPayload: updating selection";
+                        session->selectionList()->updatePaths(invertedPayloads);
+                        session->updateProgressNotify(Session::Notify("payload selection inverted", invertedPayloads,
+                                                                      Status::Info),
+                                                      1);
+                        session->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        },
+        [state](Session* session) {
+            if (!session)
+                return;
+
+            qDebug() << "selectInvertPayload: undo";
+            session->beginProgressBlock("undo invert payload selection", 1);
+
+            QThreadPool::globalInstance()->start([session, state]() {
+                qDebug() << "selectInvertPayload: undo previous selection count =" << state->previousSelection.size();
+                for (const SdfPath& selectedPath : state->previousSelection)
+                    qDebug() << "selectInvertPayload: undo restore path:"
+                             << qt::StringToQString(selectedPath.GetString());
+
+                QMetaObject::invokeMethod(
+                    session,
+                    [session, state]() {
+                        using Status = Session::Notify::Status;
+                        qDebug() << "selectInvertPayload: undo apply on main thread";
+                        session->selectionList()->updatePaths(state->previousSelection);
+                        session->updateProgressNotify(Session::Notify("invert payload selection undone",
+                                                                      state->previousSelection, Status::Info),
+                                                      1);
+                        session->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        });
+}
+
+Command
 isolatePaths(const QList<SdfPath>& paths)
 {
     auto state = std::make_shared<QList<SdfPath>>();
@@ -542,6 +710,237 @@ selectPaths(const QList<SdfPath>& paths)
                     [session, previous]() {
                         using Status = Session::Notify::Status;
                         session->updateProgressNotify(Session::Notify("select undone", *previous, Status::Info), 1);
+                        session->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        });
+}
+
+Command
+selectAll()
+{
+    struct SelectAllState {
+        QList<SdfPath> previousSelection;
+    };
+
+    auto state = std::make_shared<SelectAllState>();
+
+    auto isWithinMask = [](const QList<SdfPath>& mask, const SdfPath& path) {
+        if (mask.isEmpty())
+            return true;
+
+        for (const SdfPath& maskPath : mask) {
+            if (path == maskPath || path.HasPrefix(maskPath))
+                return true;
+        }
+        return false;
+    };
+
+    auto collectLeafPaths = [isWithinMask](const UsdStageRefPtr& stage, const QList<SdfPath>& mask) {
+        QList<SdfPath> paths;
+        if (!stage)
+            return paths;
+
+        for (const UsdPrim& prim : stage->Traverse()) {
+            if (!prim || !prim.IsValid())
+                continue;
+
+            const SdfPath path = prim.GetPath();
+            if (path.IsEmpty() || path == SdfPath::AbsoluteRootPath())
+                continue;
+
+            if (!isWithinMask(mask, path))
+                continue;
+
+            bool hasTraversableChild = false;
+            for (const UsdPrim& child : prim.GetChildren()) {
+                if (child && child.IsValid() && isWithinMask(mask, child.GetPath())) {
+                    hasTraversableChild = true;
+                    break;
+                }
+            }
+
+            if (!hasTraversableChild)
+                paths.append(path);
+        }
+
+        return paths;
+    };
+
+    return Command(
+        [state, collectLeafPaths](Session* session) {
+            if (!session)
+                return;
+
+            session->beginProgressBlock("select all", 1);
+
+            QThreadPool::globalInstance()->start([session, state, collectLeafPaths]() {
+                QList<SdfPath> selection;
+                QList<SdfPath> previousSelection;
+                QList<SdfPath> mask;
+
+                {
+                    READ_LOCKER(locker, session->stageLock(), "stageLock");
+                    const UsdStageRefPtr stage = session->stageUnsafe();
+
+                    previousSelection = session->selectionList()->paths();
+                    mask = session->mask();
+                    selection = collectLeafPaths(stage, mask);
+                }
+
+                state->previousSelection = previousSelection;
+
+                QMetaObject::invokeMethod(
+                    session,
+                    [session, selection]() {
+                        using Status = Session::Notify::Status;
+                        session->selectionList()->updatePaths(selection);
+                        session->updateProgressNotify(Session::Notify("all paths selected", selection, Status::Info),
+                                                      1);
+                        session->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        },
+        [state](Session* session) {
+            if (!session)
+                return;
+
+            session->beginProgressBlock("undo select all", 1);
+
+            QThreadPool::globalInstance()->start([session, state]() {
+                QMetaObject::invokeMethod(
+                    session,
+                    [session, state]() {
+                        using Status = Session::Notify::Status;
+                        session->selectionList()->updatePaths(state->previousSelection);
+                        session->updateProgressNotify(Session::Notify("select all undone", state->previousSelection,
+                                                                      Status::Info),
+                                                      1);
+                        session->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        });
+}
+
+Command
+selectInvert()
+{
+    struct SelectInvertState {
+        QList<SdfPath> previousSelection;
+    };
+
+    auto state = std::make_shared<SelectInvertState>();
+
+    auto isWithinMask = [](const QList<SdfPath>& mask, const SdfPath& path) {
+        if (mask.isEmpty())
+            return true;
+
+        for (const SdfPath& maskPath : mask) {
+            if (path == maskPath || path.HasPrefix(maskPath))
+                return true;
+        }
+        return false;
+    };
+
+    auto isCoveredBySelection = [](const QList<SdfPath>& selection, const SdfPath& path) {
+        for (const SdfPath& selectedPath : selection) {
+            if (path == selectedPath || path.HasPrefix(selectedPath))
+                return true;
+        }
+        return false;
+    };
+
+    auto collectLeafPaths = [isWithinMask](const UsdStageRefPtr& stage, const QList<SdfPath>& mask) {
+        QList<SdfPath> paths;
+        if (!stage)
+            return paths;
+
+        for (const UsdPrim& prim : stage->Traverse()) {
+            if (!prim || !prim.IsValid())
+                continue;
+
+            const SdfPath path = prim.GetPath();
+            if (path.IsEmpty() || path == SdfPath::AbsoluteRootPath())
+                continue;
+
+            if (!isWithinMask(mask, path))
+                continue;
+
+            bool hasTraversableChild = false;
+            for (const UsdPrim& child : prim.GetChildren()) {
+                if (child && child.IsValid()) {
+                    hasTraversableChild = true;
+                    break;
+                }
+            }
+
+            if (!hasTraversableChild)
+                paths.append(path);
+        }
+
+        return paths;
+    };
+
+    return Command(
+        [state, collectLeafPaths, isCoveredBySelection](Session* session) {
+            if (!session)
+                return;
+
+            session->beginProgressBlock("invert selection", 1);
+
+            QThreadPool::globalInstance()->start([session, state, collectLeafPaths, isCoveredBySelection]() {
+                QList<SdfPath> invertedSelection;
+                QList<SdfPath> previousSelection;
+                QList<SdfPath> domain;
+                QList<SdfPath> mask;
+
+                {
+                    READ_LOCKER(locker, session->stageLock(), "stageLock");
+                    const UsdStageRefPtr stage = session->stageUnsafe();
+
+                    previousSelection = session->selectionList()->paths();
+                    mask = session->mask();
+                    domain = collectLeafPaths(stage, mask);
+                }
+
+                state->previousSelection = previousSelection;
+
+                for (const SdfPath& path : domain) {
+                    if (!isCoveredBySelection(previousSelection, path))
+                        invertedSelection.append(path);
+                }
+
+                QMetaObject::invokeMethod(
+                    session,
+                    [session, invertedSelection]() {
+                        using Status = Session::Notify::Status;
+                        session->selectionList()->updatePaths(invertedSelection);
+                        session->updateProgressNotify(Session::Notify("selection inverted", invertedSelection,
+                                                                      Status::Info),
+                                                      1);
+                        session->endProgressBlock();
+                    },
+                    Qt::QueuedConnection);
+            });
+        },
+        [state](Session* session) {
+            if (!session)
+                return;
+
+            session->beginProgressBlock("undo invert selection", 1);
+
+            QThreadPool::globalInstance()->start([session, state]() {
+                QMetaObject::invokeMethod(
+                    session,
+                    [session, state]() {
+                        using Status = Session::Notify::Status;
+                        session->selectionList()->updatePaths(state->previousSelection);
+                        session->updateProgressNotify(Session::Notify("invert selection undone",
+                                                                      state->previousSelection, Status::Info),
+                                                      1);
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);

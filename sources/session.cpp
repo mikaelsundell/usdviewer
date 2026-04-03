@@ -26,18 +26,16 @@ class SessionPrivate : public QSharedData {
 public:
     SessionPrivate();
     ~SessionPrivate();
-
     void init();
     void initStage();
-
     void beginProgressBlock(const QString& name, size_t count);
     void updateProgressNotify(const Session::Notify& notify, size_t completed);
     void cancelProgressBlock();
     void endProgressBlock();
     bool isProgressBlockCancelled() const;
-
     bool newStage(Session::LoadPolicy policy);
     bool loadFromFile(const QString& filename, Session::LoadPolicy loadPolicy);
+    bool mergeFromFile(const QString& filename);
     bool saveToFile(const QString& filename);
     bool copyToFile(const QString& filename);
     bool flattenPathsToFile(const QList<SdfPath>& paths, const QString& filename);
@@ -46,14 +44,11 @@ public:
     bool close();
     bool reload();
     bool isLoaded() const;
-
     void setMask(const QList<SdfPath>& paths);
     void setPayloads(const QList<SdfPath>& paths, bool loaded);
-
     Session::StageUp stageUp();
     void setStageUp(Session::StageUp stageUp);
     GfBBox3d boundingBox();
-
     bool needsBoundingBoxUpdate(const NoticeBatch& batch) const;
     void updatePrims(const NoticeBatch& batch);
     void flushPrims();
@@ -364,6 +359,89 @@ SessionPrivate::loadFromFile(const QString& filename, Session::LoadPolicy policy
 
     setMask(mask);
     updateStage();
+    return true;
+}
+
+bool
+SessionPrivate::mergeFromFile(const QString& filename)
+{
+    const QString absFilename = QFileInfo(filename).absoluteFilePath();
+    if (absFilename.endsWith(".session", Qt::CaseInsensitive)) {
+        QFile file(absFilename);
+        if (!file.exists())
+            return false;
+        if (!file.open(QIODevice::ReadOnly))
+            return false;
+
+        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (!doc.isObject())
+            return false;
+
+        const QJsonObject root = doc.object();
+        const QJsonArray payloads = root.value("loadedPayloads").toArray();
+
+        WRITE_LOCKER(locker, &d.stageLock, "stageLock");
+        if (!d.stage)
+            return false;
+
+        StageBlocker blocker(d.stageWatcher.data());
+
+        for (const QJsonValue& value : payloads) {
+            const QString pathString = value.toString().trimmed();
+            if (pathString.isEmpty())
+                continue;
+
+            const SdfPath path(qt::QStringToString(pathString));
+            if (!path.IsAbsolutePath())
+                continue;
+
+            const UsdPrim prim = d.stage->GetPrimAtPath(path);
+            if (!prim || !prim.IsValid())
+                continue;
+
+            if (!stage::isPayload(d.stage, path))
+                continue;
+
+            if (!prim.IsLoaded())
+                prim.Load();
+        }
+
+        return true;
+    }
+
+    UsdStageRefPtr sourceStage;
+    try {
+        sourceStage = UsdStage::Open(QStringToString(absFilename), UsdStage::LoadAll);
+    } catch (const std::exception&) {
+        return false;
+    }
+
+    if (!sourceStage)
+        return false;
+
+    {
+        WRITE_LOCKER(locker, &d.stageLock, "stageLock");
+        if (!d.stage)
+            return false;
+
+        StageBlocker blocker(d.stageWatcher.data());
+        const SdfLayerHandle destRoot = d.stage->GetRootLayer();
+        const SdfLayerHandle srcRoot = sourceStage->GetRootLayer();
+
+        if (!destRoot || !srcRoot)
+            return false;
+
+        const std::string srcIdentifier = srcRoot->GetIdentifier();
+        const auto& sublayers = destRoot->GetSubLayerPaths();
+        if (std::find(sublayers.begin(), sublayers.end(), srcIdentifier) == sublayers.end()) {
+            destRoot->GetSubLayerPaths().push_back(srcIdentifier);
+        }
+    }
+    const QString sessionFilename = QFileInfo(absFilename + ".session").absoluteFilePath();
+    QFile sessionFile(sessionFilename);
+    if (sessionFile.exists()) {
+        mergeFromFile(sessionFilename);
+    }
     return true;
 }
 
@@ -868,6 +946,12 @@ Session::loadFromFile(const QString& filename, Session::LoadPolicy loadPolicy)
 }
 
 bool
+Session::mergeFromFile(const QString& filename)
+{
+    return p->mergeFromFile(filename);
+}
+
+bool
 Session::saveToFile(const QString& filename)
 {
     return p->saveToFile(filename);
@@ -943,9 +1027,9 @@ Session::setMask(const QList<SdfPath>& paths)
 }
 
 void
-Session::setStatus(const QString& status)
+Session::notifyStatus(Notify::Status status, const QString& message)
 {
-    Q_EMIT statusChanged(status);
+    Q_EMIT notifyStatusChanged(status, message);
 }
 
 GfBBox3d

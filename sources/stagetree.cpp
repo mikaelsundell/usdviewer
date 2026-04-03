@@ -17,6 +17,7 @@
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QDrag>
+#include <QFileInfo>
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QMenu>
@@ -26,6 +27,10 @@
 #include <QStyledItemDelegate>
 #include <QTimer>
 #include <functional>
+#include <pxr/usd/sdf/payload.h>
+#include <pxr/usd/sdf/primSpec.h>
+#include <pxr/usd/sdf/variantSetSpec.h>
+#include <pxr/usd/sdf/variantSpec.h>
 #include <pxr/usd/usd/prim.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -613,13 +618,100 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
         return stage::payloadPaths(d.stage, topLevelPaths);
     };
 
-    auto payloadPathsInSelection = [&]() {
-        QList<SdfPath> result;
+    auto payloadClipboardText = [&]() {
+        QStringList lines;
+
         READ_LOCKER(locker, d.context->stageLock(), "stageLock");
         if (!d.stage)
-            return result;
-        return stage::descendantsPayloadPaths(d.stage, topLevelPaths);
+            return QString();
+
+        for (const SdfPath& path : paths) {
+            if (!stage::isPayload(d.stage, path))
+                continue;
+
+            const UsdPrim prim = d.stage->GetPrimAtPath(path);
+            if (!prim || !prim.IsValid())
+                continue;
+
+            QStringList payloadFiles;
+            QMap<QString, QString> variantPayloadFiles;
+
+            const SdfPrimSpecHandleVector primStack = prim.GetPrimStack();
+            for (const SdfPrimSpecHandle& spec : primStack) {
+                if (!spec)
+                    continue;
+
+                auto appendPayloadFiles = [&](const SdfPayloadVector& items) {
+                    for (const SdfPayload& payload : items) {
+                        const QString assetPath = qt::StringToQString(payload.GetAssetPath());
+                        if (assetPath.isEmpty())
+                            continue;
+                        payloadFiles.append(QFileInfo(assetPath).fileName());
+                    }
+                };
+
+                appendPayloadFiles(spec->GetPayloadList().GetAppliedItems());
+
+                const auto variantSets = spec->GetVariantSets();
+                for (const auto& setIt : variantSets) {
+                    const std::string& setName = setIt.first;
+                    const SdfVariantSetSpecHandle& setSpec = setIt.second;
+                    if (!setSpec)
+                        continue;
+
+                    const auto variants = setSpec->GetVariants();
+                    for (const SdfVariantSpecHandle& variantSpec : variants) {
+                        if (!variantSpec)
+                            continue;
+
+                        const std::string variantName = variantSpec->GetName();
+
+                        const SdfPrimSpecHandle variantPrimSpec = variantSpec->GetPrimSpec();
+                        if (!variantPrimSpec)
+                            continue;
+
+                        const SdfPayloadVector variantItems = variantPrimSpec->GetPayloadList().GetAppliedItems();
+
+                        for (const SdfPayload& payload : variantItems) {
+                            const QString assetPath = qt::StringToQString(payload.GetAssetPath());
+                            if (assetPath.isEmpty())
+                                continue;
+
+                            const QString key = QString("%1=%2").arg(qt::StringToQString(setName),
+                                                                     qt::StringToQString(variantName));
+                            variantPayloadFiles[key] = QFileInfo(assetPath).fileName();
+                        }
+                    }
+                }
+            }
+
+            payloadFiles.removeDuplicates();
+
+            if (!variantPayloadFiles.isEmpty()) {
+                for (auto it = variantPayloadFiles.begin(); it != variantPayloadFiles.end(); ++it)
+                    lines.append(QString("%1:%2").arg(it.key(), it.value()));
+            }
+            else {
+                for (const QString& file : payloadFiles)
+                    lines.append(file);
+            }
+        }
+
+        return lines.join('\n');
     };
+
+    bool hasExactPayloadSelection = false;
+    {
+        READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+        if (d.stage) {
+            for (const SdfPath& path : paths) {
+                if (stage::isPayload(d.stage, path)) {
+                    hasExactPayloadSelection = true;
+                    break;
+                }
+            }
+        }
+    }
 
     const bool isolateChecked = maskContainsCurrentSelection(d.maskPaths, paths);
 
@@ -730,8 +822,12 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     QMenu* copyMenu = menu.addMenu("Copy");
     QAction* copyPath = copyMenu->addAction("Path");
     QAction* copyName = copyMenu->addAction("Name");
+    QAction* copyPayload = nullptr;
     QAction* copyPaths = nullptr;
     QAction* copyNames = nullptr;
+
+    if (hasExactPayloadSelection)
+        copyPayload = copyMenu->addAction("Payload");
 
     if (paths.size() > 1) {
         copyPaths = copyMenu->addAction("Paths");
@@ -754,6 +850,13 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
 
     if (chosen == copyName) {
         copyToClipboard(nameStrings.first());
+        return;
+    }
+
+    if (chosen == copyPayload) {
+        const QString text = payloadClipboardText();
+        if (!text.isEmpty())
+            copyToClipboard(text);
         return;
     }
 
@@ -792,7 +895,7 @@ StageTreePrivate::contextMenuEvent(QContextMenuEvent* event)
     }
 
     if (variantActions.contains(chosen)) {
-        const QList<SdfPath> payloadPaths = payloadPathsInSelection();
+        const QList<SdfPath> payloadPaths = payloadPathsAtSelection();
         if (!payloadPaths.isEmpty()) {
             const VariantSelection& sel = variantActions[chosen];
             d.context->run(new Command(loadPayloads(payloadPaths, sel.setName, sel.value)));

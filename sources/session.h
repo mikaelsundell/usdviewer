@@ -187,6 +187,23 @@ public:
     bool loadFromFile(const QString& filename, LoadPolicy policy = LoadPolicy::All);
 
     /**
+     * @brief Merges a USD file or session state file into the current stage.
+     *
+     * If @p filename refers to a USD file, the file is merged into the
+     * current stage and a companion ".session" file is also applied if present.
+     *
+     * If @p filename refers to a ".session" file, only the stored payload
+     * load state is applied to the current stage.
+     *
+     * Unlike loadFromFile(), this does not replace the current stage.
+     *
+     * @param filename USD file or ".session" state file to merge.
+     *
+     * @return True if the merge succeeded.
+     */
+    bool mergeFromFile(const QString& filename);
+
+    /**
      * @brief Saves the current stage to file.
      */
     bool saveToFile(const QString& filename);
@@ -316,7 +333,7 @@ public:
     /**
      * @brief Sets a textual status message.
      */
-    void setStatus(const QString& status);
+    void notifyStatus(Notify::Status status, const QString& message);
 
 Q_SIGNALS:
     /**
@@ -357,7 +374,7 @@ Q_SIGNALS:
     /**
      * @brief Emitted when the status message changes.
      */
-    void statusChanged(const QString& status);
+    void notifyStatusChanged(Notify::Status status, const QString& message);
 
 private:
     QExplicitlySharedDataPointer<SessionPrivate> p;

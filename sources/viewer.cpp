@@ -48,6 +48,7 @@ public:
     void initRecentFiles();
     void initSettings();
     bool loadFile(const QString& fileName);
+    bool mergeFile(const QString& fileName);
     DockWidget* outlinerDock();
     DockWidget* progressDock();
     OutlinerView* outlinerView();
@@ -60,6 +61,7 @@ public:
 public Q_SLOTS:
     void newFile();
     void open();
+    void merge();
     void save();
     void saveAs();
     void saveCopy();
@@ -75,15 +77,18 @@ public Q_SLOTS:
     void exportImage();
     void saveSettings();
     void exit();
+    void selectAll();
+    void selectInvert();
     void showSelected();
     void showRecursive();
     void hideSelected();
     void hideRecursive();
     void stageUpY();
     void stageUpZ();
-    void loadSelected();
-    void loadVariant(int variant);
-    void unloadSelected();
+    void payloadLoad();
+    void payloadUnload();
+    void payloadSelectInvert();
+    void payloadVariant(int variant);
     void deleteSelected();
     void isolate(bool checked);
     void frameAll();
@@ -111,12 +116,12 @@ public Q_SLOTS:
     void primsChanged(const NoticeBatch& batch);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
     void stageUpChanged(Session::StageUp stageUp);
-    void statusChanged(const QString& status);
+    void notifyStatusChanged(Session::Notify::Status status, const QString& message);
 
 public:
     void updateModified(bool modified);
     void updateRecentFiles(const QString& filename);
-    void updateStatus(const QString& message, bool error = false);
+    void updateStatus(Session::Notify::Status status, const QString& message);
     void updateWindowTitle();
     bool saveFile();
     bool saveChanges();
@@ -200,6 +205,7 @@ ViewerPrivate::init()
     }
     connect(d.ui->fileNew, &QAction::triggered, this, &ViewerPrivate::newFile);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
+    connect(d.ui->fileMerge, &QAction::triggered, this, &ViewerPrivate::merge);
     connect(d.ui->fileSave, &QAction::triggered, this, &ViewerPrivate::save);
     connect(d.ui->fileSaveAs, &QAction::triggered, this, &ViewerPrivate::saveAs);
     connect(d.ui->fileSaveCopy, &QAction::triggered, this, &ViewerPrivate::saveCopy);
@@ -214,6 +220,8 @@ ViewerPrivate::init()
     connect(d.ui->editRedo, &QAction::triggered, this, &ViewerPrivate::redo);
     connect(d.ui->editClear, &QAction::triggered, this, &ViewerPrivate::clear);
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
+    connect(d.ui->editSelectAll, &QAction::triggered, this, &ViewerPrivate::selectAll);
+    connect(d.ui->editSelectInvert, &QAction::triggered, this, &ViewerPrivate::selectInvert);
     connect(d.ui->editShowSelected, &QAction::triggered, this, &ViewerPrivate::showSelected);
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
@@ -226,18 +234,10 @@ ViewerPrivate::init()
             actions->addAction(d.ui->stageUpZ);
         }
     }
-    connect(d.ui->editLoadSelected, &QAction::triggered, this, &ViewerPrivate::loadSelected);
+    connect(d.ui->payloadLoad, &QAction::triggered, this, &ViewerPrivate::payloadLoad);
+    connect(d.ui->payloadUnload, &QAction::triggered, this, &ViewerPrivate::payloadUnload);
+    connect(d.ui->payloadInvertSelected, &QAction::triggered, this, &ViewerPrivate::payloadSelectInvert);
     connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
-    connect(d.ui->editLoadVariant1, &QAction::triggered, this, [=]() { loadVariant(0); });
-    connect(d.ui->editLoadVariant2, &QAction::triggered, this, [=]() { loadVariant(1); });
-    connect(d.ui->editLoadVariant3, &QAction::triggered, this, [=]() { loadVariant(2); });
-    connect(d.ui->editLoadVariant4, &QAction::triggered, this, [=]() { loadVariant(3); });
-    connect(d.ui->editLoadVariant5, &QAction::triggered, this, [=]() { loadVariant(4); });
-    connect(d.ui->editLoadVariant6, &QAction::triggered, this, [=]() { loadVariant(5); });
-    connect(d.ui->editLoadVariant7, &QAction::triggered, this, [=]() { loadVariant(7); });
-    connect(d.ui->editLoadVariant8, &QAction::triggered, this, [=]() { loadVariant(8); });
-    connect(d.ui->editLoadVariant9, &QAction::triggered, this, [=]() { loadVariant(9); });
-    connect(d.ui->editUnloadSelected, &QAction::triggered, this, &ViewerPrivate::unloadSelected);
     connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
     connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
@@ -286,7 +286,7 @@ ViewerPrivate::init()
     connect(session(), &Session::primsChanged, this, &ViewerPrivate::primsChanged);
     connect(session(), &Session::stageChanged, this, &ViewerPrivate::stageChanged);
     connect(session(), &Session::stageUpChanged, this, &ViewerPrivate::stageUpChanged);
-    connect(session(), &Session::statusChanged, this, &ViewerPrivate::statusChanged);
+    connect(session(), &Session::notifyStatusChanged, this, &ViewerPrivate::notifyStatusChanged);
     connect(session()->selectionList(), &SelectionList::selectionChanged, this, &ViewerPrivate::selectionChanged);
     // command stack
     connect(session()->commandStack(), &CommandStack::canUndoChanged, d.ui->editUndo, &QAction::setEnabled);
@@ -400,7 +400,7 @@ ViewerPrivate::loadFile(const QString& fileName)
 {
     QFileInfo fileInfo(fileName);
     if (!d.extensions.contains(fileInfo.suffix().toLower())) {
-        updateStatus(QString("Unsupported file format: %1").arg(fileInfo.suffix()), true);
+        updateStatus(Session::Notify::Status::Error, QString("Unsupported file format: %1").arg(fileInfo.suffix()));
         return false;
     }
 
@@ -408,7 +408,7 @@ ViewerPrivate::loadFile(const QString& fileName)
     timer.start();
 
     if (!session()->loadFromFile(fileName, d.loadPolicy)) {
-        updateStatus(QString("Failed to load file: %1").arg(fileName), true);
+        updateStatus(Session::Notify::Status::Error, QString("Failed to load file: %1").arg(fileName));
         return false;
     }
 
@@ -418,7 +418,36 @@ ViewerPrivate::loadFile(const QString& fileName)
     settings()->setValue("openDir", fileInfo.absolutePath());
     updateWindowTitle();
     updateRecentFiles(QFileInfo(fileName).absoluteFilePath());
-    updateStatus(QString("Loaded %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)), false);
+    updateStatus(Session::Notify::Status::Info,
+                 QString("Loaded %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
+    clearChanges();
+    return true;
+}
+
+bool
+ViewerPrivate::mergeFile(const QString& fileName)
+{
+    QFileInfo fileInfo(fileName);
+    const QString suffix = fileInfo.suffix().toLower();
+    if (suffix != "session" && !d.extensions.contains(suffix)) {
+        updateStatus(Session::Notify::Status::Error, QString("Unsupported file format: %1").arg(fileInfo.suffix()));
+        return false;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+
+    if (!session()->mergeFromFile(fileName)) {
+        updateStatus(Session::Notify::Status::Error, QString("Failed to merge file: %1").arg(fileName));
+        return false;
+    }
+
+    const qint64 elapsedMs = timer.elapsed();
+    const double elapsedSec = elapsedMs / 1000.0;
+
+    settings()->setValue("openDir", fileInfo.absolutePath());
+    updateStatus(Session::Notify::Status::Error,
+                 QString("Merge %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     clearChanges();
     return true;
 }
@@ -495,8 +524,9 @@ ViewerPrivate::enable(bool enable)
                                 d.ui->editShowRecursive,
                                 d.ui->editHideSelected,
                                 d.ui->editHideRecursive,
-                                d.ui->editLoadSelected,
-                                d.ui->editUnloadSelected,
+                                d.ui->payloadLoad,
+                                d.ui->payloadUnload,
+                                d.ui->payloadInvertSelected,
                                 d.ui->displayIsolate,
                                 d.ui->displayFrameAll,
                                 d.ui->displayFrameSelected,
@@ -524,7 +554,7 @@ ViewerPrivate::newFile()
 
     session()->commandStack()->clear();
     if (!session()->newStage(d.loadPolicy)) {
-        updateStatus("Failed to create new stage", true);
+        updateStatus(Session::Notify::Status::Error, "Failed to create new stage");
         return;
     }
 
@@ -553,6 +583,29 @@ ViewerPrivate::open()
 }
 
 void
+ViewerPrivate::merge()
+{
+    if (!saveChanges())
+        return;
+
+    QString openDir = settings()->value("openDir", QDir::homePath()).toString();
+
+    QStringList filters;
+    filters.reserve(d.extensions.size() + 1);
+    filters.append("*.session");
+    for (const QString& ext : d.extensions)
+        filters.append("*." + ext);
+
+    filters.removeDuplicates();
+
+    const QString filter = QString("USD and Session Files (%1)").arg(filters.join(' '));
+    const QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Merge USD File", openDir, filter);
+
+    if (!filename.isEmpty())
+        mergeFile(filename);
+}
+
+void
 ViewerPrivate::save()
 {
     saveFile();
@@ -575,6 +628,7 @@ ViewerPrivate::saveAs()
     }
 
     QStringList filters;
+    filters.reserve(d.extensions.size());
     for (const QString& ext : d.extensions)
         filters.append("*." + ext);
 
@@ -588,15 +642,22 @@ ViewerPrivate::saveAs()
     if (QFileInfo(filename).suffix().isEmpty())
         filename += ".usd";
 
+    QElapsedTimer timer;
+    timer.start();
+
     if (session()->saveToFile(filename)) {
+        const qint64 elapsedMs = timer.elapsed();
+        const double elapsedSec = elapsedMs / 1000.0;
+
         settings()->setValue("saveDir", QFileInfo(filename).absolutePath());
         updateWindowTitle();
         updateRecentFiles(QFileInfo(filename).absoluteFilePath());
         clearChanges();
-        updateStatus(QString("Saved %1").arg(filename), false);
+        updateStatus(Session::Notify::Status::Info,
+                     QString("Saved %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(QString("Failed to save file: %1").arg(filename), true);
+        updateStatus(Session::Notify::Status::Error, QString("Failed to save file: %1").arg(filename));
     }
 }
 
@@ -617,6 +678,7 @@ ViewerPrivate::saveCopy()
     }
 
     QStringList filters;
+    filters.reserve(d.extensions.size());
     for (const QString& ext : d.extensions)
         filters.append("*." + ext);
 
@@ -630,12 +692,19 @@ ViewerPrivate::saveCopy()
     if (QFileInfo(filename).suffix().isEmpty())
         filename += ".usd";
 
+    QElapsedTimer timer;
+    timer.start();
+
     if (session()->copyToFile(filename)) {
+        const qint64 elapsedMs = timer.elapsed();
+        const double elapsedSec = elapsedMs / 1000.0;
+
         settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
-        updateStatus(QString("Saved copy %1").arg(filename), false);
+        updateStatus(Session::Notify::Status::Info,
+                     QString("Saved copy %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(QString("Failed to save copy: %1").arg(filename), true);
+        updateStatus(Session::Notify::Status::Error, QString("Failed to save copy: %1").arg(filename));
     }
 }
 
@@ -647,14 +716,21 @@ ViewerPrivate::reload()
     if (!saveChanges())
         return;
 
+    QElapsedTimer timer;
+    timer.start();
+
     if (!session()->reload()) {
-        updateStatus("Failed to reload stage", true);
+        updateStatus(Session::Notify::Status::Error, "Failed to reload stage");
         return;
     }
 
+    const qint64 elapsedMs = timer.elapsed();
+    const double elapsedSec = elapsedMs / 1000.0;
+
     session()->commandStack()->clear();
     clearChanges();
-    updateStatus("Reloaded stage", false);
+    updateStatus(Session::Notify::Status::Info,
+                 QString("Reloaded stage in %1 seconds").arg(QString::number(elapsedSec, 'f', 2)));
 }
 
 void
@@ -696,6 +772,20 @@ ViewerPrivate::copyImage()
     QImage image = renderView()->captureImage();
     QClipboard* clipboard = QGuiApplication::clipboard();
     clipboard->setImage(image);
+}
+
+void
+ViewerPrivate::selectAll()
+{
+    session()->commandStack()->run(new Command(usdviewer::selectAll()));
+}
+
+void
+ViewerPrivate::selectInvert()
+{
+    if (session()->selectionList()->paths().size()) {
+        session()->commandStack()->run(new Command(usdviewer::selectInvert()));
+    }
 }
 
 void
@@ -747,11 +837,11 @@ ViewerPrivate::exportAll()
         const qint64 elapsedMs = timer.elapsed();
         const double elapsedSec = elapsedMs / 1000.0;
         settings()->setValue("exportAllDir", QFileInfo(fileName).absolutePath());
-        updateStatus(QString("Exported all to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)),
-                     false);
+        updateStatus(Session::Notify::Status::Info,
+                     QString("Exported all to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(QString("Failed to export all: %1").arg(fileName), true);
+        updateStatus(Session::Notify::Status::Error, QString("Failed to export all: %1").arg(fileName));
     }
 }
 
@@ -793,11 +883,11 @@ ViewerPrivate::exportSelected()
         const double elapsedSec = elapsedMs / 1000.0;
         settings()->setValue("exportSelectedDir", QFileInfo(fileName).absolutePath());
         updateStatus(
-            QString("Exported selected to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)),
-            false);
+            Session::Notify::Status::Info,
+            QString("Exported selected to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(QString("Failed to export selected: %1").arg(fileName), true);
+        updateStatus(Session::Notify::Status::Error, QString("Failed to export selected: %1").arg(fileName));
     }
 }
 
@@ -904,7 +994,7 @@ ViewerPrivate::stageUpZ()
 }
 
 void
-ViewerPrivate::loadSelected()
+ViewerPrivate::payloadLoad()
 {
     const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
     if (selectedPaths.isEmpty())
@@ -925,7 +1015,7 @@ ViewerPrivate::loadSelected()
 }
 
 void
-ViewerPrivate::loadVariant(int variant)
+ViewerPrivate::payloadVariant(int variant)
 {
     const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
     if (selectedPaths.isEmpty() || variant < 0)
@@ -962,7 +1052,7 @@ ViewerPrivate::loadVariant(int variant)
 }
 
 void
-ViewerPrivate::unloadSelected()
+ViewerPrivate::payloadUnload()
 {
     const QList<SdfPath> selectedPaths = session()->selectionList()->paths();
     if (selectedPaths.isEmpty())
@@ -980,6 +1070,14 @@ ViewerPrivate::unloadSelected()
 
     if (!payloadPaths.isEmpty())
         session()->commandStack()->run(new Command(unloadPayloads(payloadPaths)));
+}
+
+void
+ViewerPrivate::payloadSelectInvert()
+{
+    if (session()->selectionList()->paths().size()) {
+        session()->commandStack()->run(new Command(selectInvertPayload()));
+    }
 }
 
 void
@@ -1154,9 +1252,11 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
 {
     const bool hasSelection = !paths.isEmpty();
     d.ui->displayExpand->setEnabled(hasSelection);
+    d.ui->editSelectInvert->setEnabled(hasSelection);
+    d.ui->payloadInvertSelected->setEnabled(hasSelection);
 
     QList<QMenu*> staleMenus;
-    for (QObject* child : d.ui->editLoad->children()) {
+    for (QObject* child : d.ui->payloadLoad->children()) {
         QMenu* menu = qobject_cast<QMenu*>(child);
         if (menu && menu->property("variantMenu").toBool())
             staleMenus.append(menu);
@@ -1164,8 +1264,8 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
     for (QMenu* menu : staleMenus)
         delete menu;
 
-    d.ui->editLoadSelected->setEnabled(false);
-    d.ui->editUnloadSelected->setEnabled(false);
+    d.ui->payloadLoad->setEnabled(false);
+    d.ui->payloadUnload->setEnabled(false);
 
     if (!hasSelection)
         return;
@@ -1195,20 +1295,20 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
         }
     }
 
-    d.ui->editLoadSelected->setEnabled(canLoadSelected);
-    d.ui->editUnloadSelected->setEnabled(canUnloadSelected);
+    d.ui->payloadLoad->setEnabled(canLoadSelected);
+    d.ui->payloadUnload->setEnabled(canUnloadSelected);
 
     if (payloadPaths.isEmpty() || variantSets.isEmpty())
         return;
 
-    d.ui->editLoad->addSeparator();
+    d.ui->menuPayloads->addSeparator();
 
     int index = 0;
     for (auto it = variantSets.cbegin(); it != variantSets.cend(); ++it) {
         const QString& setName = it.key();
         const QList<QString>& values = it.value();
 
-        QMenu* setMenu = d.ui->editLoad->addMenu(setName);
+        QMenu* setMenu = d.ui->menuPayloads->addMenu(setName);
         setMenu->setProperty("variantMenu", true);
 
         for (const QString& value : values) {
@@ -1264,9 +1364,9 @@ ViewerPrivate::stageUpChanged(Session::StageUp stageUp)
 }
 
 void
-ViewerPrivate::statusChanged(const QString& status)
+ViewerPrivate::notifyStatusChanged(Session::Notify::Status status, const QString& message)
 {
-    updateStatus(status);
+    updateStatus(status, message);
 }
 
 void
@@ -1292,13 +1392,32 @@ ViewerPrivate::updateRecentFiles(const QString& filename)
 }
 
 void
-ViewerPrivate::updateStatus(const QString& message, bool error)
+ViewerPrivate::updateStatus(Session::Notify::Status status, const QString& message)
 {
     QStatusBar* bar = d.ui->statusbar;
-    QString text = error ? QString(" error: %1").arg(message) : QString(" %1").arg(message);
-    int timeoutMs = 6000;
+    if (!bar)
+        return;
+
+    const bool isError = (status == Session::Notify::Status::Error);
+    const QString text = isError ? QString(" Error: %1").arg(message) : QString(" %1").arg(message);
+    const int timeoutMs = isError ? 8000 : 4000;
+
+    if (isError) {
+        bar->setStyleSheet(QStringLiteral("QStatusBar {"
+                                          "  background-color: rgba(255, 120, 120, 0.20);"
+                                          "}"
+                                          "QStatusBar::item { border: none; }"));
+    }
+    else {
+        bar->setStyleSheet(QString());
+    }
+
     bar->showMessage(text, timeoutMs);
-    QTimer::singleShot(timeoutMs, bar, [bar]() { bar->showMessage(" Ready"); });
+
+    QTimer::singleShot(timeoutMs, bar, [bar]() {
+        bar->setStyleSheet(QString());
+        bar->showMessage(" Ready");
+    });
 }
 
 void
@@ -1325,14 +1444,21 @@ ViewerPrivate::saveFile()
         return !hasChanges();
     }
 
+    QElapsedTimer timer;
+    timer.start();
+
     if (session()->saveToFile(filename)) {
+        const qint64 elapsedMs = timer.elapsed();
+        const double elapsedSec = elapsedMs / 1000.0;
+
         updateWindowTitle();
         clearChanges();
-        updateStatus(QString("Saved %1").arg(filename), false);
+        updateStatus(Session::Notify::Status::Info,
+                     QString("Saved %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
         return true;
     }
 
-    updateStatus(QString("Failed to save file: %1").arg(filename), true);
+    updateStatus(Session::Notify::Status::Error, QString("Failed to save file: %1").arg(filename));
     return false;
 }
 

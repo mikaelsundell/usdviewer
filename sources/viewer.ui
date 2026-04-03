@@ -369,8 +369,8 @@
      <property name="title">
       <string>Render</string>
      </property>
-     <addaction name="renderShaded"/>
-     <addaction name="renderWireframe"/>
+     <addaction name="displayRenderShaded"/>
+     <addaction name="displayRenderWireframe"/>
     </widget>
     <addaction name="displayIsolate"/>
     <addaction name="separator"/>
@@ -464,10 +464,19 @@
      <property name="title">
       <string>Payload</string>
      </property>
-     <addaction name="payloadLoad"/>
-     <addaction name="payloadUnload"/>
+     <addaction name="editPayloadLoad"/>
+     <addaction name="editPayloadUnload"/>
      <addaction name="separator"/>
-     <addaction name="payloadInvertSelected"/>
+     <addaction name="editPayloadInvertSelected"/>
+    </widget>
+    <widget class="QMenu" name="menu_2">
+     <property name="title">
+      <string>Select visible</string>
+     </property>
+     <addaction name="editSelectVisibleCapture"/>
+     <addaction name="separator"/>
+     <addaction name="editSelectVisibleSelect"/>
+     <addaction name="editSelectVisibleClear"/>
     </widget>
     <addaction name="editUndo"/>
     <addaction name="editRedo"/>
@@ -478,6 +487,7 @@
     <addaction name="separator"/>
     <addaction name="editSelectAll"/>
     <addaction name="editSelectInvert"/>
+    <addaction name="menu_2"/>
     <addaction name="separator"/>
     <addaction name="editShow"/>
     <addaction name="editHide"/>
@@ -968,7 +978,7 @@
     <string>Scene lights</string>
    </property>
   </action>
-  <action name="renderShaded">
+  <action name="displayRenderShaded">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -982,7 +992,7 @@
     <string>S</string>
    </property>
   </action>
-  <action name="renderWireframe">
+  <action name="displayRenderWireframe">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -1106,7 +1116,7 @@
     <string>Ctrl+A</string>
    </property>
   </action>
-  <action name="payloadLoad">
+  <action name="editPayloadLoad">
    <property name="text">
     <string>Load</string>
    </property>
@@ -1114,7 +1124,7 @@
     <string>Alt+L</string>
    </property>
   </action>
-  <action name="payloadUnload">
+  <action name="editPayloadUnload">
    <property name="text">
     <string>Unload</string>
    </property>
@@ -1122,12 +1132,36 @@
     <string>Alt+U</string>
    </property>
   </action>
-  <action name="payloadInvertSelected">
+  <action name="editPayloadInvertSelected">
    <property name="text">
     <string>Invert selected</string>
    </property>
    <property name="shortcut">
     <string>Alt+I</string>
+   </property>
+  </action>
+  <action name="editSelectVisibleCapture">
+   <property name="text">
+    <string>Capture view</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+C</string>
+   </property>
+  </action>
+  <action name="editSelectVisibleSelect">
+   <property name="text">
+    <string>Select</string>
+   </property>
+   <property name="shortcut">
+    <string>Meta+Ctrl+S</string>
+   </property>
+  </action>
+  <action name="editSelectVisibleClear">
+   <property name="text">
+    <string>Clear</string>
+   </property>
+   <property name="shortcut">
+    <string>Meta+Alt+C</string>
    </property>
   </action>
  </widget>

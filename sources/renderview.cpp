@@ -28,6 +28,7 @@ public Q_SLOTS:
     void primsChanged(const NoticeBatch& batch);
     void selectionChanged(const QList<SdfPath>& paths);
     void stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status);
+    void captureReady(qint64 elapsed);
     void renderReady(qint64 elapsed);
 
 public:
@@ -49,6 +50,7 @@ RenderViewPrivate::init()
     d.context->setCommandStack(session()->commandStack());
     imageGLWidget()->setContext(d.context.data());
     // connect
+    connect(imageGLWidget(), &ImagingGLWidget::captureReady, this, &RenderViewPrivate::captureReady);
     connect(imageGLWidget(), &ImagingGLWidget::renderReady, this, &RenderViewPrivate::renderReady);
     connect(session(), &Session::boundingBoxChanged, this, &RenderViewPrivate::boundingBoxChanged);
     connect(session(), &Session::maskChanged, this, &RenderViewPrivate::maskChanged);
@@ -129,12 +131,24 @@ RenderViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy
 }
 
 void
+RenderViewPrivate::captureReady(qint64 elapsed)
+{
+    const qint64 thresholdMs = 500;
+    if (elapsed > thresholdMs) {
+        if (session()) {
+            const QString msg = QStringLiteral("Capture finished in %1 ms").arg(elapsed);
+            session()->notifyStatus(Session::Notify::Status::Info, msg);
+        }
+    }
+}
+
+void
 RenderViewPrivate::renderReady(qint64 elapsed)
 {
     const qint64 thresholdMs = 500;
     if (elapsed > thresholdMs) {
         if (session()) {
-            const QString msg = QStringLiteral("Render time %1 ms").arg(elapsed);
+            const QString msg = QStringLiteral("Render finished in %1 ms").arg(elapsed);
             session()->notifyStatus(Session::Notify::Status::Info, msg);
         }
     }
@@ -251,7 +265,7 @@ RenderView::sceneTreeEnabled() const
 }
 
 void
-RenderView::enableSceneTree(bool enabled)
+RenderView::setSceneTreeEnabled(bool enabled)
 {
     p->imageGLWidget()->enableSceneTree(enabled);
 }
@@ -263,7 +277,7 @@ RenderView::gpuPerformanceEnabled() const
 }
 
 void
-RenderView::enableGpuPerformance(bool enabled)
+RenderView::setGpuPerformanceEnabled(bool enabled)
 {
     p->imageGLWidget()->enableGpuPerformance(enabled);
 }
@@ -275,8 +289,27 @@ RenderView::cameraAxisEnabled() const
 }
 
 void
-RenderView::enableCameraAxis(bool enabled)
+RenderView::setCameraAxisEnabled(bool enabled)
 {
     p->imageGLWidget()->enableCameraAxis(enabled);
 }
+
+void
+RenderView::captureVisible()
+{
+    p->imageGLWidget()->captureVisible();
+}
+
+void
+RenderView::clearVisibleCapture()
+{
+    p->imageGLWidget()->clearVisibleCapture();
+}
+
+QList<SdfPath>
+RenderView::visibleCapturePaths() const
+{
+    return p->imageGLWidget()->visibleCapturePaths();
+}
+
 }  // namespace usdviewer

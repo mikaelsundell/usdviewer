@@ -67,6 +67,8 @@ public:
     void updateMask(const QList<SdfPath>& paths);
     void updatePrims(const NoticeBatch& batch);
     void updateSelection(const QList<SdfPath>& paths);
+    void captureVisible();
+    void clearVisibleCapture();
 
 public:
     QPoint deviceRatio(QPoint value) const;
@@ -81,6 +83,18 @@ public:
     bool isPathMaskedIn(const SdfPath& path) const;
     bool pickMaskedIntersection(const UsdImagingGLEngine::PickParams& pickParams, const GfFrustum& pickFrustum,
                                 UsdImagingGLEngine::IntersectionResultVector* results);
+
+    static QList<SdfPath> uniquePaths(const QList<SdfPath>& paths)
+    {
+        QList<SdfPath> unique;
+        unique.reserve(paths.size());
+        for (const SdfPath& path : paths) {
+            if (!path.IsEmpty() && !unique.contains(path))
+                unique.append(path);
+        }
+        return unique;
+    }
+
     struct Data {
         size_t count;
         qint64 frame;
@@ -111,6 +125,7 @@ public:
         GfBBox3d bbox;
         QList<SdfPath> mask;
         QList<SdfPath> selection;
+        QList<SdfPath> visibleCapture;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<ViewContext> context;
         QPointer<ImagingGLWidget> glwidget;
@@ -143,6 +158,7 @@ ImagingGLWidgetPrivate::init()
     d.gpuPerformanceEnabled = false;
     d.cameraAxisEnabled = true;
     d.drag = false;
+    d.sweep = false;
     d.drawMode = ImagingGLWidget::DrawMode::ShadedSmooth;
     d.context = nullptr;
 }
@@ -157,6 +173,7 @@ ImagingGLWidgetPrivate::initGL()
         Hgi* hgi = d.glEngine->GetHgi();
         if (hgi) {
             TfToken driver = hgi->GetAPIName();
+            Q_UNUSED(driver);
         }
         else {
             qWarning() << "could not initialize gl engine, no hydra driver found.";
@@ -196,6 +213,7 @@ ImagingGLWidgetPrivate::close()
 {
     d.mask.clear();
     d.selection.clear();
+    d.visibleCapture.clear();
     d.stage = nullptr;
     d.bbox = GfBBox3d();
     d.selectionBBox = GfBBox3d();
@@ -364,6 +382,8 @@ ImagingGLWidgetPrivate::paintGL()
 void
 ImagingGLWidgetPrivate::paintEvent(QPaintEvent* event)
 {
+    Q_UNUSED(event);
+
     QPainter painter(d.glwidget);
     painter.setRenderHint(QPainter::Antialiasing, true);
     if (d.sweep) {
@@ -676,14 +696,7 @@ ImagingGLWidgetPrivate::sweepEvent(const QRect& rect, QMouseEvent* event)
         }
     }
 
-    {
-        QList<SdfPath> unique;
-        for (const SdfPath& path : selectedPaths) {
-            if (!unique.contains(path))
-                unique.append(path);
-        }
-        selectedPaths = unique;
-    }
+    selectedPaths = uniquePaths(selectedPaths);
 
     bool update = false;
     if (!selectedPaths.isEmpty()) {
@@ -727,10 +740,73 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
 }
 
 void
+ImagingGLWidgetPrivate::captureVisible()
+{
+    QElapsedTimer timer;
+    timer.start();
+
+    d.glwidget->makeCurrent();
+    if (!d.stage || !d.glEngine || !d.context)
+        return;
+
+#ifdef WIN32
+    glDepthMask(GL_TRUE);
+#endif
+
+    GfCamera camera = d.viewCamera.camera();
+    GfFrustum frustum = camera.GetFrustum();
+
+    UsdImagingGLEngine::PickParams pickParams;
+    pickParams.resolveMode = TfToken("resolveUnique");
+
+    UsdImagingGLEngine::IntersectionResultVector results;
+    const bool hit = pickMaskedIntersection(pickParams, frustum, &results);
+
+    QList<SdfPath> captured;
+    if (hit) {
+        captured.reserve(results.size());
+        for (const auto& result : results) {
+            if (!result.hitPrimPath.IsEmpty())
+                captured.append(result.hitPrimPath);
+        }
+        captured = uniquePaths(captured);
+    }
+
+    bool changed = false;
+    for (const SdfPath& path : captured) {
+        if (!d.visibleCapture.contains(path)) {
+            d.visibleCapture.append(path);
+            changed = true;
+        }
+    }
+
+    if (changed && d.sceneTreeEnabled)
+        updateSceneTree();
+
+    if (changed)
+        d.glwidget->update();
+
+    Q_EMIT d.glwidget->captureReady(timer.elapsed());
+}
+
+void
+ImagingGLWidgetPrivate::clearVisibleCapture()
+{
+    if (d.visibleCapture.isEmpty())
+        return;
+
+    d.visibleCapture.clear();
+    if (d.sceneTreeEnabled)
+        updateSceneTree();
+    d.glwidget->update();
+}
+
+void
 ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
 {
     SignalGuard::Scope guard(this);
     d.stage = stage;
+    d.visibleCapture.clear();
     d.glEngine.reset();
     initGL();
     if (d.stage)
@@ -760,6 +836,8 @@ ImagingGLWidgetPrivate::updateMask(const QList<SdfPath>& paths)
 void
 ImagingGLWidgetPrivate::updatePrims(const NoticeBatch& batch)
 {
+    Q_UNUSED(batch);
+
     SignalGuard::Scope guard(this);
     if (d.sceneTreeEnabled) {
         updateSceneTree();
@@ -784,7 +862,7 @@ ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
 QPoint
 ImagingGLWidgetPrivate::deviceRatio(QPoint value) const
 {
-    return (QPoint(deviceRatio(value.x()), deviceRatio(value.y())));
+    return QPoint(deviceRatio(value.x()), deviceRatio(value.y()));
 }
 
 double
@@ -874,7 +952,6 @@ ImagingGLWidgetPrivate::drawAxis(QPainter& painter)
     font.setBold(true);
     painter.setFont(font);
 
-    QFontMetrics fm(font);
     for (const AxisLine& axis : axes) {
         QPointF end = toPoint(axis.dir);
         painter.setPen(QPen(axis.color, 2.0, Qt::SolidLine, Qt::RoundCap));
@@ -1014,6 +1091,10 @@ ImagingGLWidgetPrivate::updateSceneTree()
                         { "Normals", fmtPair(total.normals, selected.normals) },
                         { "Faces", fmtPair(total.faces, selected.faces) } };
 
+    if (!d.visibleCapture.isEmpty()) {
+        rows.append({ "Captures", fmt(d.visibleCapture.size()) });
+    }
+
     double dpr = d.glwidget->devicePixelRatioF();
 
     QFont font = app()->font();
@@ -1071,7 +1152,6 @@ void
 ImagingGLWidgetPrivate::updateGpuPerformance()
 {
     const VtDictionary stats = d.glEngine->GetRenderStats();
-    QLocale locale = QLocale::system();
     auto fmtMB = [&](unsigned long bytes) {
         return QString::number(double(bytes) / (1024.0 * 1024.0), 'f', 2) + " MB";
     };
@@ -1340,6 +1420,24 @@ ImagingGLWidget::setRendererAov(const QString& aov)
 }
 
 void
+ImagingGLWidget::captureVisible()
+{
+    p->captureVisible();
+}
+
+void
+ImagingGLWidget::clearVisibleCapture()
+{
+    p->clearVisibleCapture();
+}
+
+QList<SdfPath>
+ImagingGLWidget::visibleCapturePaths() const
+{
+    return p->d.visibleCapture;
+}
+
+void
 ImagingGLWidget::updateStage(UsdStageRefPtr stage)
 {
     p->updateStage(stage);
@@ -1418,4 +1516,5 @@ ImagingGLWidget::wheelEvent(QWheelEvent* event)
 {
     p->wheelEvent(event);
 }
+
 }  // namespace usdviewer

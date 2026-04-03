@@ -477,49 +477,25 @@ selectInvertPayload()
 
     auto state = std::make_shared<SelectInvertPayloadState>();
 
-    auto collectStagePayloadPaths = [](const UsdStageRefPtr& stage) {
-        QList<SdfPath> payloads;
-        if (!stage)
-            return payloads;
-
-        for (const UsdPrim& prim : stage->TraverseAll()) {
-            if (!prim || !prim.IsValid())
-                continue;
-
-            const SdfPath path = prim.GetPath();
-            if (path.IsEmpty() || path == SdfPath::AbsoluteRootPath())
-                continue;
-
-            if (stage::isPayload(stage, path)) {
-                qDebug() << "selectInvertPayload: stage payload found:" << qt::StringToQString(path.GetString());
-                payloads.append(path);
-            }
-        }
-
-        const QList<SdfPath> topLevel = path::topLevelPaths(payloads);
-        qDebug() << "selectInvertPayload: collected stage payload count =" << payloads.size()
-                 << "top-level count =" << topLevel.size();
-
-        for (const SdfPath& payloadPath : topLevel)
-            qDebug() << "selectInvertPayload: top-level stage payload:" << qt::StringToQString(payloadPath.GetString());
-
-        return topLevel;
-    };
-
     return Command(
-        [state, collectStagePayloadPaths](Session* session) {
+        [state](Session* session) {
             if (!session)
                 return;
 
-            qDebug() << "selectInvertPayload: execute";
             session->beginProgressBlock("invert payload selection", 1);
 
-            QThreadPool::globalInstance()->start([session, state, collectStagePayloadPaths]() {
-                bool hadStage = true;
+            QThreadPool::globalInstance()->start([session, state]() {
+                using Status = Session::Notify::Status;
+
                 QList<SdfPath> previousSelection;
-                QList<SdfPath> selectedPayloads;
-                QList<SdfPath> stagePayloads;
                 QList<SdfPath> invertedPayloads;
+                QList<payload::Result> pending;
+                pending.reserve(16);
+
+                bool hadStage = true;
+                bool hadSelectedPayloads = false;
+                int completed = 0;
+                int total = 0;
 
                 {
                     READ_LOCKER(locker, session->stageLock(), "stageLock");
@@ -527,59 +503,71 @@ selectInvertPayload()
 
                     if (!stage) {
                         hadStage = false;
-                        qDebug() << "selectInvertPayload: no stage";
                     }
                     else {
                         previousSelection = session->selectionList()->paths();
+                        const QList<SdfPath> selectedPayloads = stage::selectionPayloadPaths(stage, previousSelection);
 
-                        qDebug() << "selectInvertPayload: previous selection count =" << previousSelection.size();
-                        for (const SdfPath& selectedPath : previousSelection)
-                            qDebug() << "selectInvertPayload: selected path:"
-                                     << qt::StringToQString(selectedPath.GetString());
+                        state->previousSelection = previousSelection;
+                        hadSelectedPayloads = !selectedPayloads.isEmpty();
 
-                        selectedPayloads = stage::selectionPayloadPaths(stage, previousSelection);
+                        QSet<SdfPath> selectedSet(selectedPayloads.begin(), selectedPayloads.end());
 
-                        qDebug() << "selectInvertPayload: resolved selected payload count =" << selectedPayloads.size();
-                        for (const SdfPath& payloadPath : selectedPayloads)
-                            qDebug() << "selectInvertPayload: resolved selected payload:"
-                                     << qt::StringToQString(payloadPath.GetString());
+                        for (const UsdPrim& prim : stage->TraverseAll()) {
+                            if (!prim || !prim.IsValid())
+                                continue;
 
-                        stagePayloads = collectStagePayloadPaths(stage);
+                            const SdfPath path = prim.GetPath();
+                            if (path.IsEmpty() || path == SdfPath::AbsoluteRootPath())
+                                continue;
 
-                        qDebug() << "selectInvertPayload: all stage payload count =" << stagePayloads.size();
+                            if (!prim.HasPayload())
+                                continue;
+
+                            if (!prim.IsLoaded())
+                                continue;
+
+                            ++total;
+
+                            if (!selectedSet.contains(path))
+                                invertedPayloads.append(path);
+
+                            payload::Result result;
+                            result.path = path;
+                            result.success = true;
+                            result.message = selectedSet.contains(path) ? "payload skipped" : "payload inverted";
+                            result.status = Status::Info;
+                            pending.append(result);
+                            ++completed;
+
+                            if (pending.size() >= 16) {
+                                const QList<payload::Result> batch = pending;
+                                QMetaObject::invokeMethod(
+                                    session,
+                                    [session, batch, completed]() { payload::flushResults(session, batch, completed); },
+                                    Qt::QueuedConnection);
+                                pending.clear();
+                            }
+
+                            if (session->isProgressBlockCancelled())
+                                break;
+                        }
                     }
                 }
 
-                state->previousSelection = previousSelection;
-
-                if (hadStage) {
-                    const QSet<SdfPath> selectedSet(selectedPayloads.begin(), selectedPayloads.end());
-                    for (const SdfPath& path : stagePayloads) {
-                        const bool selected = selectedSet.contains(path);
-                        qDebug() << "selectInvertPayload: test payload:" << qt::StringToQString(path.GetString())
-                                 << "selected =" << selected;
-
-                        if (!selected)
-                            invertedPayloads.append(path);
-                    }
-
-                    qDebug() << "selectInvertPayload: inverted payload count =" << invertedPayloads.size();
-                    for (const SdfPath& payloadPath : invertedPayloads)
-                        qDebug() << "selectInvertPayload: inverted payload:"
-                                 << qt::StringToQString(payloadPath.GetString());
+                if (!pending.isEmpty()) {
+                    const QList<payload::Result> batch = pending;
+                    QMetaObject::invokeMethod(
+                        session, [session, batch, completed]() { payload::flushResults(session, batch, completed); },
+                        Qt::QueuedConnection);
                 }
 
                 QMetaObject::invokeMethod(
                     session,
-                    [session, hadStage, selectedPayloads, invertedPayloads]() {
+                    [session, hadStage, hadSelectedPayloads, invertedPayloads, total]() {
                         using Status = Session::Notify::Status;
 
-                        qDebug() << "selectInvertPayload: apply on main thread"
-                                 << "hadStage =" << hadStage << "selectedPayloads =" << selectedPayloads.size()
-                                 << "invertedPayloads =" << invertedPayloads.size();
-
                         if (!hadStage) {
-                            qDebug() << "selectInvertPayload: failed, stage missing";
                             session->updateProgressNotify(Session::Notify("invert payload selection failed", {},
                                                                           Status::Error),
                                                           1);
@@ -587,8 +575,7 @@ selectInvertPayload()
                             return;
                         }
 
-                        if (selectedPayloads.isEmpty()) {
-                            qDebug() << "selectInvertPayload: skipped, no selected payloads resolved";
+                        if (!hadSelectedPayloads) {
                             session->updateProgressNotify(Session::Notify("invert payload selection skipped", {},
                                                                           Status::Info),
                                                           1);
@@ -596,11 +583,13 @@ selectInvertPayload()
                             return;
                         }
 
-                        qDebug() << "selectInvertPayload: updating selection";
                         session->selectionList()->updatePaths(invertedPayloads);
-                        session->updateProgressNotify(Session::Notify("payload selection inverted", invertedPayloads,
-                                                                      Status::Info),
-                                                      1);
+
+                        session->updateProgressNotify(Session::Notify(total > 0 ? "payload selection inverted"
+                                                                                : "invert payload selection skipped",
+                                                                      invertedPayloads, Status::Info),
+                                                      qMax(1, total));
+
                         session->endProgressBlock();
                     },
                     Qt::QueuedConnection);
@@ -610,28 +599,19 @@ selectInvertPayload()
             if (!session)
                 return;
 
-            qDebug() << "selectInvertPayload: undo";
             session->beginProgressBlock("undo invert payload selection", 1);
 
-            QThreadPool::globalInstance()->start([session, state]() {
-                qDebug() << "selectInvertPayload: undo previous selection count =" << state->previousSelection.size();
-                for (const SdfPath& selectedPath : state->previousSelection)
-                    qDebug() << "selectInvertPayload: undo restore path:"
-                             << qt::StringToQString(selectedPath.GetString());
-
-                QMetaObject::invokeMethod(
-                    session,
-                    [session, state]() {
-                        using Status = Session::Notify::Status;
-                        qDebug() << "selectInvertPayload: undo apply on main thread";
-                        session->selectionList()->updatePaths(state->previousSelection);
-                        session->updateProgressNotify(Session::Notify("invert payload selection undone",
-                                                                      state->previousSelection, Status::Info),
-                                                      1);
-                        session->endProgressBlock();
-                    },
-                    Qt::QueuedConnection);
-            });
+            QMetaObject::invokeMethod(
+                session,
+                [session, state]() {
+                    using Status = Session::Notify::Status;
+                    session->selectionList()->updatePaths(state->previousSelection);
+                    session->updateProgressNotify(Session::Notify("invert payload selection undone",
+                                                                  state->previousSelection, Status::Info),
+                                                  1);
+                    session->endProgressBlock();
+                },
+                Qt::QueuedConnection);
         });
 }
 

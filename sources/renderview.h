@@ -154,7 +154,7 @@ public:
      *
      * @param enabled Scene tree statistics display state.
      */
-    void enableSceneTree(bool enabled);
+    void setSceneTreeEnabled(bool enabled);
 
     /**
      * @brief Returns whether rendering gpu performance hud are displayed.
@@ -166,7 +166,7 @@ public:
      *
      * @param enabled Gpu performance hud display state.
      */
-    void enableGpuPerformance(bool enabled);
+    void setGpuPerformanceEnabled(bool enabled);
 
     /**
      * @brief Returns whether rendering camera axis hud are displayed.
@@ -178,7 +178,7 @@ public:
      *
      * @param enabled Camera axis hud display state.
      */
-    void enableCameraAxis(bool enabled);
+    void setCameraAxisEnabled(bool enabled);
 
     /**
      * @brief Returns the current render mode.
@@ -191,6 +191,31 @@ public:
      * @param renderMode Rendering mode.
      */
     void setRenderMode(RenderMode renderMode);
+
+    ///@}
+
+    /** @name Visible Capture */
+    ///@{
+
+    /**
+     * @brief Captures visible prim paths from the current view.
+     *
+     * Runs a visibility query for the current camera and viewport and adds
+     * the resulting prim paths to the internal captured set.
+     */
+    void captureVisible();
+
+    /**
+     * @brief Clears the captured visible prim paths.
+     */
+    void clearVisibleCapture();
+
+    /**
+     * @brief Returns the currently captured visible prim paths.
+     *
+     * @return Accumulated visible prim paths captured from one or more views.
+     */
+    QList<SdfPath> visibleCapturePaths() const;
 
     ///@}
 

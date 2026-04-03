@@ -232,6 +232,32 @@ public:
 
     ///@}
 
+    /** @name Visible Capture */
+    ///@{
+
+    /**
+     * @brief Captures visible prim paths from the current view.
+     *
+     * Runs a visibility query for the current camera and viewport and adds
+     * the resulting prim paths to the internal captured set.
+     */
+    void captureVisible();
+
+    /**
+     * @brief Clears the captured visible prim paths.
+     */
+    void clearVisibleCapture();
+
+    /**
+     * @brief Returns the currently captured visible prim paths.
+     *
+     * @return Accumulated visible prim paths captured from one or more views.
+     */
+    QList<SdfPath> visibleCapturePaths() const;
+
+    ///@}
+
+
     /** @name Scene Updates */
     ///@{
 
@@ -283,6 +309,13 @@ Q_SIGNALS:
      * @param elapsed Rendering time in milliseconds.
      */
     void renderReady(qint64 elapsed);
+    
+    /**
+     * @brief Emitted when a capture has finished rendering.
+     *
+     * @param elapsed Capture time in milliseconds.
+     */
+    void captureReady(qint64 elapsed);
 
 protected:
     /** @name OpenGL Events */

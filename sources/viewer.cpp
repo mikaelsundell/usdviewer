@@ -83,6 +83,9 @@ public Q_SLOTS:
     void showRecursive();
     void hideSelected();
     void hideRecursive();
+    void selectVisibleCapture();
+    void selectVisibleSelect();
+    void selectVisibleClear();
     void stageUpY();
     void stageUpZ();
     void payloadLoad();
@@ -184,8 +187,8 @@ ViewerPrivate::init()
     d.ui->editUndo->setIcon(style()->icon(Style::IconRole::Undo));
     d.ui->editRedo->setIcon(style()->icon(Style::IconRole::Redo));
     d.ui->displayFrameAll->setIcon(style()->icon(Style::IconRole::FrameAll));
-    d.ui->renderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
-    d.ui->renderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
+    d.ui->displayRenderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
+    d.ui->displayRenderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
     // connect
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
         d.loadPolicy = Session::LoadPolicy::All;
@@ -222,6 +225,9 @@ ViewerPrivate::init()
     connect(d.ui->editCopyImage, &QAction::triggered, this, &ViewerPrivate::copyImage);
     connect(d.ui->editSelectAll, &QAction::triggered, this, &ViewerPrivate::selectAll);
     connect(d.ui->editSelectInvert, &QAction::triggered, this, &ViewerPrivate::selectInvert);
+    connect(d.ui->editSelectVisibleCapture, &QAction::triggered, this, &ViewerPrivate::selectVisibleCapture);
+    connect(d.ui->editSelectVisibleClear, &QAction::triggered, this, &ViewerPrivate::selectVisibleClear);
+    connect(d.ui->editSelectVisibleSelect, &QAction::triggered, this, &ViewerPrivate::selectVisibleSelect);
     connect(d.ui->editShowSelected, &QAction::triggered, this, &ViewerPrivate::showSelected);
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
@@ -234,22 +240,22 @@ ViewerPrivate::init()
             actions->addAction(d.ui->stageUpZ);
         }
     }
-    connect(d.ui->payloadLoad, &QAction::triggered, this, &ViewerPrivate::payloadLoad);
-    connect(d.ui->payloadUnload, &QAction::triggered, this, &ViewerPrivate::payloadUnload);
-    connect(d.ui->payloadInvertSelected, &QAction::triggered, this, &ViewerPrivate::payloadSelectInvert);
+    connect(d.ui->editPayloadLoad, &QAction::triggered, this, &ViewerPrivate::payloadLoad);
+    connect(d.ui->editPayloadUnload, &QAction::triggered, this, &ViewerPrivate::payloadUnload);
+    connect(d.ui->editPayloadInvertSelected, &QAction::triggered, this, &ViewerPrivate::payloadSelectInvert);
     connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
     connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
     connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
     connect(d.ui->displaySceneShaders, &QAction::toggled, this, &ViewerPrivate::sceneShaders);
-    connect(d.ui->renderShaded, &QAction::triggered, this, &ViewerPrivate::renderShaded);
-    connect(d.ui->renderWireframe, &QAction::triggered, this, &ViewerPrivate::renderWireframe);
+    connect(d.ui->displayRenderShaded, &QAction::triggered, this, &ViewerPrivate::renderShaded);
+    connect(d.ui->displayRenderWireframe, &QAction::triggered, this, &ViewerPrivate::renderWireframe);
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         {
-            actions->addAction(d.ui->renderShaded);
-            actions->addAction(d.ui->renderWireframe);
+            actions->addAction(d.ui->displayRenderShaded);
+            actions->addAction(d.ui->displayRenderWireframe);
         }
     }
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
@@ -266,8 +272,8 @@ ViewerPrivate::init()
         d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
         d.ui->redo->setDefaultAction(d.ui->editRedo);
         d.ui->undo->setDefaultAction(d.ui->editUndo);
-        d.ui->wireframe->setDefaultAction(d.ui->renderShaded);
-        d.ui->shaded->setDefaultAction(d.ui->renderWireframe);
+        d.ui->wireframe->setDefaultAction(d.ui->displayRenderShaded);
+        d.ui->shaded->setDefaultAction(d.ui->displayRenderWireframe);
     }
     connect(d.backgroundColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::backgroundColor);
     connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
@@ -293,11 +299,12 @@ ViewerPrivate::init()
     connect(session()->commandStack(), &CommandStack::canRedoChanged, d.ui->editRedo, &QAction::setEnabled);
     connect(session()->commandStack(), &CommandStack::canClearChanged, d.ui->editClear, &QAction::setEnabled);
     // views
-    connect(d.ui->hudSceneTree, &QAction::toggled, this, [=](bool checked) { renderView()->enableSceneTree(checked); });
+    connect(d.ui->hudSceneTree, &QAction::toggled, this,
+            [=](bool checked) { renderView()->setSceneTreeEnabled(checked); });
     connect(d.ui->hudGpuPerformance, &QAction::toggled, this,
-            [=](bool checked) { renderView()->enableGpuPerformance(checked); });
+            [=](bool checked) { renderView()->setGpuPerformanceEnabled(checked); });
     connect(d.ui->hudCameraAxis, &QAction::toggled, this,
-            [=](bool checked) { renderView()->enableCameraAxis(checked); });
+            [=](bool checked) { renderView()->setCameraAxisEnabled(checked); });
     connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
             [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
     connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
@@ -372,15 +379,15 @@ ViewerPrivate::initSettings()
 
     bool sceneTree = settings()->value("sceneTree", true).toBool();
     d.ui->hudSceneTree->setChecked(sceneTree);
-    renderView()->enableSceneTree(sceneTree);
+    renderView()->setSceneTreeEnabled(sceneTree);
 
     bool gpuPerformance = settings()->value("gpuPerformance", false).toBool();
     d.ui->hudGpuPerformance->setChecked(gpuPerformance);
-    renderView()->enableGpuPerformance(gpuPerformance);
+    renderView()->setGpuPerformanceEnabled(gpuPerformance);
 
     bool cameraAxis = settings()->value("cameraAxis", true).toBool();
     d.ui->hudCameraAxis->setChecked(cameraAxis);
-    renderView()->enableCameraAxis(cameraAxis);
+    renderView()->setCameraAxisEnabled(cameraAxis);
 
     QString theme = settings()->value("theme", "dark").toString();
     if (theme == "dark") {
@@ -520,21 +527,21 @@ ViewerPrivate::enable(bool enable)
                                 d.ui->fileExportImage,
                                 d.ui->editCopyImage,
                                 d.ui->editDeleteSelected,
+                                d.ui->editPayloadLoad,
+                                d.ui->editPayloadUnload,
+                                d.ui->editPayloadInvertSelected,
                                 d.ui->editShowSelected,
                                 d.ui->editShowRecursive,
                                 d.ui->editHideSelected,
                                 d.ui->editHideRecursive,
-                                d.ui->payloadLoad,
-                                d.ui->payloadUnload,
-                                d.ui->payloadInvertSelected,
                                 d.ui->displayIsolate,
                                 d.ui->displayFrameAll,
                                 d.ui->displayFrameSelected,
                                 d.ui->displayResetView,
                                 d.ui->displayExpand,
                                 d.ui->displayCollapse,
-                                d.ui->renderShaded,
-                                d.ui->renderWireframe,
+                                d.ui->displayRenderShaded,
+                                d.ui->displayRenderWireframe,
                                 d.ui->stageUpY,
                                 d.ui->stageUpZ };
     for (QAction* action : actions) {
@@ -982,6 +989,27 @@ ViewerPrivate::hideRecursive()
 }
 
 void
+ViewerPrivate::selectVisibleCapture()
+{
+    renderView()->captureVisible();
+}
+
+void
+ViewerPrivate::selectVisibleSelect()
+{
+    QList<SdfPath> paths = renderView()->visibleCapturePaths();
+    if (paths.size()) {
+        session()->commandStack()->run(new Command(selectPaths(paths)));
+    }
+}
+
+void
+ViewerPrivate::selectVisibleClear()
+{
+    renderView()->clearVisibleCapture();
+}
+
+void
 ViewerPrivate::stageUpY()
 {
     session()->commandStack()->run(new Command(stageUp(Session::StageUp::Y)));
@@ -1253,10 +1281,10 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
     const bool hasSelection = !paths.isEmpty();
     d.ui->displayExpand->setEnabled(hasSelection);
     d.ui->editSelectInvert->setEnabled(hasSelection);
-    d.ui->payloadInvertSelected->setEnabled(hasSelection);
+    d.ui->editPayloadInvertSelected->setEnabled(hasSelection);
 
     QList<QMenu*> staleMenus;
-    for (QObject* child : d.ui->payloadLoad->children()) {
+    for (QObject* child : d.ui->editPayloadLoad->children()) {
         QMenu* menu = qobject_cast<QMenu*>(child);
         if (menu && menu->property("variantMenu").toBool())
             staleMenus.append(menu);
@@ -1264,8 +1292,8 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
     for (QMenu* menu : staleMenus)
         delete menu;
 
-    d.ui->payloadLoad->setEnabled(false);
-    d.ui->payloadUnload->setEnabled(false);
+    d.ui->editPayloadLoad->setEnabled(false);
+    d.ui->editPayloadUnload->setEnabled(false);
 
     if (!hasSelection)
         return;
@@ -1295,8 +1323,8 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
         }
     }
 
-    d.ui->payloadLoad->setEnabled(canLoadSelected);
-    d.ui->payloadUnload->setEnabled(canUnloadSelected);
+    d.ui->editPayloadLoad->setEnabled(canLoadSelected);
+    d.ui->editPayloadUnload->setEnabled(canUnloadSelected);
 
     if (payloadPaths.isEmpty() || variantSets.isEmpty())
         return;

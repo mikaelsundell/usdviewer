@@ -12,6 +12,8 @@ set(OpenUSD_COMPONENTS
   CAMERAUTIL
   GF
   GLF
+  HD
+  HDX
   HGIGL
   PLUG
   SDF

@@ -41,6 +41,8 @@ public:
         ButtonAlt,
         Render,
         RenderAlt,
+        Selection,
+        SelectionAlt,
         Warning,
         Error
     };

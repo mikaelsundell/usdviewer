@@ -1161,7 +1161,7 @@
     <string>Clear</string>
    </property>
    <property name="shortcut">
-    <string>Meta+Alt+C</string>
+    <string>Meta+Ctrl+C</string>
    </property>
   </action>
  </widget>

@@ -309,7 +309,7 @@ Q_SIGNALS:
      * @param elapsed Rendering time in milliseconds.
      */
     void renderReady(qint64 elapsed);
-    
+
     /**
      * @brief Emitted when a capture has finished rendering.
      *

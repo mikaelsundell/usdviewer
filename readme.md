@@ -18,6 +18,31 @@ todo: Insert application image here with the kitchen scene.
 
 todo: Insert application functionality here
 
+
+Technical notes
+-------------
+
+Coplanar pick limitation
+
+Hydra picking in UsdImagingGLEngine is raster-based and resolve-mode dependent. The pick task renders ID and depth information for a pick frustum and then resolves that buffer into hits, rather than performing an exact analytic ray intersection against geometry. In particular, resolveNearestToCenter uses a pick render plus a customized depth buffer to determine an approximate intersection near the center of the query.
+
+This has important consequences for coplanar or near-coplanar surfaces. When two surfaces lie on the same plane, or are close enough to quantize to the same effective depth in the pick pass, a single-click pick can collapse to a single “winning” surface. In that case only one prim is returned even though multiple surfaces overlap at that location. This behavior is a consequence of the depth-buffer-based picking approach, not an issue with shading normals.
+
+Deep sweeps behave differently. Using resolveDeep, Hydra performs a deep selection over the pick region and can return multiple prims within the frustum, including those obscured by other geometry. This makes sweep-based selection significantly more robust for overlapping or coplanar surfaces.
+
+The same distinction applies to capture workflows:
+
+Single clicks using resolveNearestToCenter can miss coplanar surfaces because the result collapses to one approximate winner near the click center.
+Capture using resolveUnique collects a set of unique hits within the frustum and is generally more robust than a single nearest-center query, but it still does not provide the same “see through” behavior as deep selection.
+Deep sweeps using resolveDeep are the most reliable method for discovering all overlapping or coplanar surfaces within a screen region.
+
+In practice:
+
+- Use resolveNearestToCenter for fast, conventional click picking.
+- Use resolveUnique for visible-set capture when a deduplicated set of hits is desired.
+- Use resolveDeep for region-based queries when overlapping, obscured, or coplanar surfaces must be discovered.
+
+
 Known issues
 -------------
 

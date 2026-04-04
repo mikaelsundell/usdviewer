@@ -304,7 +304,7 @@ ImagingGLWidgetPrivate::paintGL()
                 }
                 d.params.drawMode = mode;
             }
-            d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
+            d.params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_NOTHING;
             d.params.enableLighting = true;
             {
                 std::vector<GlfSimpleLight> lights;
@@ -331,10 +331,29 @@ ImagingGLWidgetPrivate::paintGL()
             d.params.enableSceneLights = d.sceneLightsEnabled;
             d.params.enableSceneMaterials = d.sceneShadersEnabled;
             d.params.flipFrontFacing = true;
-            d.params.highlight = true;
             d.params.showGuides = false;
             d.params.showProxy = true;
             d.params.showRender = true;
+
+            d.glEngine->SetSelectionColor(qt::QColorToGfVec4f(style()->color(Style::ColorRole::SelectionAlt)));
+            d.params.highlight = true;
+            d.params.bboxes.clear();
+
+            UsdGeomBBoxCache bboxCache(UsdTimeCode::Default(),
+                                       { UsdGeomTokens->default_, UsdGeomTokens->proxy, UsdGeomTokens->render }, true);
+
+            for (const SdfPath& path : d.selection) {
+                UsdPrim prim = d.stage->GetPrimAtPath(path);
+                if (!prim)
+                    continue;
+
+                GfBBox3d bbox = bboxCache.ComputeWorldBound(prim);
+                if (!bbox.GetRange().IsEmpty())
+                    d.params.bboxes.push_back(bbox);
+            }
+
+            d.params.bboxLineColor = qt::QColorToGfVec4f(style()->color(Style::ColorRole::Selection));
+            d.params.bboxLineDashSize = 3.0f;
 
             QElapsedTimer gpuTimer;
             gpuTimer.start();
@@ -739,19 +758,27 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
     d.glwidget->update();
 }
 
+/*
 void
 ImagingGLWidgetPrivate::captureVisible()
 {
     QElapsedTimer timer;
     timer.start();
 
+    qDebug() << "[captureVisible] begin";
+
     d.glwidget->makeCurrent();
-    if (!d.stage || !d.glEngine || !d.context)
-        return;
 
 #ifdef WIN32
     glDepthMask(GL_TRUE);
 #endif
+
+    const GfVec2i size = widgetSize();
+    const GfVec4d viewport = widgetViewport();
+
+    qDebug() << "[captureVisible] viewport"
+             << "size=" << size[0] << "x" << size[1] << "viewport=" << viewport[0] << viewport[1] << viewport[2]
+             << viewport[3] << "maskedRoots=" << d.mask.size() << "existingCapture=" << d.visibleCapture.size();
 
     GfCamera camera = d.viewCamera.camera();
     GfFrustum frustum = camera.GetFrustum();
@@ -759,26 +786,44 @@ ImagingGLWidgetPrivate::captureVisible()
     UsdImagingGLEngine::PickParams pickParams;
     pickParams.resolveMode = TfToken("resolveUnique");
 
+    qDebug() << "[captureVisible] resolveMode=resolveUnique";
+
     UsdImagingGLEngine::IntersectionResultVector results;
     const bool hit = pickMaskedIntersection(pickParams, frustum, &results);
+
+    qDebug() << "[captureVisible] pick result"
+             << "hit=" << hit << "rawHits=" << results.size();
 
     QList<SdfPath> captured;
     if (hit) {
         captured.reserve(results.size());
         for (const auto& result : results) {
-            if (!result.hitPrimPath.IsEmpty())
+            if (!result.hitPrimPath.IsEmpty()) {
                 captured.append(result.hitPrimPath);
+                qDebug() << "  [captureVisible] hit path:" << TfTokenToQString(result.hitPrimPath.GetAsToken());
+            }
         }
         captured = uniquePaths(captured);
     }
 
+    qDebug() << "[captureVisible] unique captured =" << captured.size();
+
     bool changed = false;
+    int addedCount = 0;
     for (const SdfPath& path : captured) {
         if (!d.visibleCapture.contains(path)) {
             d.visibleCapture.append(path);
             changed = true;
+            addedCount++;
+            qDebug() << "  [captureVisible] added:" << TfTokenToQString(path.GetAsToken());
+        }
+        else {
+            qDebug() << "  [captureVisible] skipped existing:" << TfTokenToQString(path.GetAsToken());
         }
     }
+
+    qDebug() << "[captureVisible] summary"
+             << "added=" << addedCount << "totalCaptured=" << d.visibleCapture.size() << "changed=" << changed;
 
     if (changed && d.sceneTreeEnabled)
         updateSceneTree();
@@ -786,8 +831,145 @@ ImagingGLWidgetPrivate::captureVisible()
     if (changed)
         d.glwidget->update();
 
-    Q_EMIT d.glwidget->captureReady(timer.elapsed());
+    const qint64 elapsed = timer.elapsed();
+    qDebug() << "[captureVisible] finished in" << elapsed << "ms";
+
+    Q_EMIT d.glwidget->captureReady(elapsed);
 }
+*/
+
+void
+ImagingGLWidgetPrivate::captureVisible()
+{
+    QElapsedTimer timer;
+    timer.start();
+
+    qDebug() << "[captureVisible] begin";
+
+    d.glwidget->makeCurrent();
+    if (!d.stage || !d.glEngine || !d.context) {
+        qDebug() << "[captureVisible] aborted"
+                 << "stage=" << static_cast<bool>(d.stage) << "glEngine=" << static_cast<bool>(d.glEngine)
+                 << "context=" << static_cast<bool>(d.context);
+        return;
+    }
+
+#ifdef WIN32
+    glDepthMask(GL_TRUE);
+#endif
+
+    const GfVec2i size = widgetSize();
+    const GfVec4d viewport = widgetViewport();
+
+    qDebug() << "[captureVisible] viewport"
+             << "size=" << size[0] << "x" << size[1] << "viewport=" << viewport[0] << viewport[1] << viewport[2]
+             << viewport[3] << "maskedRoots=" << d.mask.size() << "existingCapture=" << d.visibleCapture.size();
+
+    GfCamera camera = d.viewCamera.camera();
+    GfFrustum frustum = camera.GetFrustum();
+
+    UsdImagingGLEngine::PickParams pickParams;
+    pickParams.resolveMode = TfToken("resolveUnique");
+
+    constexpr int tilesX = 6;
+    constexpr int tilesY = 6;
+    constexpr double overlap = 0.20;  // 20% overlap helps catch small items near tile borders
+
+    qDebug() << "[captureVisible] resolveMode=resolveUnique"
+             << "tiles=" << tilesX << "x" << tilesY << "overlap=" << overlap;
+
+    auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
+
+    QList<SdfPath> captured;
+    int totalRawHits = 0;
+    int tilesWithHits = 0;
+
+    for (int ty = 0; ty < tilesY; ++ty) {
+        for (int tx = 0; tx < tilesX; ++tx) {
+            const double tileW = 1.0 / static_cast<double>(tilesX);
+            const double tileH = 1.0 / static_cast<double>(tilesY);
+
+            double u0 = tx * tileW;
+            double v0 = ty * tileH;
+            double u1 = (tx + 1) * tileW;
+            double v1 = (ty + 1) * tileH;
+
+            const double padX = tileW * overlap * 0.5;
+            const double padY = tileH * overlap * 0.5;
+
+            u0 = clamp01(u0 - padX);
+            v0 = clamp01(v0 - padY);
+            u1 = clamp01(u1 + padX);
+            v1 = clamp01(v1 + padY);
+
+            const double centerU = (u0 + u1) * 0.5;
+            const double centerV = (v0 + v1) * 0.5;
+            const double sizeU = (u1 - u0);
+            const double sizeV = (v1 - v0);
+
+            GfVec2d center(centerU * 2.0 - 1.0, -1.0 * (centerV * 2.0 - 1.0));
+            GfVec2d pickSize(sizeU, sizeV);
+
+            GfFrustum tileFrustum = frustum.ComputeNarrowedFrustum(center, pickSize);
+
+            UsdImagingGLEngine::IntersectionResultVector results;
+            const bool hit = pickMaskedIntersection(pickParams, tileFrustum, &results);
+
+            qDebug() << "[captureVisible] tile"
+                     << "(" << tx << "," << ty << ")"
+                     << "uv=" << u0 << v0 << u1 << v1 << "center=" << center[0] << center[1] << "size=" << pickSize[0]
+                     << pickSize[1] << "hit=" << hit << "rawHits=" << results.size();
+
+            if (!hit)
+                continue;
+
+            tilesWithHits++;
+            totalRawHits += static_cast<int>(results.size());
+
+            for (const auto& result : results) {
+                if (!result.hitPrimPath.IsEmpty()) {
+                    captured.append(result.hitPrimPath);
+                    qDebug() << "  [captureVisible] hit path:" << TfTokenToQString(result.hitPrimPath.GetAsToken());
+                }
+            }
+        }
+    }
+
+    captured = uniquePaths(captured);
+
+    qDebug() << "[captureVisible] tiled result"
+             << "tilesWithHits=" << tilesWithHits << "rawHits=" << totalRawHits << "uniqueCaptured=" << captured.size();
+
+    bool changed = false;
+    int addedCount = 0;
+    for (const SdfPath& path : captured) {
+        if (!d.visibleCapture.contains(path)) {
+            d.visibleCapture.append(path);
+            changed = true;
+            addedCount++;
+            qDebug() << "  [captureVisible] added:" << TfTokenToQString(path.GetAsToken());
+        }
+        else {
+            qDebug() << "  [captureVisible] skipped existing:" << TfTokenToQString(path.GetAsToken());
+        }
+    }
+
+    qDebug() << "[captureVisible] summary"
+             << "added=" << addedCount << "totalCaptured=" << d.visibleCapture.size() << "changed=" << changed;
+
+    if (changed && d.sceneTreeEnabled)
+        updateSceneTree();
+
+    if (changed)
+        d.glwidget->update();
+
+    const qint64 elapsed = timer.elapsed();
+    qDebug() << "[captureVisible] finished in" << elapsed << "ms";
+
+    Q_EMIT d.glwidget->captureReady(elapsed);
+}
+
+
 
 void
 ImagingGLWidgetPrivate::clearVisibleCapture()

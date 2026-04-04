@@ -28,6 +28,7 @@
 #include <QPointer>
 #include <algorithm>
 #include <limits>
+#include <vector>
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/diagnostic.h>
@@ -69,6 +70,7 @@ public:
     void updateSelection(const QList<SdfPath>& paths);
     void captureVisible();
     void clearVisibleCapture();
+    void rebuildSelectionBBoxes();
 
 public:
     QPoint deviceRatio(QPoint value) const;
@@ -126,6 +128,7 @@ public:
         QList<SdfPath> mask;
         QList<SdfPath> selection;
         QList<SdfPath> visibleCapture;
+        std::vector<GfBBox3d> selectionBBoxes;
         QScopedPointer<UsdImagingGLEngine> glEngine;
         QPointer<ViewContext> context;
         QPointer<ImagingGLWidget> glwidget;
@@ -209,11 +212,43 @@ ImagingGLWidgetPrivate::initCamera()
 }
 
 void
+ImagingGLWidgetPrivate::rebuildSelectionBBoxes()
+{
+    d.selectionBBoxes.clear();
+
+    if (!d.context || !d.stage || d.selection.isEmpty())
+        return;
+
+    READ_LOCKER(locker, d.context->stageLock(), "stageLock");
+
+    if (!d.stage)
+        return;
+
+    UsdGeomBBoxCache bboxCache(
+        UsdTimeCode::Default(),
+        {UsdGeomTokens->default_, UsdGeomTokens->proxy, UsdGeomTokens->render},
+        true);
+
+    d.selectionBBoxes.reserve(d.selection.size());
+
+    for (const SdfPath& path : d.selection) {
+        UsdPrim prim = d.stage->GetPrimAtPath(path);
+        if (!prim)
+            continue;
+
+        GfBBox3d bbox = bboxCache.ComputeWorldBound(prim);
+        if (!bbox.GetRange().IsEmpty())
+            d.selectionBBoxes.push_back(bbox);
+    }
+}
+
+void
 ImagingGLWidgetPrivate::close()
 {
     d.mask.clear();
     d.selection.clear();
     d.visibleCapture.clear();
+    d.selectionBBoxes.clear();
     d.stage = nullptr;
     d.bbox = GfBBox3d();
     d.selectionBBox = GfBBox3d();
@@ -337,21 +372,7 @@ ImagingGLWidgetPrivate::paintGL()
 
             d.glEngine->SetSelectionColor(qt::QColorToGfVec4f(style()->color(Style::ColorRole::SelectionAlt)));
             d.params.highlight = true;
-            d.params.bboxes.clear();
-
-            UsdGeomBBoxCache bboxCache(UsdTimeCode::Default(),
-                                       { UsdGeomTokens->default_, UsdGeomTokens->proxy, UsdGeomTokens->render }, true);
-
-            for (const SdfPath& path : d.selection) {
-                UsdPrim prim = d.stage->GetPrimAtPath(path);
-                if (!prim)
-                    continue;
-
-                GfBBox3d bbox = bboxCache.ComputeWorldBound(prim);
-                if (!bbox.GetRange().IsEmpty())
-                    d.params.bboxes.push_back(bbox);
-            }
-
+            d.params.bboxes = d.selectionBBoxes;
             d.params.bboxLineColor = qt::QColorToGfVec4f(style()->color(Style::ColorRole::Selection));
             d.params.bboxLineDashSize = 3.0f;
 
@@ -758,14 +779,11 @@ ImagingGLWidgetPrivate::wheelEvent(QWheelEvent* event)
     d.glwidget->update();
 }
 
-/*
 void
 ImagingGLWidgetPrivate::captureVisible()
 {
     QElapsedTimer timer;
     timer.start();
-
-    qDebug() << "[captureVisible] begin";
 
     d.glwidget->makeCurrent();
 
@@ -775,96 +793,7 @@ ImagingGLWidgetPrivate::captureVisible()
 
     const GfVec2i size = widgetSize();
     const GfVec4d viewport = widgetViewport();
-
-    qDebug() << "[captureVisible] viewport"
-             << "size=" << size[0] << "x" << size[1] << "viewport=" << viewport[0] << viewport[1] << viewport[2]
-             << viewport[3] << "maskedRoots=" << d.mask.size() << "existingCapture=" << d.visibleCapture.size();
-
-    GfCamera camera = d.viewCamera.camera();
-    GfFrustum frustum = camera.GetFrustum();
-
-    UsdImagingGLEngine::PickParams pickParams;
-    pickParams.resolveMode = TfToken("resolveUnique");
-
-    qDebug() << "[captureVisible] resolveMode=resolveUnique";
-
-    UsdImagingGLEngine::IntersectionResultVector results;
-    const bool hit = pickMaskedIntersection(pickParams, frustum, &results);
-
-    qDebug() << "[captureVisible] pick result"
-             << "hit=" << hit << "rawHits=" << results.size();
-
-    QList<SdfPath> captured;
-    if (hit) {
-        captured.reserve(results.size());
-        for (const auto& result : results) {
-            if (!result.hitPrimPath.IsEmpty()) {
-                captured.append(result.hitPrimPath);
-                qDebug() << "  [captureVisible] hit path:" << TfTokenToQString(result.hitPrimPath.GetAsToken());
-            }
-        }
-        captured = uniquePaths(captured);
-    }
-
-    qDebug() << "[captureVisible] unique captured =" << captured.size();
-
-    bool changed = false;
-    int addedCount = 0;
-    for (const SdfPath& path : captured) {
-        if (!d.visibleCapture.contains(path)) {
-            d.visibleCapture.append(path);
-            changed = true;
-            addedCount++;
-            qDebug() << "  [captureVisible] added:" << TfTokenToQString(path.GetAsToken());
-        }
-        else {
-            qDebug() << "  [captureVisible] skipped existing:" << TfTokenToQString(path.GetAsToken());
-        }
-    }
-
-    qDebug() << "[captureVisible] summary"
-             << "added=" << addedCount << "totalCaptured=" << d.visibleCapture.size() << "changed=" << changed;
-
-    if (changed && d.sceneTreeEnabled)
-        updateSceneTree();
-
-    if (changed)
-        d.glwidget->update();
-
-    const qint64 elapsed = timer.elapsed();
-    qDebug() << "[captureVisible] finished in" << elapsed << "ms";
-
-    Q_EMIT d.glwidget->captureReady(elapsed);
-}
-*/
-
-void
-ImagingGLWidgetPrivate::captureVisible()
-{
-    QElapsedTimer timer;
-    timer.start();
-
-    qDebug() << "[captureVisible] begin";
-
-    d.glwidget->makeCurrent();
-    if (!d.stage || !d.glEngine || !d.context) {
-        qDebug() << "[captureVisible] aborted"
-                 << "stage=" << static_cast<bool>(d.stage) << "glEngine=" << static_cast<bool>(d.glEngine)
-                 << "context=" << static_cast<bool>(d.context);
-        return;
-    }
-
-#ifdef WIN32
-    glDepthMask(GL_TRUE);
-#endif
-
-    const GfVec2i size = widgetSize();
-    const GfVec4d viewport = widgetViewport();
-
-    qDebug() << "[captureVisible] viewport"
-             << "size=" << size[0] << "x" << size[1] << "viewport=" << viewport[0] << viewport[1] << viewport[2]
-             << viewport[3] << "maskedRoots=" << d.mask.size() << "existingCapture=" << d.visibleCapture.size();
-
+    
     GfCamera camera = d.viewCamera.camera();
     GfFrustum frustum = camera.GetFrustum();
 
@@ -873,10 +802,7 @@ ImagingGLWidgetPrivate::captureVisible()
 
     constexpr int tilesX = 6;
     constexpr int tilesY = 6;
-    constexpr double overlap = 0.20;  // 20% overlap helps catch small items near tile borders
-
-    qDebug() << "[captureVisible] resolveMode=resolveUnique"
-             << "tiles=" << tilesX << "x" << tilesY << "overlap=" << overlap;
+    constexpr double overlap = 0.20;
 
     auto clamp01 = [](double v) { return std::max(0.0, std::min(1.0, v)); };
 
@@ -915,11 +841,6 @@ ImagingGLWidgetPrivate::captureVisible()
             UsdImagingGLEngine::IntersectionResultVector results;
             const bool hit = pickMaskedIntersection(pickParams, tileFrustum, &results);
 
-            qDebug() << "[captureVisible] tile"
-                     << "(" << tx << "," << ty << ")"
-                     << "uv=" << u0 << v0 << u1 << v1 << "center=" << center[0] << center[1] << "size=" << pickSize[0]
-                     << pickSize[1] << "hit=" << hit << "rawHits=" << results.size();
-
             if (!hit)
                 continue;
 
@@ -929,17 +850,12 @@ ImagingGLWidgetPrivate::captureVisible()
             for (const auto& result : results) {
                 if (!result.hitPrimPath.IsEmpty()) {
                     captured.append(result.hitPrimPath);
-                    qDebug() << "  [captureVisible] hit path:" << TfTokenToQString(result.hitPrimPath.GetAsToken());
                 }
             }
         }
     }
 
     captured = uniquePaths(captured);
-
-    qDebug() << "[captureVisible] tiled result"
-             << "tilesWithHits=" << tilesWithHits << "rawHits=" << totalRawHits << "uniqueCaptured=" << captured.size();
-
     bool changed = false;
     int addedCount = 0;
     for (const SdfPath& path : captured) {
@@ -947,15 +863,8 @@ ImagingGLWidgetPrivate::captureVisible()
             d.visibleCapture.append(path);
             changed = true;
             addedCount++;
-            qDebug() << "  [captureVisible] added:" << TfTokenToQString(path.GetAsToken());
-        }
-        else {
-            qDebug() << "  [captureVisible] skipped existing:" << TfTokenToQString(path.GetAsToken());
         }
     }
-
-    qDebug() << "[captureVisible] summary"
-             << "added=" << addedCount << "totalCaptured=" << d.visibleCapture.size() << "changed=" << changed;
 
     if (changed && d.sceneTreeEnabled)
         updateSceneTree();
@@ -963,13 +872,8 @@ ImagingGLWidgetPrivate::captureVisible()
     if (changed)
         d.glwidget->update();
 
-    const qint64 elapsed = timer.elapsed();
-    qDebug() << "[captureVisible] finished in" << elapsed << "ms";
-
-    Q_EMIT d.glwidget->captureReady(elapsed);
+    Q_EMIT d.glwidget->captureReady(timer.elapsed());
 }
-
-
 
 void
 ImagingGLWidgetPrivate::clearVisibleCapture()
@@ -989,10 +893,12 @@ ImagingGLWidgetPrivate::updateStage(UsdStageRefPtr stage)
     SignalGuard::Scope guard(this);
     d.stage = stage;
     d.visibleCapture.clear();
+    d.selectionBBoxes.clear();
     d.glEngine.reset();
     initGL();
     if (d.stage)
         initCamera();
+    rebuildSelectionBBoxes();
     if (d.sceneTreeEnabled) {
         updateSceneTree();
     }
@@ -1021,6 +927,7 @@ ImagingGLWidgetPrivate::updatePrims(const NoticeBatch& batch)
     Q_UNUSED(batch);
 
     SignalGuard::Scope guard(this);
+    rebuildSelectionBBoxes();
     if (d.sceneTreeEnabled) {
         updateSceneTree();
     }
@@ -1035,6 +942,7 @@ ImagingGLWidgetPrivate::updateSelection(const QList<SdfPath>& paths)
     if (d.glEngine) {
         d.glEngine->SetSelected(QListToSdfPathVector(paths));
     }
+    rebuildSelectionBBoxes();
     if (d.sceneTreeEnabled) {
         updateSceneTree();
     }

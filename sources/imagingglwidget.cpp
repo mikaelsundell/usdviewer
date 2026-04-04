@@ -28,7 +28,6 @@
 #include <QPointer>
 #include <algorithm>
 #include <limits>
-#include <vector>
 #include <pxr/base/tf/error.h>
 #include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/diagnostic.h>
@@ -42,6 +41,7 @@
 #include <pxr/usd/usdGeom/xform.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
+#include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -224,10 +224,8 @@ ImagingGLWidgetPrivate::rebuildSelectionBBoxes()
     if (!d.stage)
         return;
 
-    UsdGeomBBoxCache bboxCache(
-        UsdTimeCode::Default(),
-        {UsdGeomTokens->default_, UsdGeomTokens->proxy, UsdGeomTokens->render},
-        true);
+    UsdGeomBBoxCache bboxCache(UsdTimeCode::Default(),
+                               { UsdGeomTokens->default_, UsdGeomTokens->proxy, UsdGeomTokens->render }, true);
 
     d.selectionBBoxes.reserve(d.selection.size());
 
@@ -793,7 +791,7 @@ ImagingGLWidgetPrivate::captureVisible()
 
     const GfVec2i size = widgetSize();
     const GfVec4d viewport = widgetViewport();
-    
+
     GfCamera camera = d.viewCamera.camera();
     GfFrustum frustum = camera.GetFrustum();
 

@@ -494,11 +494,3 @@ QTreeView::item {
     color: $color.text;
     selection-background-color: $color.highlight;
 }
-
-QTreeView::branch:open:has-children {
-    image: url("$icon.branchopen");
-}
-
-QTreeView::branch:closed:has-children {
-    image: url("$icon.branchclosed");
-}

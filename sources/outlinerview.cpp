@@ -177,12 +177,7 @@ void
 OutlinerViewPrivate::primsChanged(const NoticeBatch& batch)
 {
     propertyTree()->updatePrims(batch);
-
-    qDebug() << "stageTree: begin updatePrims";
-
     stageTree()->updatePrims(batch);
-
-    qDebug() << "stageTree: end updatePrims";
 }
 
 void

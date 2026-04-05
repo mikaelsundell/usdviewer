@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/flipman
 
 #include "application.h"
+#include "console.h"
 #include "os.h"
 #include "pythoninterpreter.h"
 #include "qtutils.h"
@@ -27,6 +28,7 @@ public:
 
 public:
     struct Data {
+        QScopedPointer<Console> console;
         QScopedPointer<PythonInterpreter> pythonInterpreter;
         QScopedPointer<Session> session;
         QScopedPointer<Style> style;
@@ -42,14 +44,12 @@ ApplicationPrivate::~ApplicationPrivate() {}
 void
 ApplicationPrivate::init()
 {
+    d.console.reset(new Console());
+    d.console->start();
     d.session.reset(new Session());
     d.settings.reset(new Settings());
     d.style.reset(new Style());
-
-    d.pythonInterpreter.reset(new PythonInterpreter());
-
-
-
+    d.pythonInterpreter.reset(new PythonInterpreter());  // after session
 #ifdef NDEBUG
     QStringList plugindirs;
     QString pluginusddir = os::getApplicationPath() + "/plugin/usd";
@@ -88,6 +88,12 @@ Application::Application(int& argc, char** argv)
 }
 
 Application::~Application() {}
+
+Console*
+Application::console() const
+{
+    return p->d.console.data();
+}
 
 PythonInterpreter*
 Application::pythonInterpreter() const

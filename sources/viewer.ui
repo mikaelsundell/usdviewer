@@ -307,51 +307,6 @@
     </font>
    </property>
   </widget>
-  <widget class="usdviewer::DockWidget" name="outlinerDock">
-   <property name="minimumSize">
-    <size>
-     <width>400</width>
-     <height>469</height>
-    </size>
-   </property>
-   <property name="maximumSize">
-    <size>
-     <width>524287</width>
-     <height>524287</height>
-    </size>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>1</number>
-   </attribute>
-   <widget class="QWidget" name="outlinerContents">
-    <property name="styleSheet">
-     <string notr="true"/>
-    </property>
-    <property name="DockWidget" stdset="0">
-     <bool>true</bool>
-    </property>
-    <layout class="QVBoxLayout" name="verticalLayout_4">
-     <property name="spacing">
-      <number>0</number>
-     </property>
-     <property name="leftMargin">
-      <number>4</number>
-     </property>
-     <property name="topMargin">
-      <number>4</number>
-     </property>
-     <property name="rightMargin">
-      <number>4</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <item>
-      <widget class="usdviewer::OutlinerView" name="outlinerView" native="true"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -509,7 +464,7 @@
      <addaction name="themeLight"/>
      <addaction name="themeDark"/>
     </widget>
-    <widget class="QMenu" name="viewStatistics_2">
+    <widget class="QMenu" name="menu_3">
      <property name="title">
       <string>Head-up display</string>
      </property>
@@ -519,93 +474,19 @@
     </widget>
     <addaction name="menuTheme"/>
     <addaction name="separator"/>
-    <addaction name="viewStatistics_2"/>
+    <addaction name="menu_3"/>
     <addaction name="separator"/>
     <addaction name="viewOutliner"/>
     <addaction name="viewProgress"/>
     <addaction name="viewPython"/>
     <addaction name="separator"/>
+    <addaction name="viewConsole"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuDisplay"/>
    <addaction name="menuView"/>
    <addaction name="menuHelp"/>
-  </widget>
-  <widget class="usdviewer::DockWidget" name="progressDock">
-   <property name="minimumSize">
-    <size>
-     <width>400</width>
-     <height>400</height>
-    </size>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>2</number>
-   </attribute>
-   <widget class="QWidget" name="progressContents">
-    <property name="styleSheet">
-     <string notr="true"/>
-    </property>
-    <property name="DockWidget" stdset="0">
-     <bool>true</bool>
-    </property>
-    <layout class="QVBoxLayout" name="verticalLayout_3">
-     <property name="spacing">
-      <number>0</number>
-     </property>
-     <property name="leftMargin">
-      <number>4</number>
-     </property>
-     <property name="topMargin">
-      <number>4</number>
-     </property>
-     <property name="rightMargin">
-      <number>4</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <item>
-      <widget class="usdviewer::ProgressView" name="progressView" native="true"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="usdviewer::DockWidget" name="pythonDock">
-   <property name="minimumSize">
-    <size>
-     <width>400</width>
-     <height>400</height>
-    </size>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>2</number>
-   </attribute>
-   <widget class="QWidget" name="pythonContents">
-    <property name="DockWidget" stdset="0">
-     <bool>true</bool>
-    </property>
-    <layout class="QVBoxLayout" name="verticalLayout_5">
-     <property name="spacing">
-      <number>0</number>
-     </property>
-     <property name="leftMargin">
-      <number>4</number>
-     </property>
-     <property name="topMargin">
-      <number>4</number>
-     </property>
-     <property name="rightMargin">
-      <number>4</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <item>
-      <widget class="usdviewer::PythonView" name="pythonView" native="true"/>
-     </item>
-    </layout>
-   </widget>
   </widget>
   <action name="displayFrameAll">
    <property name="text">
@@ -945,15 +826,10 @@
     <bool>true</bool>
    </property>
    <property name="checked">
-    <bool>true</bool>
+    <bool>false</bool>
    </property>
    <property name="text">
     <string>Python editor</string>
-   </property>
-  </action>
-  <action name="viewConsole">
-   <property name="text">
-    <string>Console</string>
    </property>
   </action>
   <action name="displayCameraLight">
@@ -1164,36 +1040,20 @@
     <string>Meta+Ctrl+C</string>
    </property>
   </action>
+  <action name="viewConsole">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Console</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
-  <customwidget>
-   <class>usdviewer::DockWidget</class>
-   <extends>QDockWidget</extends>
-   <header>../../../sources/dockwidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>usdviewer::OutlinerView</class>
-   <extends>QWidget</extends>
-   <header>../../../sources/outlinerview.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>usdviewer::ProgressView</class>
-   <extends>QWidget</extends>
-   <header>../../../sources/progressview.h</header>
-   <container>1</container>
-  </customwidget>
   <customwidget>
    <class>usdviewer::RenderView</class>
    <extends>QWidget</extends>
    <header>../../../sources/renderview.h</header>
-  </customwidget>
-  <customwidget>
-   <class>usdviewer::PythonView</class>
-   <extends>QWidget</extends>
-   <header>../../../sources/pythonview.h</header>
-   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources>

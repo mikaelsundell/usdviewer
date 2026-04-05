@@ -104,11 +104,14 @@ bool
 ProgressViewPrivate::eventFilter(QObject* obj, QEvent* event)
 {
     if (event->type() == QEvent::Show) {
-        static bool initialized = false;
-        if (!initialized) {
-            initialized = true;
-            progressTree()->setColumnWidth(0, 220);
-            progressTree()->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+        if (auto* tree = qobject_cast<QTreeWidget*>(obj)) {
+            if (tree == progressTree()) {
+                auto* header = tree->header();
+                header->setStretchLastSection(false);
+                header->setSectionResizeMode(0, QHeaderView::Stretch);
+                header->setSectionResizeMode(1, QHeaderView::Fixed);
+                tree->setColumnWidth(1, 80);
+            }
         }
     }
     return QObject::eventFilter(obj, event);

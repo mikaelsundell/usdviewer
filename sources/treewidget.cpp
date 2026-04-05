@@ -26,6 +26,7 @@ public:
     bool hitBranch(const QPoint& pos, QModelIndex* outIndex = nullptr) const;
     bool hitCheckbox(const QPoint& pos, QModelIndex* outIndex = nullptr) const;
     bool hitSelectableContent(const QPoint& pos, QModelIndex* outIndex = nullptr) const;
+
 public:
     class ItemDelegate : public QStyledItemDelegate {
     public:
@@ -62,19 +63,16 @@ public:
             if (index.column() == 0) {
                 int x = l.contentRect.left() + xOffset;
 
-                l.isCheckable = (index.flags() & Qt::ItemIsUserCheckable)
-                                && index.data(Qt::CheckStateRole).isValid();
+                l.isCheckable = (index.flags() & Qt::ItemIsUserCheckable) && index.data(Qt::CheckStateRole).isValid();
 
                 if (l.isCheckable) {
-                    l.checkRect =
-                        QRect(x, l.contentRect.center().y() - iconSize / 2 + yOffset, iconSize, iconSize);
+                    l.checkRect = QRect(x, l.contentRect.center().y() - iconSize / 2 + yOffset, iconSize, iconSize);
                     l.checkHitRect = l.checkRect.adjusted(3, 1, -2, -1);
                     x = l.checkRect.right() + 1 + iconSpacing;
                 }
 
                 if (l.hasDecoration) {
-                    l.iconRect =
-                        QRect(x, l.contentRect.center().y() - iconSize / 2 + yOffset, iconSize, iconSize);
+                    l.iconRect = QRect(x, l.contentRect.center().y() - iconSize / 2 + yOffset, iconSize, iconSize);
                     l.iconHitRect = l.iconRect;
                     x = l.iconRect.right() + 1 + textSpacing;
                 }
@@ -453,8 +451,7 @@ TreeWidget::selectionCommand(const QModelIndex& index, const QEvent* event) cons
         return QItemSelectionModel::NoUpdate;
     }
 
-    default:
-        break;
+    default: break;
     }
 
     return QTreeWidget::selectionCommand(index, event);

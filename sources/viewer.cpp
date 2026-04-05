@@ -5,6 +5,8 @@
 #include "viewer.h"
 #include "application.h"
 #include "commandstack.h"
+#include "consolewidget.h"
+#include "dockwidget.h"
 #include "mouseevent.h"
 #include "notice.h"
 #include "os.h"
@@ -33,27 +35,35 @@
 #include <QObject>
 #include <QPointer>
 #include <QSettings>
+#include <QStatusBar>
 #include <QTimer>
 #include <QToolButton>
+#include <QVBoxLayout>
 
 // generated files
 #include "ui_viewer.h"
 
 namespace usdviewer {
+
 class ViewerPrivate : public QObject, public SignalGuard {
     Q_OBJECT
 public:
     ViewerPrivate();
     void init();
+    void initDocks();
     void initRecentFiles();
     void initSettings();
     bool loadFile(const QString& fileName);
     bool mergeFile(const QString& fileName);
+    DockWidget* createDock(const QString& objectName, const QString& title, QWidget* view, Qt::DockWidgetArea area);
+    void updateDockAction(QAction* action, bool checked);
     DockWidget* outlinerDock();
     DockWidget* progressDock();
+    DockWidget* pythonDock();
     OutlinerView* outlinerView();
     ProgressView* progressView();
     PythonView* pythonView();
+    ConsoleWidget* consoleWidget();
     RenderView* renderView();
     bool eventFilter(QObject* object, QEvent* event);
     void enable(bool enable);
@@ -109,6 +119,7 @@ public Q_SLOTS:
     void toggleOutliner(bool checked);
     void toggleProgress(bool checked);
     void togglePython(bool checked);
+    void toggleConsole(bool checked);
     void openGithubReadme();
     void openGithubIssues();
 
@@ -130,6 +141,7 @@ public:
     bool saveChanges();
     void clearChanges();
     bool hasChanges() const;
+
     struct Data {
         Session::LoadPolicy loadPolicy;
         bool init;
@@ -145,6 +157,15 @@ public:
         QScopedPointer<MouseEvent> backgroundColorFilter;
         QScopedPointer<Ui_Viewer> ui;
         QPointer<Viewer> viewer;
+
+        QPointer<DockWidget> outlinerDock;
+        QPointer<DockWidget> progressDock;
+        QPointer<DockWidget> pythonDock;
+
+        QPointer<OutlinerView> outlinerView;
+        QPointer<ProgressView> progressView;
+        QPointer<PythonView> pythonView;
+        QPointer<ConsoleWidget> consoleWidget;
     };
     Data d;
 };
@@ -156,6 +177,92 @@ ViewerPrivate::ViewerPrivate()
     d.modified = false;
     d.changes = 0;
     d.extensions = { "usd", "usda", "usdc", "usdz" };
+    d.outlinerArea = Qt::LeftDockWidgetArea;
+    d.progressArea = Qt::RightDockWidgetArea;
+    d.pythonArea = Qt::RightDockWidgetArea;
+}
+
+DockWidget*
+ViewerPrivate::createDock(const QString& objectName, const QString& title, QWidget* view, Qt::DockWidgetArea area)
+{
+    DockWidget* dock = new DockWidget(d.viewer.data());
+    dock->setObjectName(objectName);
+    dock->setWindowTitle(title);
+    dock->setMinimumSize(QSize(350, 0));
+
+    QWidget* contents = new QWidget(dock);
+    contents->setObjectName(objectName + "Contents");
+    contents->setStyleSheet(QString());
+    contents->setProperty("DockWidget", QVariant(true));
+
+    QVBoxLayout* layout = new QVBoxLayout(contents);
+    layout->setSpacing(0);
+    layout->setContentsMargins(4, 4, 4, 4);
+    layout->addWidget(view);
+
+    dock->setWidget(contents);
+    d.viewer->addDockWidget(area, dock);
+    return dock;
+}
+
+void
+ViewerPrivate::updateDockAction(QAction* action, bool checked)
+{
+    if (!action)
+        return;
+    action->blockSignals(true);
+    action->setChecked(checked);
+    action->blockSignals(false);
+}
+
+void
+ViewerPrivate::initDocks()
+{
+    d.outlinerView = new OutlinerView(d.viewer.data());
+    d.outlinerView->setObjectName("outlinerView");
+    d.outlinerView->setAttribute(Qt::WA_DeleteOnClose, false);
+    d.outlinerDock = createDock("outlinerDock", "Outliner", d.outlinerView, d.outlinerArea);
+
+    d.progressView = new ProgressView(d.viewer.data());
+    d.progressView->setObjectName("progressView");
+    d.progressView->setAttribute(Qt::WA_DeleteOnClose, false);
+    d.progressDock = createDock("progressDock", "Progress", d.progressView, d.progressArea);
+
+    d.pythonView = new PythonView(d.viewer.data());
+    d.pythonView->setObjectName("pythonView");
+    d.pythonView->setAttribute(Qt::WA_DeleteOnClose, false);
+    d.pythonDock = createDock("pythonDock", "Python", d.pythonView, d.pythonArea);
+
+    d.consoleWidget = new ConsoleWidget(nullptr);
+    d.consoleWidget->setObjectName("consoleWidget");
+    d.consoleWidget->setAttribute(Qt::WA_DeleteOnClose, false);
+    d.consoleWidget->setWindowTitle("Console");
+    d.consoleWidget->hide();
+
+    connect(d.outlinerDock, &QDockWidget::dockLocationChanged, this,
+            [this](Qt::DockWidgetArea area) { d.outlinerArea = area; });
+    connect(d.progressDock, &QDockWidget::dockLocationChanged, this,
+            [this](Qt::DockWidgetArea area) { d.progressArea = area; });
+    connect(d.pythonDock, &QDockWidget::dockLocationChanged, this,
+            [this](Qt::DockWidgetArea area) { d.pythonArea = area; });
+
+    connect(d.outlinerDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) { updateDockAction(d.ui->viewOutliner, visible); });
+    connect(d.progressDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) { updateDockAction(d.ui->viewProgress, visible); });
+    connect(d.pythonDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) { updateDockAction(d.ui->viewPython, visible); });
+    connect(d.consoleWidget, &ConsoleWidget::visibilityChanged, this,
+            [this](bool visible) { updateDockAction(d.ui->viewConsole, visible); });
+
+    d.outlinerDock->show();
+    d.progressDock->show();
+    d.pythonDock->hide();
+
+    updateDockAction(d.ui->viewOutliner, true);
+    updateDockAction(d.ui->viewProgress, true);
+    updateDockAction(d.ui->viewPython, false);
+    updateDockAction(d.ui->viewConsole, false);
 }
 
 void
@@ -165,22 +272,18 @@ ViewerPrivate::init()
     d.ui.reset(new Ui_Viewer());
     d.ui->setupUi(d.viewer.data());
     attach(d.ui->displayIsolate);
-    // background color
+
     d.backgroundColor = QColor(settings()->value("backgroundColor", "#4f4f4f").toString());
     d.ui->backgroundColor->setStyleSheet("background-color: " + d.backgroundColor.name() + ";");
     d.backgroundColorFilter.reset(new MouseEvent);
     d.ui->backgroundColor->installEventFilter(d.backgroundColorFilter.data());
-    // event filter
+
     d.viewer->installEventFilter(this);
-    // views
-    d.outlinerArea = d.viewer->dockWidgetArea(d.ui->outlinerDock);
-    outlinerView()->setAttribute(Qt::WA_DeleteOnClose, false);
-    d.progressArea = d.viewer->dockWidgetArea(d.ui->progressDock);
-    progressView()->setAttribute(Qt::WA_DeleteOnClose, false);
-    d.pythonArea = d.viewer->dockWidgetArea(d.ui->pythonDock);
-    pythonView()->setAttribute(Qt::WA_DeleteOnClose, false);
+
+    initDocks();
+
     renderView()->setBackgroundColor(d.backgroundColor);
-    // actions
+
     d.ui->fileOpen->setIcon(style()->icon(Style::IconRole::Open));
     d.ui->fileExportAll->setIcon(style()->icon(Style::IconRole::Export));
     d.ui->fileExportImage->setIcon(style()->icon(Style::IconRole::ExportImage));
@@ -189,7 +292,7 @@ ViewerPrivate::init()
     d.ui->displayFrameAll->setIcon(style()->icon(Style::IconRole::FrameAll));
     d.ui->displayRenderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
     d.ui->displayRenderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
-    // connect
+
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
         d.loadPolicy = Session::LoadPolicy::All;
         settings()->setValue("loadType", "all");
@@ -201,11 +304,10 @@ ViewerPrivate::init()
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
-        {
-            actions->addAction(d.ui->policyAll);
-            actions->addAction(d.ui->policyPayload);
-        }
+        actions->addAction(d.ui->policyAll);
+        actions->addAction(d.ui->policyPayload);
     }
+
     connect(d.ui->fileNew, &QAction::triggered, this, &ViewerPrivate::newFile);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->fileMerge, &QAction::triggered, this, &ViewerPrivate::merge);
@@ -219,6 +321,7 @@ ViewerPrivate::init()
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->fileSaveSettings, &QAction::triggered, this, &ViewerPrivate::saveSettings);
     connect(d.ui->fileExit, &QAction::triggered, this, &ViewerPrivate::exit);
+
     connect(d.ui->editUndo, &QAction::triggered, this, &ViewerPrivate::undo);
     connect(d.ui->editRedo, &QAction::triggered, this, &ViewerPrivate::redo);
     connect(d.ui->editClear, &QAction::triggered, this, &ViewerPrivate::clear);
@@ -232,32 +335,33 @@ ViewerPrivate::init()
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
     connect(d.ui->editHideRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
+
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
-        {
-            actions->addAction(d.ui->stageUpY);
-            actions->addAction(d.ui->stageUpZ);
-        }
+        actions->addAction(d.ui->stageUpY);
+        actions->addAction(d.ui->stageUpZ);
     }
+
     connect(d.ui->editPayloadLoad, &QAction::triggered, this, &ViewerPrivate::payloadLoad);
     connect(d.ui->editPayloadUnload, &QAction::triggered, this, &ViewerPrivate::payloadUnload);
     connect(d.ui->editPayloadInvertSelected, &QAction::triggered, this, &ViewerPrivate::payloadSelectInvert);
     connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
+
     connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
     connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
     connect(d.ui->displaySceneShaders, &QAction::toggled, this, &ViewerPrivate::sceneShaders);
     connect(d.ui->displayRenderShaded, &QAction::triggered, this, &ViewerPrivate::renderShaded);
     connect(d.ui->displayRenderWireframe, &QAction::triggered, this, &ViewerPrivate::renderWireframe);
+
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
-        {
-            actions->addAction(d.ui->displayRenderShaded);
-            actions->addAction(d.ui->displayRenderWireframe);
-        }
+        actions->addAction(d.ui->displayRenderShaded);
+        actions->addAction(d.ui->displayRenderWireframe);
     }
+
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
     connect(d.ui->displayFrameSelected, &QAction::triggered, this, &ViewerPrivate::frameSelected);
     connect(d.ui->displayResetView, &QAction::triggered, this, &ViewerPrivate::resetView);
@@ -265,28 +369,27 @@ ViewerPrivate::init()
     connect(d.ui->displayExpand, &QAction::triggered, this, &ViewerPrivate::expand);
     connect(d.ui->helpGithubReadme, &QAction::triggered, this, &ViewerPrivate::openGithubReadme);
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
-    {
-        d.ui->open->setDefaultAction(d.ui->fileOpen);
-        d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
-        d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
-        d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
-        d.ui->redo->setDefaultAction(d.ui->editRedo);
-        d.ui->undo->setDefaultAction(d.ui->editUndo);
-        d.ui->wireframe->setDefaultAction(d.ui->displayRenderShaded);
-        d.ui->shaded->setDefaultAction(d.ui->displayRenderWireframe);
-    }
+
+    d.ui->open->setDefaultAction(d.ui->fileOpen);
+    d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
+    d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
+    d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
+    d.ui->redo->setDefaultAction(d.ui->editRedo);
+    d.ui->undo->setDefaultAction(d.ui->editUndo);
+    d.ui->wireframe->setDefaultAction(d.ui->displayRenderShaded);
+    d.ui->shaded->setDefaultAction(d.ui->displayRenderWireframe);
+
     connect(d.backgroundColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::backgroundColor);
     connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
     connect(d.ui->themeDark, &QAction::triggered, this, &ViewerPrivate::dark);
+
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
-        {
-            actions->addAction(d.ui->themeLight);
-            actions->addAction(d.ui->themeDark);
-        }
+        actions->addAction(d.ui->themeLight);
+        actions->addAction(d.ui->themeDark);
     }
-    // models
+
     connect(session(), &Session::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
     connect(session(), &Session::maskChanged, this, &ViewerPrivate::maskChanged);
     connect(session(), &Session::primsChanged, this, &ViewerPrivate::primsChanged);
@@ -294,35 +397,25 @@ ViewerPrivate::init()
     connect(session(), &Session::stageUpChanged, this, &ViewerPrivate::stageUpChanged);
     connect(session(), &Session::notifyStatusChanged, this, &ViewerPrivate::notifyStatusChanged);
     connect(session()->selectionList(), &SelectionList::selectionChanged, this, &ViewerPrivate::selectionChanged);
-    // command stack
+
     connect(session()->commandStack(), &CommandStack::canUndoChanged, d.ui->editUndo, &QAction::setEnabled);
     connect(session()->commandStack(), &CommandStack::canRedoChanged, d.ui->editRedo, &QAction::setEnabled);
     connect(session()->commandStack(), &CommandStack::canClearChanged, d.ui->editClear, &QAction::setEnabled);
-    // views
+
     connect(d.ui->hudSceneTree, &QAction::toggled, this,
             [=](bool checked) { renderView()->setSceneTreeEnabled(checked); });
     connect(d.ui->hudGpuPerformance, &QAction::toggled, this,
             [=](bool checked) { renderView()->setGpuPerformanceEnabled(checked); });
     connect(d.ui->hudCameraAxis, &QAction::toggled, this,
             [=](bool checked) { renderView()->setCameraAxisEnabled(checked); });
-    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
-    connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
-    connect(d.ui->pythonDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewPython->setChecked(visible); });
-    // docks
-    connect(d.ui->outlinerDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewOutliner->setChecked(visible); });
-    connect(d.ui->progressDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewProgress->setChecked(visible); });
-    connect(d.ui->pythonDock, &QDockWidget::visibilityChanged, this,
-            [=](bool visible) { d.ui->viewPython->setChecked(visible); });
+
     connect(d.ui->viewOutliner, &QAction::toggled, this, &ViewerPrivate::toggleOutliner);
     connect(d.ui->viewProgress, &QAction::toggled, this, &ViewerPrivate::toggleProgress);
     connect(d.ui->viewPython, &QAction::toggled, this, &ViewerPrivate::togglePython);
-    // setup
+    connect(d.ui->viewConsole, &QAction::toggled, this, &ViewerPrivate::toggleConsole);
+
     renderView()->setFocus();
+
     initSettings();
     newFile();
 }
@@ -354,9 +447,10 @@ ViewerPrivate::initRecentFiles()
         });
         recentMenu->addAction(action);
     }
+
     recentMenu->addSeparator();
     QAction* clearAction = new QAction("Clear", recentMenu);
-    connect(clearAction, &QAction::triggered, this, [this, recentMenu]() {
+    connect(clearAction, &QAction::triggered, this, [this]() {
         d.recentFiles.clear();
         settings()->setValue("recentFiles", QStringList());
         initRecentFiles();
@@ -398,6 +492,7 @@ ViewerPrivate::initSettings()
         light();
         d.ui->themeLight->setChecked(true);
     }
+
     d.recentFiles = settings()->value("recentFiles", QStringList()).toStringList();
     initRecentFiles();
 }
@@ -419,8 +514,7 @@ ViewerPrivate::loadFile(const QString& fileName)
         return false;
     }
 
-    const qint64 elapsedMs = timer.elapsed();
-    const double elapsedSec = elapsedMs / 1000.0;
+    const double elapsedSec = timer.elapsed() / 1000.0;
 
     settings()->setValue("openDir", fileInfo.absolutePath());
     updateWindowTitle();
@@ -449,11 +543,10 @@ ViewerPrivate::mergeFile(const QString& fileName)
         return false;
     }
 
-    const qint64 elapsedMs = timer.elapsed();
-    const double elapsedSec = elapsedMs / 1000.0;
+    const double elapsedSec = timer.elapsed() / 1000.0;
 
     settings()->setValue("openDir", fileInfo.absolutePath());
-    updateStatus(Session::Notify::Status::Error,
+    updateStatus(Session::Notify::Status::Info,
                  QString("Merge %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     clearChanges();
     return true;
@@ -462,31 +555,43 @@ ViewerPrivate::mergeFile(const QString& fileName)
 DockWidget*
 ViewerPrivate::outlinerDock()
 {
-    return d.ui->outlinerDock;
+    return d.outlinerDock.data();
 }
 
 DockWidget*
 ViewerPrivate::progressDock()
 {
-    return d.ui->progressDock;
+    return d.progressDock.data();
+}
+
+DockWidget*
+ViewerPrivate::pythonDock()
+{
+    return d.pythonDock.data();
 }
 
 OutlinerView*
 ViewerPrivate::outlinerView()
 {
-    return d.ui->outlinerView;
+    return d.outlinerView.data();
 }
 
 ProgressView*
 ViewerPrivate::progressView()
 {
-    return d.ui->progressView;
+    return d.progressView.data();
 }
 
 PythonView*
 ViewerPrivate::pythonView()
 {
-    return d.ui->pythonView;
+    return d.pythonView.data();
+}
+
+ConsoleWidget*
+ViewerPrivate::consoleWidget()
+{
+    return d.consoleWidget.data();
 }
 
 RenderView*
@@ -498,16 +603,20 @@ ViewerPrivate::renderView()
 bool
 ViewerPrivate::eventFilter(QObject* object, QEvent* event)
 {
+    Q_UNUSED(object);
+
     if (event->type() == QEvent::WindowStateChange) {
         Qt::WindowStates state = d.viewer->windowState();
         if (!(state & Qt::WindowMinimized)) {
             QTimer::singleShot(0, d.viewer, [this]() {
-                if (d.ui->viewOutliner->isChecked() && !d.ui->outlinerDock->isVisible())
-                    d.ui->outlinerDock->show();
-                if (d.ui->viewProgress->isChecked() && !d.ui->progressDock->isVisible())
-                    d.ui->progressDock->show();
-                if (d.ui->viewPython->isChecked() && !d.ui->pythonDock->isVisible())
-                    d.ui->progressDock->show();
+                if (d.ui->viewOutliner->isChecked() && d.outlinerDock && !d.outlinerDock->isVisible())
+                    d.outlinerDock->show();
+                if (d.ui->viewProgress->isChecked() && d.progressDock && !d.progressDock->isVisible())
+                    d.progressDock->show();
+                if (d.ui->viewPython->isChecked() && d.pythonDock && !d.pythonDock->isVisible())
+                    d.pythonDock->show();
+                if (d.ui->viewConsole->isChecked() && d.consoleWidget && !d.consoleWidget->isVisible())
+                    d.consoleWidget->show();
             });
         }
     }
@@ -582,14 +691,13 @@ ViewerPrivate::open()
 
     QString openDir = settings()->value("openDir", QDir::homePath()).toString();
     QStringList filters;
-    for (const QString& ext : d.extensions) {
+    for (const QString& ext : d.extensions)
         filters.append("*." + ext);
-    }
+
     QString filter = QString("USD Files (%1)").arg(filters.join(' '));
     QString filename = QFileDialog::getOpenFileName(d.viewer.data(), "Open USD File", openDir, filter);
-    if (filename.size()) {
+    if (!filename.isEmpty())
         loadFile(filename);
-    }
 }
 
 void
@@ -605,7 +713,6 @@ ViewerPrivate::merge()
     filters.append("*.session");
     for (const QString& ext : d.extensions)
         filters.append("*." + ext);
-
     filters.removeDuplicates();
 
     const QString filter = QString("USD and Session Files (%1)").arg(filters.join(' '));
@@ -656,8 +763,7 @@ ViewerPrivate::saveAs()
     timer.start();
 
     if (session()->saveToFile(filename)) {
-        const qint64 elapsedMs = timer.elapsed();
-        const double elapsedSec = elapsedMs / 1000.0;
+        const double elapsedSec = timer.elapsed() / 1000.0;
 
         settings()->setValue("saveDir", QFileInfo(filename).absolutePath());
         updateWindowTitle();
@@ -706,8 +812,7 @@ ViewerPrivate::saveCopy()
     timer.start();
 
     if (session()->copyToFile(filename)) {
-        const qint64 elapsedMs = timer.elapsed();
-        const double elapsedSec = elapsedMs / 1000.0;
+        const double elapsedSec = timer.elapsed() / 1000.0;
 
         settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
         updateStatus(Session::Notify::Status::Info,
@@ -734,9 +839,7 @@ ViewerPrivate::reload()
         return;
     }
 
-    const qint64 elapsedMs = timer.elapsed();
-    const double elapsedSec = elapsedMs / 1000.0;
-
+    const double elapsedSec = timer.elapsed() / 1000.0;
     session()->commandStack()->clear();
     clearChanges();
     updateStatus(Session::Notify::Status::Info,
@@ -746,16 +849,17 @@ ViewerPrivate::reload()
 void
 ViewerPrivate::close()
 {
-    if (session()->isLoaded()) {
-        if (!saveChanges())
-            return;
-        session()->commandStack()->clear();
-        session()->close();
-        d.init = false;
-        updateWindowTitle();
-        clearChanges();
-        enable(false);
-    }
+    if (!session()->isLoaded())
+        return;
+    if (!saveChanges())
+        return;
+
+    session()->commandStack()->clear();
+    session()->close();
+    d.init = false;
+    updateWindowTitle();
+    clearChanges();
+    enable(false);
 }
 
 void
@@ -793,21 +897,21 @@ ViewerPrivate::selectAll()
 void
 ViewerPrivate::selectInvert()
 {
-    if (session()->selectionList()->paths().size()) {
+    if (session()->selectionList()->paths().size())
         session()->commandStack()->run(new Command(usdviewer::selectInvert()));
-    }
 }
 
 void
 ViewerPrivate::backgroundColor()
 {
     QColor color = QColorDialog::getColor(d.backgroundColor, d.viewer.data(), "Select color");
-    if (color.isValid()) {
-        renderView()->setBackgroundColor(color);
-        d.ui->backgroundColor->setStyleSheet("background-color: " + color.name() + ";");
-        settings()->setValue("backgroundColor", color.name());
-        d.backgroundColor = color;
-    }
+    if (!color.isValid())
+        return;
+
+    renderView()->setBackgroundColor(color);
+    d.ui->backgroundColor->setStyleSheet("background-color: " + color.name() + ";");
+    settings()->setValue("backgroundColor", color.name());
+    d.backgroundColor = color;
 }
 
 void
@@ -844,8 +948,7 @@ ViewerPrivate::exportAll()
     timer.start();
 
     if (session()->flattenToFile(fileName)) {
-        const qint64 elapsedMs = timer.elapsed();
-        const double elapsedSec = elapsedMs / 1000.0;
+        const double elapsedSec = timer.elapsed() / 1000.0;
         settings()->setValue("exportAllDir", QFileInfo(fileName).absolutePath());
         updateStatus(Session::Notify::Status::Info,
                      QString("Exported all to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
@@ -889,8 +992,7 @@ ViewerPrivate::exportSelected()
     timer.start();
 
     if (session()->flattenPathsToFile(session()->selectionList()->paths(), fileName)) {
-        const qint64 elapsedMs = timer.elapsed();
-        const double elapsedSec = elapsedMs / 1000.0;
+        const double elapsedSec = timer.elapsed() / 1000.0;
         settings()->setValue("exportSelectedDir", QFileInfo(fileName).absolutePath());
         updateStatus(
             Session::Notify::Status::Info,
@@ -906,38 +1008,40 @@ ViewerPrivate::exportImage()
 {
     QString exportImageDir = settings()->value("exportImageDir", QDir::homePath()).toString();
     QImage image = renderView()->captureImage();
+
     QStringList filters;
     QList<QByteArray> formats = QImageWriter::supportedImageFormats();
     QString defaultFormat = "png";
     filters.append("PNG Files (*.png)");
     for (const QByteArray& format : formats) {
         QString ext = QString(format).toLower();
-        if (ext != defaultFormat) {
+        if (ext != defaultFormat)
             filters.append(QString("%1 Files (*.%2)").arg(ext.toUpper(), ext));
-        }
     }
     filters.append("All Files (*)");
-    QString filter = filters.join(";;");
-    QString exportName = exportImageDir + "/image." + defaultFormat;
-    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export Image", exportName, filter);
-    if (!filename.isEmpty()) {
-        QString extension = QFileInfo(filename).suffix().toLower();
-        if (extension.isEmpty()) {
-            filename += "." + defaultFormat;
-            extension = defaultFormat;
-        }
-        if (!formats.contains(extension.toUtf8())) {
-            qWarning() << "unsupported file format: " << extension;
-            filename = QFileInfo(filename).completeBaseName() + ".png";
-            extension = defaultFormat;
-        }
-        if (image.save(filename, extension.toUtf8().constData())) {
-            settings()->setValue("exportImageDir", QFileInfo(filename).absolutePath());
-        }
-        else {
-            qWarning() << "failed to save image: " << filename;
-        }
+
+    QString filename = QFileDialog::getSaveFileName(d.viewer.data(), "Export Image",
+                                                    exportImageDir + "/image." + defaultFormat, filters.join(";;"));
+
+    if (filename.isEmpty())
+        return;
+
+    QString extension = QFileInfo(filename).suffix().toLower();
+    if (extension.isEmpty()) {
+        filename += "." + defaultFormat;
+        extension = defaultFormat;
     }
+
+    if (!formats.contains(extension.toUtf8())) {
+        qWarning() << "unsupported file format: " << extension;
+        filename = QFileInfo(filename).completeBaseName() + ".png";
+        extension = defaultFormat;
+    }
+
+    if (image.save(filename, extension.toUtf8().constData()))
+        settings()->setValue("exportImageDir", QFileInfo(filename).absolutePath());
+    else
+        qWarning() << "failed to save image: " << filename;
 }
 
 void
@@ -959,36 +1063,32 @@ void
 ViewerPrivate::showSelected()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
-    if (paths.size()) {
+    if (paths.size())
         session()->commandStack()->run(new Command(showPaths(paths, false)));
-    }
 }
 
 void
 ViewerPrivate::showRecursive()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
-    if (paths.size()) {
+    if (paths.size())
         session()->commandStack()->run(new Command(showPaths(paths, true)));
-    }
 }
 
 void
 ViewerPrivate::hideSelected()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
-    if (paths.size()) {
+    if (paths.size())
         session()->commandStack()->run(new Command(hidePaths(paths, false)));
-    }
 }
 
 void
 ViewerPrivate::hideRecursive()
 {
     QList<SdfPath> paths = session()->selectionList()->paths();
-    if (paths.size()) {
+    if (paths.size())
         session()->commandStack()->run(new Command(hidePaths(paths, true)));
-    }
 }
 
 void
@@ -1001,9 +1101,8 @@ void
 ViewerPrivate::selectVisibleSelect()
 {
     QList<SdfPath> paths = renderView()->visibleCapturePaths();
-    if (paths.size()) {
+    if (paths.size())
         session()->commandStack()->run(new Command(selectPaths(paths)));
-    }
 }
 
 void
@@ -1037,7 +1136,6 @@ ViewerPrivate::payloadLoad()
         const UsdStageRefPtr stage = session()->stageUnsafe();
         if (!stage)
             return;
-
         payloadPaths = stage::selectionPayloadPaths(stage, selectedPaths);
     }
 
@@ -1071,7 +1169,6 @@ ViewerPrivate::payloadVariant(int variant)
     for (auto it = variantSets.cbegin(); it != variantSets.cend(); ++it) {
         const QString& setName = it.key();
         const QList<QString>& values = it.value();
-
         for (const QString& value : values) {
             if (index == variant) {
                 session()->commandStack()->run(new Command(loadPayloads(payloadPaths, setName, value)));
@@ -1095,7 +1192,6 @@ ViewerPrivate::payloadUnload()
         const UsdStageRefPtr stage = session()->stageUnsafe();
         if (!stage)
             return;
-
         payloadPaths = stage::selectionPayloadPaths(stage, selectedPaths);
     }
 
@@ -1106,9 +1202,8 @@ ViewerPrivate::payloadUnload()
 void
 ViewerPrivate::payloadSelectInvert()
 {
-    if (session()->selectionList()->paths().size()) {
+    if (session()->selectionList()->paths().size())
         session()->commandStack()->run(new Command(selectInvertPayload()));
-    }
 }
 
 void
@@ -1129,17 +1224,15 @@ ViewerPrivate::isolate(bool checked)
 void
 ViewerPrivate::frameAll()
 {
-    if (session()->isLoaded()) {
+    if (session()->isLoaded())
         renderView()->frameAll();
-    }
 }
 
 void
 ViewerPrivate::frameSelected()
 {
-    if (session()->selectionList()->paths().size()) {
+    if (session()->selectionList()->paths().size())
         renderView()->frameSelected();
-    }
 }
 
 void
@@ -1157,9 +1250,8 @@ ViewerPrivate::collapse()
 void
 ViewerPrivate::expand()
 {
-    if (session()->selectionList()->paths().size()) {
+    if (session()->selectionList()->paths().size())
         outlinerView()->expand();
-    }
 }
 
 void
@@ -1209,51 +1301,58 @@ ViewerPrivate::dark()
 void
 ViewerPrivate::toggleOutliner(bool checked)
 {
+    if (!d.outlinerDock)
+        return;
     if (checked) {
-        if (!d.ui->outlinerDock->isVisible()) {
-            d.ui->outlinerDock->setFloating(false);
-            if (!d.ui->outlinerDock->parentWidget())
-                d.viewer->addDockWidget(d.outlinerArea, d.ui->outlinerDock);
-            d.ui->outlinerDock->show();
-        }
+        d.outlinerDock->show();
+        d.outlinerDock->raise();
     }
     else {
-        if (d.ui->outlinerDock->isVisible())
-            d.ui->outlinerDock->hide();
+        d.outlinerDock->hide();
     }
 }
 
 void
 ViewerPrivate::toggleProgress(bool checked)
 {
+    if (!d.progressDock)
+        return;
     if (checked) {
-        if (!d.ui->progressDock->isVisible()) {
-            d.ui->progressDock->setFloating(false);
-            if (!d.ui->progressDock->parentWidget())
-                d.viewer->addDockWidget(d.progressArea, d.ui->progressDock);
-            d.ui->progressDock->show();
-        }
+        d.progressDock->show();
+        d.progressDock->raise();
     }
     else {
-        if (d.ui->progressDock->isVisible())
-            d.ui->progressDock->hide();
+        d.progressDock->hide();
     }
 }
 
 void
 ViewerPrivate::togglePython(bool checked)
 {
+    if (!d.pythonDock)
+        return;
     if (checked) {
-        if (!d.ui->pythonDock->isVisible()) {
-            d.ui->pythonDock->setFloating(false);
-            if (!d.ui->pythonDock->parentWidget())
-                d.viewer->addDockWidget(d.pythonArea, d.ui->pythonDock);
-            d.ui->pythonDock->show();
-        }
+        d.pythonDock->show();
+        d.pythonDock->raise();
     }
     else {
-        if (d.ui->pythonDock->isVisible())
-            d.ui->pythonDock->hide();
+        d.pythonDock->hide();
+    }
+}
+
+void
+ViewerPrivate::toggleConsole(bool checked)
+{
+    if (!d.consoleWidget)
+        return;
+
+    if (checked) {
+        d.consoleWidget->show();
+        d.consoleWidget->raise();
+        d.consoleWidget->activateWindow();
+    }
+    else {
+        d.consoleWidget->hide();
     }
 }
 
@@ -1320,7 +1419,6 @@ ViewerPrivate::selectionChanged(const QList<SdfPath>& paths)
                 canUnloadSelected = true;
             else
                 canLoadSelected = true;
-
             if (canLoadSelected && canUnloadSelected)
                 break;
         }
@@ -1363,10 +1461,7 @@ void
 ViewerPrivate::maskChanged(const QList<SdfPath>& paths)
 {
     SignalGuard::Scope guard(this);
-    if (paths.isEmpty())
-        d.ui->displayIsolate->setChecked(false);
-    else
-        d.ui->displayIsolate->setChecked(true);
+    d.ui->displayIsolate->setChecked(!paths.isEmpty());
 }
 
 void
@@ -1381,10 +1476,12 @@ ViewerPrivate::primsChanged(const NoticeBatch& batch)
 void
 ViewerPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy, Session::StageStatus status)
 {
+    Q_UNUSED(stage);
+    Q_UNUSED(policy);
+
     d.init = false;
-    if (status == Session::StageStatus::Loaded) {
+    if (status == Session::StageStatus::Loaded)
         enable(true);
-    }
 }
 
 void
@@ -1405,7 +1502,6 @@ ViewerPrivate::updateModified(bool modified)
 {
     if (d.modified == modified)
         return;
-
     d.modified = modified;
     updateWindowTitle();
 }
@@ -1434,9 +1530,7 @@ ViewerPrivate::updateStatus(Session::Notify::Status status, const QString& messa
     const int timeoutMs = isError ? 8000 : 4000;
 
     if (isError) {
-        bar->setStyleSheet(QStringLiteral("QStatusBar {"
-                                          "  background-color: rgba(255, 120, 120, 0.20);"
-                                          "}"
+        bar->setStyleSheet(QStringLiteral("QStatusBar { background-color: rgba(255, 120, 120, 0.20); }"
                                           "QStatusBar::item { border: none; }"));
     }
     else {
@@ -1455,14 +1549,17 @@ void
 ViewerPrivate::updateWindowTitle()
 {
     const QString title = QStringLiteral("%1 build:%2 (%3)").arg(PROJECT_NAME, PROJECT_BUILD_DATE, PROJECT_BUILD_CONFIG);
+
     if (!session()->isLoaded()) {
         d.viewer->setWindowTitle(title);
         return;
     }
+
     const QString filename = session()->filename();
     QString name = filename.isEmpty() ? QStringLiteral("Untitled") : QFileInfo(filename).fileName();
     if (d.modified)
         name.prepend(QLatin1Char('*'));
+
     d.viewer->setWindowTitle(QStringLiteral("%1: %2").arg(title, name));
 }
 
@@ -1479,9 +1576,7 @@ ViewerPrivate::saveFile()
     timer.start();
 
     if (session()->saveToFile(filename)) {
-        const qint64 elapsedMs = timer.elapsed();
-        const double elapsedSec = elapsedMs / 1000.0;
-
+        const double elapsedSec = timer.elapsed() / 1000.0;
         updateWindowTitle();
         clearChanges();
         updateStatus(Session::Notify::Status::Info,
@@ -1526,8 +1621,6 @@ ViewerPrivate::hasChanges() const
     return d.changes > 0;
 }
 
-#include "viewer.moc"
-
 Viewer::Viewer(QWidget* parent)
     : QMainWindow(parent)
     , p(new ViewerPrivate())
@@ -1542,6 +1635,7 @@ void
 Viewer::setArguments(const QStringList& arguments)
 {
     p->d.arguments = arguments;
+
     for (int i = 0; i < arguments.size(); ++i) {
         if (arguments[i] == "--open" && i + 1 < arguments.size()) {
             QString filename = arguments[i + 1];
@@ -1551,6 +1645,7 @@ Viewer::setArguments(const QStringList& arguments)
             }
         }
     }
+
     if (arguments.size() == 2) {
         QString arg = arguments[1];
         const QString protocolPrefix = "usdviewer://";
@@ -1611,4 +1706,7 @@ Viewer::dropEvent(QDropEvent* event)
     }
     event->ignore();
 }
+
 }  // namespace usdviewer
+
+#include "viewer.moc"

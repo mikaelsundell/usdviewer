@@ -9,6 +9,7 @@
 
 namespace usdviewer {
 class PythonInterpreter;
+class Console;
 class Session;
 class Style;
 class Settings;
@@ -39,6 +40,11 @@ public:
 
     /** @name Subsystems */
     ///@{
+
+    /**
+     * @brief Returns the console subsystem.
+     */
+    Console* console() const;
 
     /**
      * @brief Returns the python interpreter subsystem.
@@ -82,6 +88,16 @@ inline Application*
 app()
 {
     return Application::instance();
+}
+
+/**
+ * @brief Returns the global console subsystem.
+ */
+inline Console*
+console()
+{
+    auto* a = app();
+    return a ? a->console() : nullptr;
 }
 
 /**

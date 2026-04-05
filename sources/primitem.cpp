@@ -23,7 +23,6 @@ class PrimItemPrivate {
 public:
     void init();
     void updateCache();
-
     struct Data {
         UsdStageRefPtr stage;
         SdfPath path;
@@ -54,7 +53,6 @@ PrimItemPrivate::updateCache()
 {
     if (!d.dirty)
         return;
-
     d.visible = true;
     d.active = false;
     d.hasPayload = false;
@@ -62,7 +60,6 @@ PrimItemPrivate::updateCache()
     d.isRoot = false;
     d.name.clear();
     d.typeName.clear();
-
     if (!d.stage) {
         d.dirty = false;
         return;

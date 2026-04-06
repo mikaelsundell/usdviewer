@@ -246,6 +246,7 @@ StylePrivate::updateTheme(Style::Theme theme)
     d.icons[roleName(Style::IconRole::BranchOpen)] = ":/icons/resources/BranchOpen.png";
     d.icons[roleName(Style::IconRole::BranchClosed)] = ":/icons/resources/BranchClosed.png";
     d.icons[roleName(Style::IconRole::Clear)] = ":/icons/resources/Clear.png";
+    d.icons[roleName(Style::IconRole::Code)] = ":/icons/resources/Code.png";
     d.icons[roleName(Style::IconRole::Collapse)] = ":/icons/resources/Collapse.png";
     d.icons[roleName(Style::IconRole::Export)] = ":/icons/resources/Export.png";
     d.icons[roleName(Style::IconRole::ExportImage)] = ":/icons/resources/ExportImage.png";

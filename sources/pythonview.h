@@ -41,6 +41,7 @@ public:
     virtual ~PythonView();
 
 private:
+    Q_DISABLE_COPY_MOVE(PythonView)
     QScopedPointer<PythonViewPrivate> p;
 };
 

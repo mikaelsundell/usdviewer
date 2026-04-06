@@ -23,6 +23,100 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace usdviewer {
 namespace qt {
 
+    /** @name Qt / Image Conversions */
+    ///@{
+    /**
+     * @brief Encodes an image as PNG bytes.
+     *
+     * Returns an empty byte array if the input image is null or if the image
+     * could not be written as PNG data.
+     *
+     * @param image The image to encode.
+     * @return PNG-encoded image bytes.
+     */
+    QByteArray imageToPngBytes(const QImage& image);
+
+    /**
+     * @brief Decodes an image from PNG bytes.
+     *
+     * Returns a null image if the input byte array is empty or if the PNG data
+     * could not be decoded.
+     *
+     * @param bytes The PNG-encoded image bytes.
+     * @return The decoded image.
+     */
+    QImage pngBytesToImage(const QByteArray& bytes);
+
+    /**
+     * @brief Creates an icon from PNG-encoded image bytes.
+     *
+     * Returns a null icon if the input byte array is empty or if the PNG data
+     * could not be decoded into an image.
+     *
+     * @param bytes The PNG-encoded image bytes.
+     * @return An icon created from the decoded image.
+     */
+    QIcon pngBytesToIcon(const QByteArray& bytes);
+
+    ///@}
+
+    /** @name Qt / String and text Conversions */
+    ///@{
+
+    /**
+     * @brief Normalizes all line ending variants to LF newlines.
+     *
+     * Converts CRLF, CR, Unicode line separator (U+2028), and Unicode paragraph
+     * separator (U+2029) into the standard line feed character (`'\n'`).
+     *
+     * @param text The input text to normalize.
+     * @return A copy of the text with normalized newlines.
+     */
+    QString normalizeNewlines(const QString& text);
+
+    /**
+     * @brief Returns the first non-empty trimmed line from a block of text.
+     *
+     * Splits the input text on line feeds, trims each line, and returns the first
+     * line that is not empty after trimming. Returns an empty string if no such
+     * line exists.
+     *
+     * @param text The input text to inspect.
+     * @return The first non-empty trimmed line, or an empty string if none exists.
+     */
+    QString firstNonEmptyLine(const QString& text);
+
+    /**
+     * @brief Truncates text to a maximum length and appends an ellipsis if needed.
+     *
+     * The input text is trimmed before processing. If the trimmed text length
+     * exceeds @p maxLength, the result is shortened to that length, trimmed again,
+     * and suffixed with `...`. Returns an empty string if @p maxLength is zero or
+     * negative.
+     *
+     * @param text The input text to shorten.
+     * @param maxLength The maximum number of characters to keep before appending
+     * an ellipsis.
+     * @return The original trimmed text if it fits, otherwise an elided version.
+     */
+    QString elideText(const QString& text, int maxLength);
+
+    /**
+     * @brief Removes a prefix from text if it is present.
+     *
+     * Trims the input text, checks whether it starts with @p prefix, and if so
+     * removes that prefix and trims the remainder. If the prefix is not present,
+     * the trimmed input text is returned unchanged.
+     *
+     * @param text The input text to process.
+     * @param prefix The prefix to remove when present.
+     * @return The trimmed text with the prefix removed if matched.
+     */
+    QString stripPrefix(const QString& text, const QString& prefix);
+
+    ///@}
+
+
     /** @name Qt / USD Conversions */
     ///@{
 

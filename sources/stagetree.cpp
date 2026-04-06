@@ -5,6 +5,7 @@
 #include "stagetree.h"
 #include "application.h"
 #include "command.h"
+#include "mime.h"
 #include "primitem.h"
 #include "qtutils.h"
 #include "selectionlist.h"
@@ -85,10 +86,6 @@ public:
 public:
     enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
     struct Data {
-        static constexpr const char* primPathMime = "application/x-usdviewer-prim-path";
-        static constexpr const char* dropItemPtrProperty = "_usdviewer_drop_item_ptr";
-        static constexpr const char* dropModeProperty = "_usdviewer_drop_mode";
-
         int pending = 0;
         bool payloadEnabled = false;
         QString filter;
@@ -173,8 +170,8 @@ StageTreePrivate::clearDropIndicator()
     if (!d.tree)
         return;
 
-    d.tree->setProperty(Data::dropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
-    d.tree->setProperty(Data::dropModeProperty, DropNone);
+    d.tree->setProperty(mime::dropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
+    d.tree->setProperty(mime::dropModeProperty, DropNone);
 
     if (d.tree->updatesEnabled())
         d.tree->update();
@@ -187,8 +184,8 @@ StageTreePrivate::setDropIndicator(QTreeWidgetItem* item, int mode)
         return;
 
     const qulonglong ptr = reinterpret_cast<qulonglong>(item);
-    d.tree->setProperty(Data::dropItemPtrProperty, QVariant::fromValue(ptr));
-    d.tree->setProperty(Data::dropModeProperty, mode);
+    d.tree->setProperty(mime::dropItemPtrProperty, QVariant::fromValue(ptr));
+    d.tree->setProperty(mime::dropModeProperty, mode);
 
     if (d.tree->updatesEnabled())
         d.tree->update();
@@ -1728,7 +1725,7 @@ StageTree::startDrag(Qt::DropActions supportedActions)
         return;
 
     auto* mime = new QMimeData();
-    mime->setData(StageTreePrivate::Data::primPathMime, pathString.toUtf8());
+    mime->setData(mime::primPath, pathString.toUtf8());
 
     auto* drag = new QDrag(this);
     drag->setMimeData(mime);
@@ -1738,7 +1735,7 @@ StageTree::startDrag(Qt::DropActions supportedActions)
 void
 StageTree::dragEnterEvent(QDragEnterEvent* event)
 {
-    if (!event->mimeData()->hasFormat(StageTreePrivate::Data::primPathMime)) {
+    if (!event->mimeData()->hasFormat(mime::primPath)) {
         p->clearDropIndicator();
         event->ignore();
         return;
@@ -1750,7 +1747,7 @@ StageTree::dragEnterEvent(QDragEnterEvent* event)
 void
 StageTree::dragMoveEvent(QDragMoveEvent* event)
 {
-    if (!event->mimeData()->hasFormat(StageTreePrivate::Data::primPathMime)) {
+    if (!event->mimeData()->hasFormat(mime::primPath)) {
         p->clearDropIndicator();
         event->ignore();
         return;
@@ -1764,7 +1761,7 @@ StageTree::dragMoveEvent(QDragMoveEvent* event)
     }
 
     auto* primTarget = static_cast<PrimItem*>(target);
-    const QString fromPathString = QString::fromUtf8(event->mimeData()->data(StageTreePrivate::Data::primPathMime));
+    const QString fromPathString = QString::fromUtf8(event->mimeData()->data(mime::primPath));
     const QString targetPathString = primTarget->data(0, PrimItem::Path).toString();
 
     if (fromPathString.isEmpty() || targetPathString.isEmpty()) {
@@ -1799,7 +1796,7 @@ StageTree::dragMoveEvent(QDragMoveEvent* event)
 void
 StageTree::dropEvent(QDropEvent* event)
 {
-    if (!event->mimeData()->hasFormat(StageTreePrivate::Data::primPathMime)) {
+    if (!event->mimeData()->hasFormat(mime::primPath)) {
         p->clearDropIndicator();
         event->ignore();
         return;
@@ -1812,7 +1809,7 @@ StageTree::dropEvent(QDropEvent* event)
         return;
     }
 
-    const QString fromPathString = QString::fromUtf8(event->mimeData()->data(StageTreePrivate::Data::primPathMime));
+    const QString fromPathString = QString::fromUtf8(event->mimeData()->data(mime::primPath));
     const QString targetPathString = targetItem->data(0, PrimItem::Path).toString();
 
     if (fromPathString.isEmpty() || targetPathString.isEmpty()) {
@@ -1823,7 +1820,7 @@ StageTree::dropEvent(QDropEvent* event)
 
     const SdfPath fromPath(QStringToString(fromPathString));
     const SdfPath targetPath(QStringToString(targetPathString));
-    const int mode = property(StageTreePrivate::Data::dropModeProperty).toInt();
+    const int mode = property(mime::dropModeProperty).toInt();
 
     SdfPath newParentPath;
     int insertIndex = -1;

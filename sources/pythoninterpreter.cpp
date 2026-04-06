@@ -138,11 +138,16 @@ PythonInterpreterPrivate::release()
 QString
 PythonInterpreterPrivate::executeScript(const QString& script)
 {
-    if (!d.initialized)
-        return "Python not initialized";
+    if (!d.initialized) {
+        const QString error = QStringLiteral("Python not initialized");
+        session()->notifyStatus(Session::Notify::Status::Error,
+                                QStringLiteral("Python script failed. Check the Python log for details."));
+        return error;
+    }
 
     QString output;
     PyGILState_STATE gil = PyGILState_Ensure();
+
     try {
         QByteArray scriptBytes = script.toUtf8();
         const char* code = scriptBytes.constData();
@@ -153,6 +158,7 @@ PythonInterpreterPrivate::executeScript(const QString& script)
         PyObject* result = PyRun_String(code, Py_file_input, d.globals, d.locals);
 
         session()->setPrimsUpdate(Session::PrimsUpdate::Immediate);
+
         if (result) {
             if (result != Py_None) {
                 PyObject* str = PyObject_Str(result);
@@ -165,12 +171,24 @@ PythonInterpreterPrivate::executeScript(const QString& script)
         }
         else {
             output = pythonError();
+            qWarning().noquote() << "[Python]" << output;
+            session()->notifyStatus(Session::Notify::Status::Error,
+                                    QStringLiteral("Python script failed. Check the Python log for details."));
         }
     } catch (const std::exception& e) {
-        output = QString("[c++ exception] ") + e.what();
+        session()->setPrimsUpdate(Session::PrimsUpdate::Immediate);
+        output = QStringLiteral("[C++ exception] ") + QString::fromUtf8(e.what());
+        qWarning().noquote() << output;
+        session()->notifyStatus(Session::Notify::Status::Error,
+                                QStringLiteral("Python script failed. Check the Python log for details."));
     } catch (...) {
-        output = "[c++ exception] Unknown error";
+        session()->setPrimsUpdate(Session::PrimsUpdate::Immediate);
+        output = QStringLiteral("[C++ exception] Unknown error");
+        qWarning().noquote() << output;
+        session()->notifyStatus(Session::Notify::Status::Error,
+                                QStringLiteral("Python script failed. Check the Python log for details."));
     }
+
     PyGILState_Release(gil);
     return output;
 }

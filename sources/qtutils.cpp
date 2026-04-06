@@ -3,7 +3,11 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "qtutils.h"
+#include <QBuffer>
 #include <QColor>
+#include <QIcon>
+#include <QImage>
+#include <QPixmap>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdGeom/bboxCache.h>
@@ -11,6 +15,72 @@
 
 namespace usdviewer {
 namespace qt {
+
+    QByteArray imageToPngBytes(const QImage& image)
+    {
+        if (image.isNull())
+            return QByteArray();
+
+        QByteArray bytes;
+        QBuffer buffer(&bytes);
+        if (!buffer.open(QIODevice::WriteOnly))
+            return QByteArray();
+
+        image.save(&buffer, "PNG");
+        return bytes;
+    }
+
+    QImage pngBytesToImage(const QByteArray& bytes)
+    {
+        if (bytes.isEmpty())
+            return QImage();
+
+        QImage image;
+        image.loadFromData(bytes, "PNG");
+        return image;
+    }
+
+    QString normalizeNewlines(const QString& text)
+    {
+        QString out = text;
+        out.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+        out.replace(QChar('\r'), QChar('\n'));
+        out.replace(QChar(0x2028), QChar('\n'));
+        out.replace(QChar(0x2029), QChar('\n'));
+        return out;
+    }
+
+    QString firstNonEmptyLine(const QString& text)
+    {
+        const QStringList lines = text.split('\n');
+        for (QString line : lines) {
+            line = line.trimmed();
+            if (!line.isEmpty())
+                return line;
+        }
+        return QString();
+    }
+
+    QString stripPrefix(const QString& text, const QString& prefix)
+    {
+        QString out = text.trimmed();
+        if (out.startsWith(prefix))
+            out = out.mid(prefix.size()).trimmed();
+        return out;
+    }
+
+    QString elideText(const QString& text, int maxLength)
+    {
+        if (maxLength <= 0)
+            return QString();
+        QString out = text.trimmed();
+        if (out.length() > maxLength)
+            out = out.left(maxLength).trimmed() + "...";
+        return out;
+    }
+
+    QIcon pngBytesToIcon(const QByteArray& bytes) { return QIcon(QPixmap::fromImage(pngBytesToImage(bytes))); }
+
     std::string QStringToString(const QString& str) { return str.toUtf8().constData(); }
 
     QString StringToQString(const std::string& str) { return QString::fromUtf8(str.c_str()); }

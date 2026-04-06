@@ -69,7 +69,6 @@ ProgressViewPrivate::init()
 {
     d.ui.reset(new Ui_ProgressView());
     d.ui->setupUi(d.view.data());
-
     progressTree()->installEventFilter(this);
     progressTree()->setHeaderLabels(QStringList() << "Command"
                                                   << "Status");
@@ -78,12 +77,11 @@ ProgressViewPrivate::init()
     progressTree()->setItemsExpandable(true);
     progressTree()->setExpandsOnDoubleClick(true);
     progressTree()->setSelectionMode(QAbstractItemView::SingleSelection);
-
     d.ui->progress->setValue(0);
-    d.ui->status->setText(QString());
+    d.ui->status->setText("Idle");
     d.ui->clear->setEnabled(false);
     d.ui->cancel->setEnabled(false);
-
+    // connect
     connect(d.ui->clear, &QPushButton::clicked, this, &ProgressViewPrivate::clear);
     connect(d.ui->cancel, &QPushButton::clicked, this, &ProgressViewPrivate::cancel);
     connect(progressTree(), &QTreeWidget::itemSelectionChanged, this,
@@ -199,7 +197,7 @@ ProgressViewPrivate::clear()
     d.expectedCount = 0;
     d.ui->progress->setValue(0);
     if (!d.running)
-        d.ui->status->setText(QString());
+        d.ui->status->setText("Idle");
     d.ui->clear->setEnabled(false);
 }
 
@@ -344,7 +342,7 @@ ProgressViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy poli
     d.ui->progress->setValue(0);
     d.ui->cancel->setEnabled(false);
     d.ui->clear->setEnabled(false);
-    d.ui->status->setText(QString());
+    d.ui->status->setText("Idle");
 }
 
 void

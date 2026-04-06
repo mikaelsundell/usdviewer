@@ -55,6 +55,7 @@ public:
         BranchOpen,
         BranchClosed,
         Clear,
+        Code,
         Collapse,
         Expand,
         Export,

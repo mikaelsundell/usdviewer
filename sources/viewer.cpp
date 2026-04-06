@@ -135,7 +135,6 @@ public Q_SLOTS:
 public:
     void updateModified(bool modified);
     void updateRecentFiles(const QString& filename);
-    void updateStatus(Session::Notify::Status status, const QString& message);
     void updateWindowTitle();
     bool saveFile();
     bool saveChanges();
@@ -157,11 +156,9 @@ public:
         QScopedPointer<MouseEvent> backgroundColorFilter;
         QScopedPointer<Ui_Viewer> ui;
         QPointer<Viewer> viewer;
-
         QPointer<DockWidget> outlinerDock;
         QPointer<DockWidget> progressDock;
         QPointer<DockWidget> pythonDock;
-
         QPointer<OutlinerView> outlinerView;
         QPointer<ProgressView> progressView;
         QPointer<PythonView> pythonView;
@@ -222,23 +219,20 @@ ViewerPrivate::initDocks()
     d.outlinerView->setObjectName("outlinerView");
     d.outlinerView->setAttribute(Qt::WA_DeleteOnClose, false);
     d.outlinerDock = createDock("outlinerDock", "Outliner", d.outlinerView, d.outlinerArea);
-
     d.progressView = new ProgressView(d.viewer.data());
     d.progressView->setObjectName("progressView");
     d.progressView->setAttribute(Qt::WA_DeleteOnClose, false);
     d.progressDock = createDock("progressDock", "Progress", d.progressView, d.progressArea);
-
     d.pythonView = new PythonView(d.viewer.data());
     d.pythonView->setObjectName("pythonView");
     d.pythonView->setAttribute(Qt::WA_DeleteOnClose, false);
     d.pythonDock = createDock("pythonDock", "Python", d.pythonView, d.pythonArea);
-
     d.consoleWidget = new ConsoleWidget(nullptr);
     d.consoleWidget->setObjectName("consoleWidget");
     d.consoleWidget->setAttribute(Qt::WA_DeleteOnClose, false);
     d.consoleWidget->setWindowTitle("Console");
     d.consoleWidget->hide();
-
+    // connect
     connect(d.outlinerDock, &QDockWidget::dockLocationChanged, this,
             [this](Qt::DockWidgetArea area) { d.outlinerArea = area; });
     connect(d.progressDock, &QDockWidget::dockLocationChanged, this,
@@ -254,11 +248,9 @@ ViewerPrivate::initDocks()
             [this](bool visible) { updateDockAction(d.ui->viewPython, visible); });
     connect(d.consoleWidget, &ConsoleWidget::visibilityChanged, this,
             [this](bool visible) { updateDockAction(d.ui->viewConsole, visible); });
-
     d.outlinerDock->show();
     d.progressDock->show();
     d.pythonDock->hide();
-
     updateDockAction(d.ui->viewOutliner, true);
     updateDockAction(d.ui->viewProgress, true);
     updateDockAction(d.ui->viewPython, false);
@@ -272,18 +264,13 @@ ViewerPrivate::init()
     d.ui.reset(new Ui_Viewer());
     d.ui->setupUi(d.viewer.data());
     attach(d.ui->displayIsolate);
-
+    initDocks();
     d.backgroundColor = QColor(settings()->value("backgroundColor", "#4f4f4f").toString());
     d.ui->backgroundColor->setStyleSheet("background-color: " + d.backgroundColor.name() + ";");
     d.backgroundColorFilter.reset(new MouseEvent);
     d.ui->backgroundColor->installEventFilter(d.backgroundColorFilter.data());
-
     d.viewer->installEventFilter(this);
-
-    initDocks();
-
     renderView()->setBackgroundColor(d.backgroundColor);
-
     d.ui->fileOpen->setIcon(style()->icon(Style::IconRole::Open));
     d.ui->fileExportAll->setIcon(style()->icon(Style::IconRole::Export));
     d.ui->fileExportImage->setIcon(style()->icon(Style::IconRole::ExportImage));
@@ -292,7 +279,7 @@ ViewerPrivate::init()
     d.ui->displayFrameAll->setIcon(style()->icon(Style::IconRole::FrameAll));
     d.ui->displayRenderWireframe->setIcon(style()->icon(Style::IconRole::Wireframe));
     d.ui->displayRenderShaded->setIcon(style()->icon(Style::IconRole::Shaded));
-
+    // connect
     connect(d.ui->policyAll, &QAction::triggered, this, [this]() {
         d.loadPolicy = Session::LoadPolicy::All;
         settings()->setValue("loadType", "all");
@@ -307,7 +294,6 @@ ViewerPrivate::init()
         actions->addAction(d.ui->policyAll);
         actions->addAction(d.ui->policyPayload);
     }
-
     connect(d.ui->fileNew, &QAction::triggered, this, &ViewerPrivate::newFile);
     connect(d.ui->fileOpen, &QAction::triggered, this, &ViewerPrivate::open);
     connect(d.ui->fileMerge, &QAction::triggered, this, &ViewerPrivate::merge);
@@ -321,7 +307,6 @@ ViewerPrivate::init()
     connect(d.ui->fileExportImage, &QAction::triggered, this, &ViewerPrivate::exportImage);
     connect(d.ui->fileSaveSettings, &QAction::triggered, this, &ViewerPrivate::saveSettings);
     connect(d.ui->fileExit, &QAction::triggered, this, &ViewerPrivate::exit);
-
     connect(d.ui->editUndo, &QAction::triggered, this, &ViewerPrivate::undo);
     connect(d.ui->editRedo, &QAction::triggered, this, &ViewerPrivate::redo);
     connect(d.ui->editClear, &QAction::triggered, this, &ViewerPrivate::clear);
@@ -335,33 +320,28 @@ ViewerPrivate::init()
     connect(d.ui->editShowRecursive, &QAction::triggered, this, &ViewerPrivate::showRecursive);
     connect(d.ui->editHideSelected, &QAction::triggered, this, &ViewerPrivate::hideSelected);
     connect(d.ui->editHideRecursive, &QAction::triggered, this, &ViewerPrivate::hideRecursive);
-
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         actions->addAction(d.ui->stageUpY);
         actions->addAction(d.ui->stageUpZ);
     }
-
     connect(d.ui->editPayloadLoad, &QAction::triggered, this, &ViewerPrivate::payloadLoad);
     connect(d.ui->editPayloadUnload, &QAction::triggered, this, &ViewerPrivate::payloadUnload);
     connect(d.ui->editPayloadInvertSelected, &QAction::triggered, this, &ViewerPrivate::payloadSelectInvert);
     connect(d.ui->editDeleteSelected, &QAction::triggered, this, &ViewerPrivate::deleteSelected);
-
     connect(d.ui->displayIsolate, &QAction::toggled, this, &ViewerPrivate::isolate);
     connect(d.ui->displayCameraLight, &QAction::toggled, this, &ViewerPrivate::cameraLight);
     connect(d.ui->displaySceneLights, &QAction::toggled, this, &ViewerPrivate::sceneLights);
     connect(d.ui->displaySceneShaders, &QAction::toggled, this, &ViewerPrivate::sceneShaders);
     connect(d.ui->displayRenderShaded, &QAction::triggered, this, &ViewerPrivate::renderShaded);
     connect(d.ui->displayRenderWireframe, &QAction::triggered, this, &ViewerPrivate::renderWireframe);
-
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         actions->addAction(d.ui->displayRenderShaded);
         actions->addAction(d.ui->displayRenderWireframe);
     }
-
     connect(d.ui->displayFrameAll, &QAction::triggered, this, &ViewerPrivate::frameAll);
     connect(d.ui->displayFrameSelected, &QAction::triggered, this, &ViewerPrivate::frameSelected);
     connect(d.ui->displayResetView, &QAction::triggered, this, &ViewerPrivate::resetView);
@@ -369,27 +349,25 @@ ViewerPrivate::init()
     connect(d.ui->displayExpand, &QAction::triggered, this, &ViewerPrivate::expand);
     connect(d.ui->helpGithubReadme, &QAction::triggered, this, &ViewerPrivate::openGithubReadme);
     connect(d.ui->helpGithubIssues, &QAction::triggered, this, &ViewerPrivate::openGithubIssues);
-
-    d.ui->open->setDefaultAction(d.ui->fileOpen);
-    d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
-    d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
-    d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
-    d.ui->redo->setDefaultAction(d.ui->editRedo);
-    d.ui->undo->setDefaultAction(d.ui->editUndo);
-    d.ui->wireframe->setDefaultAction(d.ui->displayRenderShaded);
-    d.ui->shaded->setDefaultAction(d.ui->displayRenderWireframe);
-
+    {
+        d.ui->open->setDefaultAction(d.ui->fileOpen);
+        d.ui->exportImage->setDefaultAction(d.ui->fileExportImage);
+        d.ui->exportAll->setDefaultAction(d.ui->fileExportAll);
+        d.ui->frameAll->setDefaultAction(d.ui->displayFrameAll);
+        d.ui->redo->setDefaultAction(d.ui->editRedo);
+        d.ui->undo->setDefaultAction(d.ui->editUndo);
+        d.ui->wireframe->setDefaultAction(d.ui->displayRenderShaded);
+        d.ui->shaded->setDefaultAction(d.ui->displayRenderWireframe);
+    }
     connect(d.backgroundColorFilter.data(), &MouseEvent::pressed, this, &ViewerPrivate::backgroundColor);
     connect(d.ui->themeLight, &QAction::triggered, this, &ViewerPrivate::light);
     connect(d.ui->themeDark, &QAction::triggered, this, &ViewerPrivate::dark);
-
     {
         QActionGroup* actions = new QActionGroup(this);
         actions->setExclusive(true);
         actions->addAction(d.ui->themeLight);
         actions->addAction(d.ui->themeDark);
     }
-
     connect(session(), &Session::boundingBoxChanged, this, &ViewerPrivate::boundingBoxChanged);
     connect(session(), &Session::maskChanged, this, &ViewerPrivate::maskChanged);
     connect(session(), &Session::primsChanged, this, &ViewerPrivate::primsChanged);
@@ -397,25 +375,20 @@ ViewerPrivate::init()
     connect(session(), &Session::stageUpChanged, this, &ViewerPrivate::stageUpChanged);
     connect(session(), &Session::notifyStatusChanged, this, &ViewerPrivate::notifyStatusChanged);
     connect(session()->selectionList(), &SelectionList::selectionChanged, this, &ViewerPrivate::selectionChanged);
-
     connect(session()->commandStack(), &CommandStack::canUndoChanged, d.ui->editUndo, &QAction::setEnabled);
     connect(session()->commandStack(), &CommandStack::canRedoChanged, d.ui->editRedo, &QAction::setEnabled);
     connect(session()->commandStack(), &CommandStack::canClearChanged, d.ui->editClear, &QAction::setEnabled);
-
     connect(d.ui->hudSceneTree, &QAction::toggled, this,
             [=](bool checked) { renderView()->setSceneTreeEnabled(checked); });
     connect(d.ui->hudGpuPerformance, &QAction::toggled, this,
             [=](bool checked) { renderView()->setGpuPerformanceEnabled(checked); });
     connect(d.ui->hudCameraAxis, &QAction::toggled, this,
             [=](bool checked) { renderView()->setCameraAxisEnabled(checked); });
-
     connect(d.ui->viewOutliner, &QAction::toggled, this, &ViewerPrivate::toggleOutliner);
     connect(d.ui->viewProgress, &QAction::toggled, this, &ViewerPrivate::toggleProgress);
     connect(d.ui->viewPython, &QAction::toggled, this, &ViewerPrivate::togglePython);
     connect(d.ui->viewConsole, &QAction::toggled, this, &ViewerPrivate::toggleConsole);
-
     renderView()->setFocus();
-
     initSettings();
     newFile();
 }
@@ -502,7 +475,8 @@ ViewerPrivate::loadFile(const QString& fileName)
 {
     QFileInfo fileInfo(fileName);
     if (!d.extensions.contains(fileInfo.suffix().toLower())) {
-        updateStatus(Session::Notify::Status::Error, QString("Unsupported file format: %1").arg(fileInfo.suffix()));
+        session()->notifyStatus(Session::Notify::Status::Error,
+                                QString("Unsupported file format: %1").arg(fileInfo.suffix()));
         return false;
     }
 
@@ -510,17 +484,17 @@ ViewerPrivate::loadFile(const QString& fileName)
     timer.start();
 
     if (!session()->loadFromFile(fileName, d.loadPolicy)) {
-        updateStatus(Session::Notify::Status::Error, QString("Failed to load file: %1").arg(fileName));
+        session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to load file: %1").arg(fileName));
         return false;
     }
 
     const double elapsedSec = timer.elapsed() / 1000.0;
 
     settings()->setValue("openDir", fileInfo.absolutePath());
+    session()->notifyStatus(Session::Notify::Status::Info,
+                            QString("Loaded %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     updateWindowTitle();
     updateRecentFiles(QFileInfo(fileName).absoluteFilePath());
-    updateStatus(Session::Notify::Status::Info,
-                 QString("Loaded %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     clearChanges();
     return true;
 }
@@ -531,7 +505,8 @@ ViewerPrivate::mergeFile(const QString& fileName)
     QFileInfo fileInfo(fileName);
     const QString suffix = fileInfo.suffix().toLower();
     if (suffix != "session" && !d.extensions.contains(suffix)) {
-        updateStatus(Session::Notify::Status::Error, QString("Unsupported file format: %1").arg(fileInfo.suffix()));
+        session()->notifyStatus(Session::Notify::Status::Error,
+                                QString("Unsupported file format: %1").arg(fileInfo.suffix()));
         return false;
     }
 
@@ -539,15 +514,15 @@ ViewerPrivate::mergeFile(const QString& fileName)
     timer.start();
 
     if (!session()->mergeFromFile(fileName)) {
-        updateStatus(Session::Notify::Status::Error, QString("Failed to merge file: %1").arg(fileName));
+        session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to merge file: %1").arg(fileName));
         return false;
     }
 
     const double elapsedSec = timer.elapsed() / 1000.0;
 
     settings()->setValue("openDir", fileInfo.absolutePath());
-    updateStatus(Session::Notify::Status::Info,
-                 QString("Merge %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
+    session()->notifyStatus(Session::Notify::Status::Info,
+                            QString("Merge %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     clearChanges();
     return true;
 }
@@ -673,7 +648,7 @@ ViewerPrivate::newFile()
 
     session()->commandStack()->clear();
     if (!session()->newStage(d.loadPolicy)) {
-        updateStatus(Session::Notify::Status::Error, "Failed to create new stage");
+        session()->notifyStatus(Session::Notify::Status::Error, "Failed to create new stage");
         return;
     }
 
@@ -769,11 +744,11 @@ ViewerPrivate::saveAs()
         updateWindowTitle();
         updateRecentFiles(QFileInfo(filename).absoluteFilePath());
         clearChanges();
-        updateStatus(Session::Notify::Status::Info,
-                     QString("Saved %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
+        session()->notifyStatus(Session::Notify::Status::Info,
+                                QString("Saved %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(Session::Notify::Status::Error, QString("Failed to save file: %1").arg(filename));
+        session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to save file: %1").arg(filename));
     }
 }
 
@@ -815,11 +790,11 @@ ViewerPrivate::saveCopy()
         const double elapsedSec = timer.elapsed() / 1000.0;
 
         settings()->setValue("copyDir", QFileInfo(filename).absolutePath());
-        updateStatus(Session::Notify::Status::Info,
-                     QString("Saved copy %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
+        session()->notifyStatus(Session::Notify::Status::Info, QString("Saved copy %1 in %2 seconds")
+                                                                   .arg(filename, QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(Session::Notify::Status::Error, QString("Failed to save copy: %1").arg(filename));
+        session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to save copy: %1").arg(filename));
     }
 }
 
@@ -835,15 +810,15 @@ ViewerPrivate::reload()
     timer.start();
 
     if (!session()->reload()) {
-        updateStatus(Session::Notify::Status::Error, "Failed to reload stage");
+        session()->notifyStatus(Session::Notify::Status::Error, "Failed to reload stage");
         return;
     }
 
     const double elapsedSec = timer.elapsed() / 1000.0;
     session()->commandStack()->clear();
+    session()->notifyStatus(Session::Notify::Status::Info,
+                            QString("Reloaded stage in %1 seconds").arg(QString::number(elapsedSec, 'f', 2)));
     clearChanges();
-    updateStatus(Session::Notify::Status::Info,
-                 QString("Reloaded stage in %1 seconds").arg(QString::number(elapsedSec, 'f', 2)));
 }
 
 void
@@ -950,11 +925,12 @@ ViewerPrivate::exportAll()
     if (session()->flattenToFile(fileName)) {
         const double elapsedSec = timer.elapsed() / 1000.0;
         settings()->setValue("exportAllDir", QFileInfo(fileName).absolutePath());
-        updateStatus(Session::Notify::Status::Info,
-                     QString("Exported all to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
+        session()->notifyStatus(
+            Session::Notify::Status::Info,
+            QString("Exported all to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(Session::Notify::Status::Error, QString("Failed to export all: %1").arg(fileName));
+        session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to export all: %1").arg(fileName));
     }
 }
 
@@ -994,12 +970,12 @@ ViewerPrivate::exportSelected()
     if (session()->flattenPathsToFile(session()->selectionList()->paths(), fileName)) {
         const double elapsedSec = timer.elapsed() / 1000.0;
         settings()->setValue("exportSelectedDir", QFileInfo(fileName).absolutePath());
-        updateStatus(
+        session()->notifyStatus(
             Session::Notify::Status::Info,
             QString("Exported selected to %1 in %2 seconds").arg(fileName).arg(QString::number(elapsedSec, 'f', 2)));
     }
     else {
-        updateStatus(Session::Notify::Status::Error, QString("Failed to export selected: %1").arg(fileName));
+        session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to export selected: %1").arg(fileName));
     }
 }
 
@@ -1494,33 +1470,6 @@ ViewerPrivate::stageUpChanged(Session::StageUp stageUp)
 void
 ViewerPrivate::notifyStatusChanged(Session::Notify::Status status, const QString& message)
 {
-    updateStatus(status, message);
-}
-
-void
-ViewerPrivate::updateModified(bool modified)
-{
-    if (d.modified == modified)
-        return;
-    d.modified = modified;
-    updateWindowTitle();
-}
-
-void
-ViewerPrivate::updateRecentFiles(const QString& filename)
-{
-    d.recentFiles.removeAll(filename);
-    d.recentFiles.prepend(filename);
-    const int maxRecent = 10;
-    while (d.recentFiles.size() > maxRecent)
-        d.recentFiles.removeLast();
-    settings()->setValue("recentFiles", d.recentFiles);
-    initRecentFiles();
-}
-
-void
-ViewerPrivate::updateStatus(Session::Notify::Status status, const QString& message)
-{
     QStatusBar* bar = d.ui->statusbar;
     if (!bar)
         return;
@@ -1543,6 +1492,27 @@ ViewerPrivate::updateStatus(Session::Notify::Status status, const QString& messa
         bar->setStyleSheet(QString());
         bar->showMessage(" Ready");
     });
+}
+
+void
+ViewerPrivate::updateModified(bool modified)
+{
+    if (d.modified == modified)
+        return;
+    d.modified = modified;
+    updateWindowTitle();
+}
+
+void
+ViewerPrivate::updateRecentFiles(const QString& filename)
+{
+    d.recentFiles.removeAll(filename);
+    d.recentFiles.prepend(filename);
+    const int maxRecent = 10;
+    while (d.recentFiles.size() > maxRecent)
+        d.recentFiles.removeLast();
+    settings()->setValue("recentFiles", d.recentFiles);
+    initRecentFiles();
 }
 
 void
@@ -1579,12 +1549,11 @@ ViewerPrivate::saveFile()
         const double elapsedSec = timer.elapsed() / 1000.0;
         updateWindowTitle();
         clearChanges();
-        updateStatus(Session::Notify::Status::Info,
-                     QString("Saved %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
+        session()->notifyStatus(Session::Notify::Status::Info,
+                                QString("Saved %1 in %2 seconds").arg(filename, QString::number(elapsedSec, 'f', 2)));
         return true;
     }
-
-    updateStatus(Session::Notify::Status::Error, QString("Failed to save file: %1").arg(filename));
+    session()->notifyStatus(Session::Notify::Status::Error, QString("Failed to save file: %1").arg(filename));
     return false;
 }
 

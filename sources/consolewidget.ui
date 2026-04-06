@@ -49,6 +49,11 @@
       </property>
       <item>
        <widget class="QPlainTextEdit" name="log">
+        <property name="font">
+         <font>
+          <pointsize>10</pointsize>
+         </font>
+        </property>
         <property name="readOnly">
          <bool>true</bool>
         </property>

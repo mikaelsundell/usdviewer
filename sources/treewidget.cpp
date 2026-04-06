@@ -4,6 +4,7 @@
 
 #include "treewidget.h"
 #include "application.h"
+#include "mime.h"
 #include "style.h"
 #include "treeitem.h"
 #include <QEvent>
@@ -170,8 +171,6 @@ public:
     };
     enum DropMode { DropNone = 0, DropAboveItem = 1, DropOnItem = 2, DropBelowItem = 3 };
     struct Data {
-        static constexpr const char* dropItemPtrProperty = "_usdviewer_drop_item_ptr";
-        static constexpr const char* dropModeProperty = "_usdviewer_drop_mode";
         QPointer<ItemDelegate> delegate;
         QPointer<TreeWidget> tree;
         bool suppressNextSelection = false;
@@ -338,8 +337,8 @@ bool
 TreeWidget::viewportEvent(QEvent* event)
 {
     if (event->type() == QEvent::DragLeave) {
-        setProperty(TreeWidgetPrivate::Data::dropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
-        setProperty(TreeWidgetPrivate::Data::dropModeProperty, TreeWidgetPrivate::DropNone);
+        setProperty(mime::dropItemPtrProperty, QVariant::fromValue<qulonglong>(0));
+        setProperty(mime::dropModeProperty, TreeWidgetPrivate::DropNone);
         viewport()->update();
     }
     return QTreeWidget::viewportEvent(event);
@@ -503,8 +502,8 @@ TreeWidget::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const
         painter->fillRect(rowRect, app()->style()->color(Style::ColorRole::HighlightAlt));
     }
 
-    const qulonglong dropItemPtr = property(TreeWidgetPrivate::Data::dropItemPtrProperty).toULongLong();
-    const int dropMode = property(TreeWidgetPrivate::Data::dropModeProperty).toInt();
+    const qulonglong dropItemPtr = property(mime::dropItemPtrProperty).toULongLong();
+    const int dropMode = property(mime::dropModeProperty).toInt();
 
     if (item && dropItemPtr != 0 && reinterpret_cast<qulonglong>(item) == dropItemPtr) {
         painter->save();

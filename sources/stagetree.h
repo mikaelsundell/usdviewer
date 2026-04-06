@@ -250,6 +250,7 @@ protected:
     ///@}
 
 private:
+    Q_DISABLE_COPY_MOVE(StageTree)
     QScopedPointer<StageTreePrivate> p;
 };
 

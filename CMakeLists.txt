@@ -36,12 +36,12 @@ file (GLOB project_resources
 )
 
 # build
-string(TIMESTAMP PROJECT_BUILD_DATE "%y%m%d")
-if(CMAKE_CONFIGURATION_TYPES)
-    set(PROJECT_BUILD_CONFIG "$<CONFIG>")
-else()
-    set(PROJECT_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
-endif()
+string (TIMESTAMP project_build_date "%y%m%d")
+if (CMAKE_CONFIGURATION_TYPES)
+    set(project_build_config "$<CONFIG>")
+else ()
+    set(project_build_config "${CMAKE_BUILD_TYPE}")
+endif ()
 
 # source groups
 source_group ("Icon Files" FILES ${project_icons})
@@ -49,7 +49,7 @@ source_group ("Resource Files" FILES ${project_resources})
 
 set (project_copyright "Copyright 2025-present Contributors to the ${project_name} project")
 set (project_identifier "com.github.mikaelsundell.${project_name}")
-set (project_long_version "1.3.4.3")
+set (project_long_version "1.3.4")
 set (project_short_version "1.3")
 set (project_url "https://github.com/mikaelsundell/usdviewer")
 
@@ -81,8 +81,6 @@ if (APPLE)
     )
     target_compile_definitions (${project_name} PRIVATE GL_SILENCE_DEPRECATION)
     target_compile_definitions (${project_name} PRIVATE PXR_PYTHON_DIR="${OpenUSD_PYTHON_DIR}")
-    target_compile_definitions( ${project_name} PRIVATE PROJECT_BUILD_CONFIG="${PROJECT_BUILD_CONFIG}")
-    target_compile_definitions( ${project_name} PRIVATE PROJECT_BUILD_DATE="${PROJECT_BUILD_DATE}")
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python
@@ -100,8 +98,8 @@ elseif (WIN32)
         WINVER=0x0A00
         $<$<CONFIG:Debug>:TBB_USE_DEBUG=1>
     )
+    target_compile_definitions (${project_name} PRIVATE GL_SILENCE_DEPRECATION)
     target_compile_definitions (${project_name} PRIVATE PXR_PYTHON_DIR="${OpenUSD_PYTHON_DIR}")
-    target_compile_definitions( ${project_name} PRIVATE PROJECT_BUILD="${PROJECT_BUILD_STRING}")
     target_link_libraries (${project_name} 
         Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::OpenGLWidgets Qt6::Widgets
         Boost::python
@@ -136,9 +134,11 @@ endif ()
 
 target_compile_definitions (${project_name} PRIVATE
     -DPROJECT_NAME="${project_name}"
-    -DPROJECT_VERSION="${project_version}"
+    -DPROJECT_VERSION="${project_long_version}"
     -DPROJECT_COPYRIGHT="${project_copyright}"
     -DPROJECT_IDENTIFIER="${project_identifier}"
+    -DPROJECT_CONFIG="${project_build_config}"
+    -DPROJECT_DATE="${project_build_date}"
     -DGITHUB_URL="${project_url}"
     -DQT_NO_KEYWORDS # tbb compatibility
 )

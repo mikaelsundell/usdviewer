@@ -11,9 +11,11 @@
 #include "style.h"
 #include <QApplication>
 #include <QBuffer>
+#include <QDrag>
 #include <QDragEnterEvent>
 #include <QImageReader>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPointer>
 #include <QStyledItemDelegate>
@@ -28,9 +30,10 @@ public:
     QMimeData* mimeData(const QList<QListWidgetItem*>& items) const;
     bool hasImageMime(const QMimeData* mime) const;
     QImage imageMimeData(const QMimeData* mime);
-    QImage iconImage(const QImage& image);
-    QImage centerCrop(const QImage& image);
+    QImage iconImage(const QImage& image) const;
+    QImage centerCrop(const QImage& image) const;
     QString scriptTitle(const QString& code) const;
+    QSize tileContentSize() const;
 
 public:
     class ShelfItemDelegate : public QStyledItemDelegate {
@@ -38,45 +41,49 @@ public:
         explicit ShelfItemDelegate(QObject* parent = nullptr)
             : QStyledItemDelegate(parent)
         {}
+
         void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
         {
             painter->save();
-
             QStyleOptionViewItem opt(option);
             initStyleOption(&opt, index);
-
-            const QWidget* widget = opt.widget;
-            QStyle* style = widget ? widget->style() : QApplication::style();
-            const auto* list = qobject_cast<const ShelfList*>(widget);
+            const auto* list = qobject_cast<const ShelfList*>(opt.widget);
             const bool isPressed = list && list->pressedIndex() == index;
-            const bool isSelected = (opt.state & QStyle::State_Selected);
             const bool isEnabled = (opt.state & QStyle::State_Enabled);
-
             const QIcon icon = opt.icon;
             opt.icon = QIcon();
             opt.text.clear();
-            if (isPressed)
-                opt.state |= QStyle::State_Sunken;
+            const int spacing = 4;
+            QRect tileRect = opt.rect.adjusted(spacing, spacing, -spacing, -spacing);
+            const QColor fill = isPressed ? style()->color(Style::ColorRole::ButtonAlt)
+                                          : style()->color(Style::ColorRole::Button);
 
-            style->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter, widget);
-
-            QRect iconRect = opt.rect.adjusted(2, 2, -2, -2);
-            if (isPressed)
-                iconRect.translate(0, 1);
-
-            icon.paint(painter, iconRect, Qt::AlignCenter, isEnabled ? QIcon::Normal : QIcon::Disabled,
-                       (isSelected || isPressed) ? QIcon::On : QIcon::Off);
+            painter->fillRect(tileRect, fill);
+            const QRect iconRect = tileRect.adjusted(0, 0, 0, 0);
+            const QPixmap pixmap = icon.pixmap(iconRect.size(), isEnabled ? QIcon::Normal : QIcon::Disabled,
+                                               isPressed ? QIcon::On : QIcon::Off);
+            if (!pixmap.isNull())
+                painter->drawPixmap(iconRect, pixmap);
             painter->restore();
         }
 
         QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
         {
-            return QStyledItemDelegate::sizeHint(option, index);
+            Q_UNUSED(option);
+            Q_UNUSED(index);
+
+            if (const auto* list = qobject_cast<const ShelfList*>(parent()))
+                return list->gridSize();
+
+            return QSize(64, 64);
         }
     };
+
     struct Data {
         QModelIndex pressedIndex;
+        QPoint pressPos;
         QPointer<ShelfList> list;
+        bool dragStarted = false;
     };
     Data d;
 };
@@ -94,31 +101,40 @@ ShelfListPrivate::init()
     d.list->setWrapping(true);
     d.list->setResizeMode(QListView::Adjust);
     d.list->setMovement(QListView::Static);
-    d.list->setSpacing(10);
+    d.list->setSpacing(6);
     d.list->setUniformItemSizes(true);
     d.list->setItemDelegate(new ShelfItemDelegate(d.list.data()));
+
     d.list->setDragDropMode(QAbstractItemView::DragDrop);
     d.list->setDefaultDropAction(Qt::CopyAction);
     d.list->setDragEnabled(true);
     d.list->setAcceptDrops(true);
-
     d.list->setDropIndicatorShown(true);
-    d.list->setSelectionMode(QAbstractItemView::SingleSelection);
+
+    d.list->setSelectionMode(QAbstractItemView::NoSelection);
     d.list->setContextMenuPolicy(Qt::CustomContextMenu);
 
-    const int iconSize = usdviewer::style()->iconSize(Style::UIScale::Large);
+    const int iconSize = usdviewer::style()->iconSize(Style::UIScale::Medium);
     d.list->setIconSize(QSize(iconSize, iconSize));
 
-    QFont f = d.list->font();
-    f.setPointSizeF(usdviewer::style()->fontSize(Style::UIScale::Small) - 2);
-    d.list->setFont(f);
-
-    const int pad = 10;
+    const int pad = 12;
     const int width = iconSize + pad * 2;
     const int height = iconSize + pad * 2;
 
     d.list->setGridSize(QSize(width, height));
     d.list->viewport()->setAcceptDrops(true);
+}
+
+QSize
+ShelfListPrivate::tileContentSize() const
+{
+    if (!d.list)
+        return QSize(64, 64);
+
+    const int spacing = 4;
+    const int border = 1;
+    const QSize grid = d.list->gridSize();
+    return QSize(qMax(1, grid.width() - spacing * 2 - border * 2), qMax(1, grid.height() - spacing * 2 - border * 2));
 }
 
 QMimeData*
@@ -189,28 +205,21 @@ ShelfListPrivate::imageMimeData(const QMimeData* mime)
 }
 
 QImage
-ShelfListPrivate::iconImage(const QImage& image)
+ShelfListPrivate::iconImage(const QImage& image) const
 {
     if (image.isNull())
         return QImage();
 
-    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
-    const int iconSize = usdviewer::style()->iconSize(Style::UIScale::Large);
-    const int tilePadding = 10;
-    const int logicalSize = iconSize + tilePadding * 2;
-    if (logicalSize <= 0)
+    const QSize targetSize = tileContentSize();
+    if (!targetSize.isValid())
         return QImage();
 
-    const int physicalSize = qMax(1, qRound(logicalSize * dpr));
     const QImage cropped = centerCrop(image).convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    QImage scaled = cropped.scaled(physicalSize, physicalSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-
-    scaled.setDevicePixelRatio(dpr);
-    return scaled;
+    return cropped.scaled(targetSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 }
 
 QImage
-ShelfListPrivate::centerCrop(const QImage& image)
+ShelfListPrivate::centerCrop(const QImage& image) const
 {
     if (image.isNull())
         return QImage();
@@ -275,6 +284,11 @@ ShelfList::supportedDropActions() const
 void
 ShelfList::dragEnterEvent(QDragEnterEvent* event)
 {
+    if (event->source() == this) {
+        event->ignore();
+        return;
+    }
+
     if (event->mimeData()->hasFormat(mime::script) || event->mimeData()->hasText()
         || p->hasImageMime(event->mimeData())) {
         event->acceptProposedAction();
@@ -286,6 +300,11 @@ ShelfList::dragEnterEvent(QDragEnterEvent* event)
 void
 ShelfList::dragMoveEvent(QDragMoveEvent* event)
 {
+    if (event->source() == this) {
+        event->ignore();
+        return;
+    }
+
     if (event->mimeData()->hasFormat(mime::script) || event->mimeData()->hasText()
         || p->hasImageMime(event->mimeData())) {
         event->acceptProposedAction();
@@ -298,7 +317,13 @@ void
 ShelfList::dropEvent(QDropEvent* event)
 {
     p->d.pressedIndex = QModelIndex();
+    p->d.dragStarted = false;
     viewport()->update();
+
+    if (event->source() == this) {
+        event->ignore();
+        return;
+    }
 
     if (p->hasImageMime(event->mimeData())) {
         QListWidgetItem* targetItem = itemAt(event->position().toPoint());
@@ -313,11 +338,13 @@ ShelfList::dropEvent(QDropEvent* event)
 
                 if (auto* widget = qobject_cast<ShelfWidget*>(parentWidget()))
                     Q_EMIT widget->changed();
+
                 event->acceptProposedAction();
                 return;
             }
         }
     }
+
     QString code;
     if (event->mimeData()->hasFormat(mime::script))
         code = QString::fromUtf8(event->mimeData()->data(mime::script));
@@ -326,11 +353,13 @@ ShelfList::dropEvent(QDropEvent* event)
 
     code = qt::normalizeNewlines(code).trimmed();
     if (!code.isEmpty()) {
-        auto* widget = qobject_cast<ShelfWidget*>(parent());
-        widget->addScript(code);
+        if (auto* widget = qobject_cast<ShelfWidget*>(parentWidget()))
+            widget->addScript(code);
+
         event->acceptProposedAction();
         return;
     }
+
     QListWidget::dropEvent(event);
 }
 
@@ -339,6 +368,8 @@ ShelfList::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         p->d.pressedIndex = indexAt(event->pos());
+        p->d.pressPos = event->pos();
+        p->d.dragStarted = false;
         viewport()->update();
     }
 
@@ -348,12 +379,36 @@ ShelfList::mousePressEvent(QMouseEvent* event)
 void
 ShelfList::mouseMoveEvent(QMouseEvent* event)
 {
-    if (p->d.pressedIndex.isValid()) {
-        const QModelIndex current = indexAt(event->pos());
-        if (current != p->d.pressedIndex)
-            viewport()->update();
+    if (!(event->buttons() & Qt::LeftButton) || !p->d.pressedIndex.isValid()) {
+        QListWidget::mouseMoveEvent(event);
+        return;
     }
-    QListWidget::mouseMoveEvent(event);
+
+    if ((event->pos() - p->d.pressPos).manhattanLength() < QApplication::startDragDistance()) {
+        QListWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    QListWidgetItem* item = itemFromIndex(p->d.pressedIndex);
+    if (!item) {
+        QListWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    p->d.dragStarted = true;
+    viewport()->update();
+
+    QList<QListWidgetItem*> items;
+    items.append(item);
+
+    QMimeData* mime = p->mimeData(items);
+    if (!mime)
+        return;
+
+    auto* drag = new QDrag(this);
+    drag->setMimeData(mime);
+    drag->setPixmap(item->icon().pixmap(iconSize()));
+    drag->exec(Qt::CopyAction);
 }
 
 void
@@ -361,13 +416,18 @@ ShelfList::mouseReleaseEvent(QMouseEvent* event)
 {
     const QModelIndex pressed = p->d.pressedIndex;
     const QModelIndex released = indexAt(event->pos());
+    const bool dragStarted = p->d.dragStarted;
 
     p->d.pressedIndex = QModelIndex();
+    p->d.dragStarted = false;
     viewport()->update();
 
     QListWidget::mouseReleaseEvent(event);
 
     if (event->button() != Qt::LeftButton)
+        return;
+
+    if (dragStarted)
         return;
 
     if (!pressed.isValid() || pressed != released)
@@ -376,8 +436,6 @@ ShelfList::mouseReleaseEvent(QMouseEvent* event)
     QListWidgetItem* item = itemFromIndex(released);
     if (!item)
         return;
-
-    setCurrentItem(item);
 
     if (auto* widget = qobject_cast<ShelfWidget*>(parentWidget()))
         Q_EMIT widget->itemActivated(item->data(Qt::UserRole).toString());
@@ -390,6 +448,7 @@ ShelfList::leaveEvent(QEvent* event)
 {
     if (p->d.pressedIndex.isValid()) {
         p->d.pressedIndex = QModelIndex();
+        p->d.dragStarted = false;
         viewport()->update();
     }
     QListWidget::leaveEvent(event);

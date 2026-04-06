@@ -1474,13 +1474,19 @@ ViewerPrivate::notifyStatusChanged(Session::Notify::Status status, const QString
     if (!bar)
         return;
 
-    const bool isError = (status == Session::Notify::Status::Error);
-    const QString text = isError ? QString(" Error: %1").arg(message) : QString(" %1").arg(message);
-    const int timeoutMs = isError ? 8000 : 4000;
+    const bool hasError = (status == Session::Notify::Status::Error);
+    const QString text = hasError ? QString(" Error: %1").arg(message) : QString(" %1").arg(message);
+    const int timeoutMs = hasError ? 8000 : 4000;
 
-    if (isError) {
-        bar->setStyleSheet(QStringLiteral("QStatusBar { background-color: rgba(255, 120, 120, 0.20); }"
-                                          "QStatusBar::item { border: none; }"));
+    if (hasError) {
+        QColor color = style()->color(Style::ColorRole::Error);
+        color.setAlphaF(0.20);
+        bar->setStyleSheet(QStringLiteral("QStatusBar { background-color: rgba(%1, %2, %3, %4); }"
+                                          "QStatusBar::item { border: none; }")
+                               .arg(color.red())
+                               .arg(color.green())
+                               .arg(color.blue())
+                               .arg(color.alpha()));
     }
     else {
         bar->setStyleSheet(QString());
@@ -1518,8 +1524,18 @@ ViewerPrivate::updateRecentFiles(const QString& filename)
 void
 ViewerPrivate::updateWindowTitle()
 {
-    const QString title = QStringLiteral("%1 build:%2 (%3)").arg(PROJECT_NAME, PROJECT_BUILD_DATE, PROJECT_BUILD_CONFIG);
-
+    #ifdef QT_DEBUG
+    const QString title = QStringLiteral("%1 %2 (%3 %4)")
+        .arg(QStringLiteral(PROJECT_NAME),
+             QStringLiteral(PROJECT_VERSION),
+             QStringLiteral(PROJECT_DATE),
+             QStringLiteral(PROJECT_CONFIG));
+    #else
+    const QString title = QStringLiteral("%1 %2")
+        .arg(QStringLiteral(PROJECT_NAME),
+             QStringLiteral(PROJECT_VERSION));
+    #endif
+    
     if (!session()->isLoaded()) {
         d.viewer->setWindowTitle(title);
         return;
@@ -1639,6 +1655,10 @@ Viewer::closeEvent(QCloseEvent* event)
         return;
     }
     p->saveSettings();
+    if (p->d.consoleWidget) {
+        p->d.consoleWidget->hide();
+        p->d.consoleWidget->close();
+    }
     event->accept();
 }
 

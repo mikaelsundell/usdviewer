@@ -4,7 +4,9 @@
 
 #include "pythonview.h"
 #include "application.h"
+#include "mime.h"
 #include "pythoninterpreter.h"
+#include "qtutils.h"
 #include "session.h"
 #include "settings.h"
 #include "shelfwidget.h"
@@ -25,36 +27,20 @@
 #include <QSaveFile>
 #include <QStyle>
 #include <QTabBar>
+#include <QTextCursor>
 #include <QToolButton>
 #include <QVariantMap>
-
-
-#include <QTimer>
 
 // generated files
 #include "ui_pythonview.h"
 
 namespace usdviewer {
 
-namespace {
-
-    constexpr auto kShelvesSettingsKey = "python/shelves";
-    constexpr auto kScriptMimeType = "application/x-usdviewer-python-script";
-
-    QString normalizedSelectedText(const QString& text)
-    {
-        QString out = text;
-        out.replace(QChar(0x2029), '\n');
-        out.replace(QChar(0x2028), '\n');
-        return out;
-    }
-
-}  // namespace
-
 class PythonViewPrivate : public QObject {
 public:
     void init();
     bool eventFilter(QObject* object, QEvent* event) override;
+    void executeCode(const QString& code);
     void createDefaultTabIfNeeded();
     int createShelfTab(const QString& name, const QVariantList& scripts = {});
     ShelfWidget* currentShelf() const;
@@ -68,6 +54,7 @@ public:
     void saveShelves() const;
     void startScriptDrag(QPlainTextEdit* edit);
     void updateClearButton();
+    bool isPointInSelection(QPlainTextEdit* edit, const QPoint& pos) const;
 
 public Q_SLOTS:
     void run();
@@ -85,6 +72,8 @@ public:
         QPointer<QLineEdit> tabRenameEditor;
         int tabRenameIndex = -1;
         QPointer<QToolButton> addTabButton;
+        bool dragCandidate = false;
+        QPointer<QPlainTextEdit> dragSourceEdit;
     };
     Data d;
 };
@@ -106,7 +95,6 @@ PythonViewPrivate::init()
     d.ui->tabWidget->tabBar()->installEventFilter(this);
     d.ui->tabWidget->setUsesScrollButtons(true);
     d.ui->tabWidget->setElideMode(Qt::ElideRight);
-
     if (QTabBar* bar = d.ui->tabWidget->tabBar()) {
         bar->setExpanding(false);
         bar->setUsesScrollButtons(true);
@@ -114,21 +102,9 @@ PythonViewPrivate::init()
         bar->setMinimumWidth(0);
         bar->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     }
-
-    d.ui->log->viewport()->installEventFilter(this);
     d.ui->editor->viewport()->installEventFilter(this);
 
-
-
-    /*
-    d.addTabButton = new QToolButton(d.ui->tabWidget);
-    d.addTabButton->setText("+");
-    d.addTabButton->setAutoRaise(true);
-    d.addTabButton->setToolTip(tr("New Shelf"));
-    d.ui->tabWidget->setCornerWidget(d.addTabButton, Qt::TopRightCorner);
-    */
-
-
+    // connect
     QObject::connect(d.addTabButton, &QToolButton::clicked, this, &PythonViewPrivate::newTab);
     QObject::connect(d.ui->run, &QToolButton::clicked, this, &PythonViewPrivate::run);
     QObject::connect(d.ui->clear, &QToolButton::clicked, this, &PythonViewPrivate::clear);
@@ -139,7 +115,6 @@ PythonViewPrivate::init()
                      &PythonViewPrivate::showTabContextMenu);
     QObject::connect(d.ui->tabWidget->tabBar(), &QTabBar::tabMoved, this, [this](int, int) { saveShelves(); });
     QObject::connect(session(), &Session::stageChanged, this, &PythonViewPrivate::stageChanged);
-
 
     loadShelves();
     createDefaultTabIfNeeded();
@@ -161,26 +136,33 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
         }
     }
 
-    if (object == d.ui->log->viewport() || object == d.ui->editor->viewport()) {
-        QPlainTextEdit* edit = nullptr;
-        if (object == d.ui->log->viewport())
-            edit = d.ui->log;
-        else if (object == d.ui->editor->viewport())
-            edit = d.ui->editor;
-
+    if (object == d.ui->editor->viewport()) {
+        QPlainTextEdit* edit = d.ui->editor;
         if (!edit)
             return QObject::eventFilter(object, event);
 
         switch (event->type()) {
         case QEvent::MouseButtonPress: {
             auto* mouseEvent = static_cast<QMouseEvent*>(event);
-            if (mouseEvent->button() == Qt::LeftButton)
+            if (mouseEvent->button() == Qt::LeftButton) {
                 d.dragStartPos = mouseEvent->pos();
+                d.dragCandidate = false;
+                d.dragSourceEdit = nullptr;
+
+                // Only allow drag if the press begins inside an already existing selection.
+                // This prevents drag initiation while the user is actively selecting text.
+                if (isPointInSelection(edit, mouseEvent->pos())) {
+                    d.dragCandidate = true;
+                    d.dragSourceEdit = edit;
+                }
+            }
             break;
         }
         case QEvent::MouseMove: {
             auto* mouseEvent = static_cast<QMouseEvent*>(event);
             if (!(mouseEvent->buttons() & Qt::LeftButton))
+                break;
+            if (!d.dragCandidate || d.dragSourceEdit != edit)
                 break;
             if ((mouseEvent->pos() - d.dragStartPos).manhattanLength() < QApplication::startDragDistance())
                 break;
@@ -188,12 +170,17 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
                 break;
 
             startScriptDrag(edit);
+            d.dragCandidate = false;
+            d.dragSourceEdit = nullptr;
             return true;
         }
+        case QEvent::MouseButtonRelease:
+            d.dragCandidate = false;
+            d.dragSourceEdit = nullptr;
+            break;
         case QEvent::DragEnter: {
             auto* dragEvent = static_cast<QDragEnterEvent*>(event);
-            if (object == d.ui->editor->viewport()
-                && (dragEvent->mimeData()->hasFormat(kScriptMimeType) || dragEvent->mimeData()->hasText())) {
+            if (dragEvent->mimeData()->hasFormat(mime::script) || dragEvent->mimeData()->hasText()) {
                 dragEvent->acceptProposedAction();
                 return true;
             }
@@ -201,8 +188,7 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
         }
         case QEvent::DragMove: {
             auto* dragEvent = static_cast<QDragMoveEvent*>(event);
-            if (object == d.ui->editor->viewport()
-                && (dragEvent->mimeData()->hasFormat(kScriptMimeType) || dragEvent->mimeData()->hasText())) {
+            if (dragEvent->mimeData()->hasFormat(mime::script) || dragEvent->mimeData()->hasText()) {
                 dragEvent->acceptProposedAction();
                 return true;
             }
@@ -210,17 +196,18 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
         }
         case QEvent::Drop: {
             auto* dropEvent = static_cast<QDropEvent*>(event);
-            if (object == d.ui->editor->viewport()
-                && (dropEvent->mimeData()->hasFormat(kScriptMimeType) || dropEvent->mimeData()->hasText())) {
+            if (dropEvent->mimeData()->hasFormat(mime::script) || dropEvent->mimeData()->hasText()) {
                 QString code;
-                if (dropEvent->mimeData()->hasFormat(kScriptMimeType))
-                    code = QString::fromUtf8(dropEvent->mimeData()->data(kScriptMimeType));
+                if (dropEvent->mimeData()->hasFormat(mime::script))
+                    code = QString::fromUtf8(dropEvent->mimeData()->data(mime::script));
                 else
                     code = dropEvent->mimeData()->text();
 
-                code = normalizedSelectedText(code).trimmed();
+                code = qt::normalizeNewlines(code).trimmed();
                 if (!code.isEmpty()) {
-                    d.ui->editor->setPlainText(code);
+                    QTextCursor cursor = d.ui->editor->cursorForPosition(dropEvent->position().toPoint());
+                    d.ui->editor->setTextCursor(cursor);
+                    d.ui->editor->insertPlainText(code);
                     dropEvent->acceptProposedAction();
                     updateClearButton();
                     return true;
@@ -236,6 +223,23 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
 }
 
 void
+PythonViewPrivate::executeCode(const QString& code)
+{
+    auto* interpreter = pythonInterpreter();
+    const QString trimmed = code.trimmed();
+    if (trimmed.isEmpty())
+        return;
+
+    d.ui->log->appendPlainText(">>> " + trimmed);
+
+    const QString result = interpreter->executeScript(trimmed);
+    if (!result.isEmpty())
+        d.ui->log->appendPlainText(result);
+
+    d.ui->log->appendPlainText("");
+}
+
+void
 PythonViewPrivate::createDefaultTabIfNeeded()
 {
     if (d.ui->tabWidget->count() == 0)
@@ -248,12 +252,8 @@ PythonViewPrivate::createShelfTab(const QString& name, const QVariantList& scrip
     auto* shelf = new ShelfWidget(d.ui->tabWidget);
     shelf->fromVariantList(scripts);
 
-    QObject::connect(shelf, &ShelfWidget::itemActivated, this, [this](const QString& code) {
-        d.ui->editor->setPlainText(code);
-        updateClearButton();
-        run();
-    });
-
+    // connect
+    QObject::connect(shelf, &ShelfWidget::itemActivated, this, [this](const QString& code) { executeCode(code); });
     QObject::connect(shelf, &ShelfWidget::itemContextMenuRequested, this,
                      [this, shelf](const QPoint& pos, QListWidgetItem* item) {
                          QMenu menu(shelf);
@@ -427,7 +427,7 @@ PythonViewPrivate::loadShelves()
 {
     d.ui->tabWidget->clear();
 
-    const QVariant value = settings()->value(kShelvesSettingsKey);
+    const QVariant value = settings()->value("python/shelves");
     const QVariantList tabs = value.toList();
     for (const QVariant& tabValue : tabs) {
         const QVariantMap tabMap = tabValue.toMap();
@@ -452,18 +452,18 @@ PythonViewPrivate::saveShelves() const
         tabs.append(tabMap);
     }
 
-    settings()->setValue(kShelvesSettingsKey, tabs);
+    settings()->setValue("python/shelves", tabs);
 }
 
 void
 PythonViewPrivate::startScriptDrag(QPlainTextEdit* edit)
 {
-    QString code = normalizedSelectedText(edit->textCursor().selectedText()).trimmed();
+    QString code = qt::normalizeNewlines(edit->textCursor().selectedText()).trimmed();
     if (code.isEmpty())
         return;
 
     auto* mime = new QMimeData();
-    mime->setData(kScriptMimeType, code.toUtf8());
+    mime->setData(mime::script, code.toUtf8());
     mime->setText(code);
 
     auto* drag = new QDrag(edit);
@@ -477,6 +477,25 @@ PythonViewPrivate::updateClearButton()
 {
     const bool enabled = d.ui->editor->isEnabled() && !d.ui->editor->document()->isEmpty();
     d.ui->clear->setEnabled(enabled);
+}
+
+bool
+PythonViewPrivate::isPointInSelection(QPlainTextEdit* edit, const QPoint& pos) const
+{
+    if (!edit)
+        return false;
+
+    QTextCursor selection = edit->textCursor();
+    if (!selection.hasSelection())
+        return false;
+
+    const int selStart = selection.selectionStart();
+    const int selEnd = selection.selectionEnd();
+
+    QTextCursor hit = edit->cursorForPosition(pos);
+    const int hitPos = hit.position();
+
+    return hitPos >= selStart && hitPos < selEnd;
 }
 
 void
@@ -554,18 +573,7 @@ PythonViewPrivate::newTab()
 void
 PythonViewPrivate::run()
 {
-    auto* interpreter = pythonInterpreter();
-    const QString code = d.ui->editor->toPlainText().trimmed();
-    if (code.isEmpty())
-        return;
-
-    d.ui->log->appendPlainText(">>> " + code);
-
-    const QString result = interpreter->executeScript(code);
-    if (!result.isEmpty())
-        d.ui->log->appendPlainText(result);
-
-    d.ui->log->appendPlainText("");
+    executeCode(d.ui->editor->toPlainText());
 }
 
 void

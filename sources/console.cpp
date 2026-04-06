@@ -68,11 +68,16 @@ ConsolePrivate::start()
         return false;
     }
 
+    // Flush any pending stdio output before redirecting descriptors.
+    std::fflush(stdout);
+    std::fflush(stderr);
+
     if (::dup2(d.writeFd, STDOUT_FILENO) < 0 || ::dup2(d.writeFd, STDERR_FILENO) < 0) {
         stop();
         return false;
     }
 
+    // Disable C stdio buffering while redirected.
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     std::setvbuf(stderr, nullptr, _IONBF, 0);
 
@@ -86,6 +91,10 @@ ConsolePrivate::start()
 void
 ConsolePrivate::stop()
 {
+    // Flush pending redirected stdio before restoring the original fds.
+    std::fflush(stdout);
+    std::fflush(stderr);
+
     if (d.notifier) {
         delete d.notifier;
         d.notifier = nullptr;

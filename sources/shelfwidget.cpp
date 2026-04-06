@@ -106,7 +106,7 @@ ShelfWidgetPrivate::addScript(const QString& code, const QString& name, const QB
     const QString title = uniqueTitle(
         name.isEmpty() ? titleFromText(trimmed, 12, QStringLiteral("Script"), QStringLiteral(">>>")) : name.trimmed());
 
-    auto* item = new QListWidgetItem(style()->icon(Style::IconRole::Code), QString());
+    auto* item = new QListWidgetItem(style()->icon(Style::IconRole::Code, Style::UIScale::Large), QString());
     item->setSizeHint(d.list->gridSize());
     item->setData(Qt::UserRole, trimmed);
     item->setData(roles::shelf::scriptName, title);
@@ -131,8 +131,6 @@ ShelfWidgetPrivate::editScript(QListWidgetItem* item)
     const bool blocked = d.list->blockSignals(true);
     item->setText(item->data(roles::shelf::scriptName).toString());
     d.list->blockSignals(blocked);
-
-    d.list->setCurrentItem(item);
     d.list->editItem(item);
 }
 

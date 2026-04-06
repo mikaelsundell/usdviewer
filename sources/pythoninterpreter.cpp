@@ -24,10 +24,9 @@ class PythonInterpreterPrivate {
 public:
     PythonInterpreterPrivate();
     ~PythonInterpreterPrivate();
-
     void init();
     void release();
-
+    void configure();
     QString executeScript(const QString& script);
     QString pythonError() const;
 
@@ -68,6 +67,8 @@ PythonInterpreterPrivate::init()
         }
     }
 
+    configure();
+
     PyObject* mainModule = PyImport_AddModule("__main__");
     PyObject* mainDict = PyModule_GetDict(mainModule);
 
@@ -92,6 +93,7 @@ PythonInterpreterPrivate::init()
         Py_DECREF(module);
         return;
     }
+
     PyObject* instance = PyObject_CallObject(cls, nullptr);
     if (!instance) {
         PyErr_Print();
@@ -109,9 +111,40 @@ PythonInterpreterPrivate::init()
 
     PyObject* key = PyUnicode_FromString("session");
     int has = PyDict_Contains(d.globals, key);
+    Q_UNUSED(has);
     Py_DECREF(key);
 
     d.initialized = true;
+}
+
+void
+PythonInterpreterPrivate::configure()
+{
+    const char* code = "import sys\n"
+                       "for _stream_name in ('stdout', 'stderr'):\n"
+                       "    _stream = getattr(sys, _stream_name, None)\n"
+                       "    if _stream is None:\n"
+                       "        continue\n"
+                       "    _reconfigure = getattr(_stream, 'reconfigure', None)\n"
+                       "    if callable(_reconfigure):\n"
+                       "        try:\n"
+                       "            _reconfigure(line_buffering=True, write_through=True)\n"
+                       "        except TypeError:\n"
+                       "            try:\n"
+                       "                _reconfigure(line_buffering=True)\n"
+                       "            except Exception:\n"
+                       "                pass\n"
+                       "        except Exception:\n"
+                       "            pass\n"
+                       "    try:\n"
+                       "        _stream.flush()\n"
+                       "    except Exception:\n"
+                       "        pass\n";
+
+    if (PyRun_SimpleString(code) != 0) {
+        PyErr_Clear();
+        qWarning() << "[Python] Failed to configure stdout/stderr buffering";
+    }
 }
 
 void
@@ -173,7 +206,7 @@ PythonInterpreterPrivate::executeScript(const QString& script)
             output = pythonError();
             qWarning().noquote() << "[Python]" << output;
             session()->notifyStatus(Session::Notify::Status::Error,
-                                    QStringLiteral("Python script failed. Check the Python log for details."));
+                                    QStringLiteral("Python script failed. Check the Python log for details"));
         }
     } catch (const std::exception& e) {
         session()->setPrimsUpdate(Session::PrimsUpdate::Immediate);
@@ -230,7 +263,9 @@ PythonInterpreterPrivate::pythonError() const
             if (fmt && PyCallable_Check(fmt)) {
                 PyObject* list = PyObject_CallFunctionObjArgs(fmt, traceback, nullptr);
                 if (list) {
-                    PyObject* str = PyUnicode_Join(PyUnicode_FromString(""), list);
+                    PyObject* sep = PyUnicode_FromString("");
+                    PyObject* str = PyUnicode_Join(sep, list);
+                    Py_DECREF(sep);
                     if (str) {
                         msg += QString::fromUtf8(PyUnicode_AsUTF8(str));
                         Py_DECREF(str);

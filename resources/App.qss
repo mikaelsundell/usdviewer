@@ -201,7 +201,7 @@ QProgressBar {
 QPlainTextEdit
 {
     font-family: "Menlo", "Consolas", "Courier New", monospace;
-    font-size: 10px;
+    font-size: 8px;
     color: $color.text;
     background-color: $color.base;
     selection-background-color: $color.highlight;
@@ -228,12 +228,7 @@ QPushButton
 {
     color: $color.text;
     font-size: $font.size.medium;
-    background-color: 
-    qlineargradient( 
-        x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $color.button,
-        stop: 1.0 $color.buttonalt
-    );
+    background-color: $color.button;
     height: 20px;  
     min-width: 50px;      
     border: 1px solid $color.borderalt;
@@ -255,12 +250,7 @@ QPushButton:disabled
 
 QPushButton:pressed
 {
-    background-color: 
-    qlineargradient( 
-        x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $color.button.lightness(120),
-        stop: 1.0 $color.buttonalt.lightness(120)
-    );
+    background-color: $color.borderalt;
 }
 
 QScrollBar:horizontal {
@@ -464,12 +454,7 @@ QToolButton
 {
     color: $color.text;
     font-size: $font.size.medium;
-    background-color: 
-    qlineargradient( 
-        x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $color.button,
-        stop: 1.0 $color.buttonalt
-    );
+    background-color: $color.button;
     border: 1px solid $color.borderalt;
     border-radius: 0px;        
     padding: 2px;
@@ -489,22 +474,12 @@ QToolButton:disabled
 
 QToolButton:checked
 {
-    background-color: 
-    qlineargradient( 
-        x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $color.button.lightness(160),
-        stop: 1.0 $color.buttonalt.lightness(160)
-    );
+    background-color: $color.button.lightness(160);
 }
 
 QToolButton:pressed
 {
-    background-color: 
-    qlineargradient( 
-        x1: 0, y1: 0, x2: 0, y2: 1, 
-        stop: 0 $color.button.lightness(160),
-        stop: 1.0 $color.buttonalt.lightness(160)
-    );
+    background-color: $color.borderalt;
 }
 
 QSlider {

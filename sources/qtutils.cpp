@@ -3,6 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "qtutils.h"
+#include <QApplication>
 #include <QBuffer>
 #include <QColor>
 #include <QIcon>
@@ -15,6 +16,42 @@
 
 namespace usdviewer {
 namespace qt {
+
+    qreal devicePixelRatio() { return qApp ? qApp->devicePixelRatio() : 1.0; }
+
+    int physicalPixelSize(int logicalSize, qreal dpr)
+    {
+        const qreal resolvedDpr = (dpr > 0.0) ? dpr : devicePixelRatio();
+        return qMax(1, qRound(logicalSize * resolvedDpr));
+    }
+
+    QImage scaledImage(const QImage& image, int logicalSize, Qt::AspectRatioMode aspectMode,
+                       Qt::TransformationMode transformMode)
+    {
+        if (image.isNull() || logicalSize <= 0)
+            return QImage();
+
+        const qreal dpr = devicePixelRatio();
+        const int physicalSize = physicalPixelSize(logicalSize, dpr);
+
+        QImage scaled = image.scaled(physicalSize, physicalSize, aspectMode, transformMode);
+        scaled.setDevicePixelRatio(dpr);
+        return scaled;
+    }
+
+    QPixmap scaledPixmap(const QPixmap& pixmap, int logicalSize, Qt::AspectRatioMode aspectMode,
+                         Qt::TransformationMode transformMode)
+    {
+        if (pixmap.isNull() || logicalSize <= 0)
+            return QPixmap();
+
+        const qreal dpr = devicePixelRatio();
+        const int physicalSize = physicalPixelSize(logicalSize, dpr);
+
+        QPixmap scaled = pixmap.scaled(physicalSize, physicalSize, aspectMode, transformMode);
+        scaled.setDevicePixelRatio(dpr);
+        return scaled;
+    }
 
     QByteArray imageToPngBytes(const QImage& image)
     {

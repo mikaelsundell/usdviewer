@@ -3,7 +3,7 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "style.h"
-
+#include "qtutils.h"
 #include <QApplication>
 #include <QFile>
 #include <QMetaEnum>
@@ -211,8 +211,8 @@ StylePrivate::updateTheme(Style::Theme theme)
         map(Style::ColorRole::BorderAlt, QColor::fromHsl(220, 3, 64));
         map(Style::ColorRole::Handle, QColor::fromHsl(0, 0, 150));
         map(Style::ColorRole::Progress, QColor::fromHsl(216, 82, 20));
-        map(Style::ColorRole::Button, QColor::fromHsl(220, 6, 40));
-        map(Style::ColorRole::ButtonAlt, QColor::fromHsl(220, 6, 54));
+        map(Style::ColorRole::Button, QColor::fromHsl(220, 6, 36));
+        map(Style::ColorRole::ButtonAlt, QColor::fromHsl(220, 6, 64));
         map(Style::ColorRole::Render, QColor::fromHsl(220, 6, 25));
         map(Style::ColorRole::RenderAlt, QColor::fromHsl(220, 6, 40));
         map(Style::ColorRole::Selection, QColor::fromHsl(55, 220, 180));
@@ -276,8 +276,8 @@ StylePrivate::updateTheme(Style::Theme theme)
     d.fontSizes[roleName(Style::UIScale::Large)] = 14;
 
     d.iconSizes[roleName(Style::UIScale::Small)] = 16;
-    d.iconSizes[roleName(Style::UIScale::Medium)] = 24;
-    d.iconSizes[roleName(Style::UIScale::Large)] = 32;
+    d.iconSizes[roleName(Style::UIScale::Medium)] = 32;
+    d.iconSizes[roleName(Style::UIScale::Large)] = 64;
 }
 
 QColorSpace
@@ -305,12 +305,12 @@ StylePrivate::fontSize(Style::UIScale scale) const
 QPixmap
 StylePrivate::icon(Style::IconRole role, Style::UIScale scale, Style::UIState state) const
 {
-    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
+    const qreal dpr = qt::devicePixelRatio();
     const int logicalSize = iconSize(scale);
     if (logicalSize <= 0)
         return QPixmap();
 
-    const int physicalSize = qMax(1, qRound(logicalSize * dpr));
+    const int physicalSize = qt::physicalPixelSize(logicalSize, dpr);
     IconKey key { int(role), int(scale), int(state), physicalSize };
 
     auto it = d.pixmaps.constFind(key);
@@ -325,9 +325,7 @@ StylePrivate::icon(Style::IconRole role, Style::UIScale scale, Style::UIState st
     if (loaded.isNull())
         return QPixmap();
 
-    QPixmap scaled = loaded.scaled(physicalSize, physicalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    scaled.setDevicePixelRatio(dpr);
-
+    QPixmap scaled = qt::scaledPixmap(loaded, logicalSize, Qt::KeepAspectRatio);
     d.pixmaps.insert(key, scaled);
     return scaled;
 }

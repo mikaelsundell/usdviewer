@@ -1528,8 +1528,8 @@ ViewerPrivate::updateWindowTitle()
     const QString title = QStringLiteral("%1 %2 (%3 %4)")
         .arg(QStringLiteral(PROJECT_NAME),
              QStringLiteral(PROJECT_VERSION),
-             QStringLiteral(PROJECT_DATE),
-             QStringLiteral(PROJECT_CONFIG));
+             QStringLiteral(PROJECT_CONFIG),
+             QStringLiteral(PROJECT_DATE));
     #else
     const QString title = QStringLiteral("%1 %2")
         .arg(QStringLiteral(PROJECT_NAME),

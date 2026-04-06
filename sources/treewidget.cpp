@@ -223,7 +223,7 @@ QRect
 TreeWidgetPrivate::branchRect(const QRect& rect, const QModelIndex& index) const
 {
     Q_UNUSED(index);
-    const int size = style()->iconSize(Style::UIScale::Medium) - 4;
+    const int size = style()->iconSize(Style::UIScale::Small);
     const int x = 6;
     const int y = (rect.center().y() - size / 2) + 1;
     return QRect(x, y, size, size);
@@ -468,8 +468,8 @@ TreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex
     const QRect r = p->branchRect(vr, index);
     const QRect hr = p->branchHitRect(vr, index);
 
-    QIcon icon = expanded ? app()->style()->icon(Style::IconRole::BranchOpen, Style::UIScale::Medium)
-                          : app()->style()->icon(Style::IconRole::BranchClosed, Style::UIScale::Medium);
+    QIcon icon = expanded ? app()->style()->icon(Style::IconRole::BranchOpen, Style::UIScale::Small)
+                          : app()->style()->icon(Style::IconRole::BranchClosed, Style::UIScale::Small);
     icon.paint(painter, r, Qt::AlignCenter);
 }
 

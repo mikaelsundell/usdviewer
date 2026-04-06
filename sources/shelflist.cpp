@@ -210,12 +210,18 @@ ShelfListPrivate::iconImage(const QImage& image) const
     if (image.isNull())
         return QImage();
 
-    const QSize targetSize = tileContentSize();
-    if (!targetSize.isValid())
+    const int iconSize = usdviewer::style()->iconSize(Style::UIScale::Large);
+    const int tilePadding = 10;
+    const int logicalSize = iconSize + tilePadding * 2;
+    if (logicalSize <= 0)
         return QImage();
 
     const QImage cropped = centerCrop(image).convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    return cropped.scaled(targetSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    return qt::scaledImage(
+        cropped,
+        logicalSize,
+        Qt::IgnoreAspectRatio,
+        Qt::SmoothTransformation);
 }
 
 QImage

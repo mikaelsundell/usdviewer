@@ -75,13 +75,9 @@ ShelfWidgetPrivate::init()
     layout->addWidget(d.list);
     // connect
     QObject::connect(d.list, &QWidget::customContextMenuRequested, this, &ShelfWidgetPrivate::contextMenuEvent);
-
     QObject::connect(d.list->model(), &QAbstractItemModel::rowsInserted, this, [this]() { Q_EMIT d.shelf->changed(); });
-
     QObject::connect(d.list->model(), &QAbstractItemModel::rowsRemoved, this, [this]() { Q_EMIT d.shelf->changed(); });
-
     QObject::connect(d.list->model(), &QAbstractItemModel::modelReset, this, [this]() { Q_EMIT d.shelf->changed(); });
-
     QObject::connect(d.list, &QListWidget::itemChanged, this, [this](QListWidgetItem* item) {
         const QString editedName = item->text().trimmed();
         const QString newName = uniqueTitle(editedName.isEmpty() ? QStringLiteral("Script") : editedName, item);

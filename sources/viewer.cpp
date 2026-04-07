@@ -228,6 +228,7 @@ ViewerPrivate::initDocks()
     d.pythonView->setAttribute(Qt::WA_DeleteOnClose, false);
     d.pythonDock = createDock("pythonDock", "Python", d.pythonView, d.pythonArea);
     d.consoleWidget = new ConsoleWidget(nullptr);
+    d.consoleWidget->setWindowFlags(Qt::Tool | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     d.consoleWidget->setObjectName("consoleWidget");
     d.consoleWidget->setAttribute(Qt::WA_DeleteOnClose, false);
     d.consoleWidget->setWindowTitle("Console");
@@ -1524,18 +1525,14 @@ ViewerPrivate::updateRecentFiles(const QString& filename)
 void
 ViewerPrivate::updateWindowTitle()
 {
-    #ifdef QT_DEBUG
+#ifdef QT_DEBUG
     const QString title = QStringLiteral("%1 %2 (%3 %4)")
-        .arg(QStringLiteral(PROJECT_NAME),
-             QStringLiteral(PROJECT_VERSION),
-             QStringLiteral(PROJECT_CONFIG),
-             QStringLiteral(PROJECT_DATE));
-    #else
-    const QString title = QStringLiteral("%1 %2")
-        .arg(QStringLiteral(PROJECT_NAME),
-             QStringLiteral(PROJECT_VERSION));
-    #endif
-    
+                              .arg(QStringLiteral(PROJECT_NAME), QStringLiteral(PROJECT_VERSION),
+                                   QStringLiteral(PROJECT_CONFIG), QStringLiteral(PROJECT_DATE));
+#else
+    const QString title = QStringLiteral("%1 %2").arg(QStringLiteral(PROJECT_NAME), QStringLiteral(PROJECT_VERSION));
+#endif
+
     if (!session()->isLoaded()) {
         d.viewer->setWindowTitle(title);
         return;

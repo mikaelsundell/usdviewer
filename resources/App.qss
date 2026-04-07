@@ -106,8 +106,8 @@ QLineEdit
     font-size: $font.size.medium;
     background-color: $color.base;
     selection-background-color: $color.highlight;
-    height: 20px;  
-    min-height: 20px;  
+    height: 18px;  
+    min-height: 18px;  
     min-width: 50px;      
     border: 1px solid $color.borderalt;
     border-radius: 0px;        
@@ -456,7 +456,9 @@ QToolButton
     font-size: $font.size.medium;
     background-color: $color.button;
     border: 1px solid $color.borderalt;
-    border-radius: 0px;        
+    border-radius: 0px;
+    height: 18px;  
+    min-height: 18px;
     padding: 2px;
     padding-left: 5px;
     padding-right: 5px;

@@ -71,7 +71,6 @@ public:
         QPoint dragStartPos;
         QPointer<QLineEdit> tabRenameEditor;
         int tabRenameIndex = -1;
-        QPointer<QToolButton> addTabButton;
         bool dragCandidate = false;
         QPointer<QPlainTextEdit> dragSourceEdit;
     };
@@ -103,9 +102,7 @@ PythonViewPrivate::init()
         bar->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     }
     d.ui->editor->viewport()->installEventFilter(this);
-
     // connect
-    QObject::connect(d.addTabButton, &QToolButton::clicked, this, &PythonViewPrivate::newTab);
     QObject::connect(d.ui->run, &QToolButton::clicked, this, &PythonViewPrivate::run);
     QObject::connect(d.ui->clear, &QToolButton::clicked, this, &PythonViewPrivate::clear);
     QObject::connect(d.ui->editor->document(), &QTextDocument::contentsChanged, this,
@@ -115,7 +112,6 @@ PythonViewPrivate::init()
                      &PythonViewPrivate::showTabContextMenu);
     QObject::connect(d.ui->tabWidget->tabBar(), &QTabBar::tabMoved, this, [this](int, int) { saveShelves(); });
     QObject::connect(session(), &Session::stageChanged, this, &PythonViewPrivate::stageChanged);
-
     loadShelves();
     createDefaultTabIfNeeded();
     updateClearButton();
@@ -135,7 +131,6 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
             }
         }
     }
-
     if (object == d.ui->editor->viewport()) {
         QPlainTextEdit* edit = d.ui->editor;
         if (!edit)
@@ -148,9 +143,6 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
                 d.dragStartPos = mouseEvent->pos();
                 d.dragCandidate = false;
                 d.dragSourceEdit = nullptr;
-
-                // Only allow drag if the press begins inside an already existing selection.
-                // This prevents drag initiation while the user is actively selecting text.
                 if (isPointInSelection(edit, mouseEvent->pos())) {
                     d.dragCandidate = true;
                     d.dragSourceEdit = edit;
@@ -168,7 +160,6 @@ PythonViewPrivate::eventFilter(QObject* object, QEvent* event)
                 break;
             if (!edit->textCursor().hasSelection())
                 break;
-
             startScriptDrag(edit);
             d.dragCandidate = false;
             d.dragSourceEdit = nullptr;
@@ -503,14 +494,11 @@ PythonViewPrivate::stageChanged(UsdStageRefPtr stage, Session::LoadPolicy policy
 {
     Q_UNUSED(stage);
     Q_UNUSED(policy);
-
     const bool enabled = (status == Session::StageStatus::Loaded);
     d.ui->run->setEnabled(enabled);
     d.ui->editor->setEnabled(enabled);
     d.ui->log->setEnabled(enabled);
     d.ui->tabWidget->setEnabled(enabled);
-    if (d.addTabButton)
-        d.addTabButton->setEnabled(enabled);
     updateClearButton();
 }
 

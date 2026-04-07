@@ -217,11 +217,7 @@ ShelfListPrivate::iconImage(const QImage& image) const
         return QImage();
 
     const QImage cropped = centerCrop(image).convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    return qt::scaledImage(
-        cropped,
-        logicalSize,
-        Qt::IgnoreAspectRatio,
-        Qt::SmoothTransformation);
+    return qt::scaledImage(cropped, logicalSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 }
 
 QImage

@@ -51,32 +51,33 @@ ApplicationPrivate::init()
     d.style.reset(new Style());
     d.pythonInterpreter.reset(new PythonInterpreter());  // after session
 #ifdef NDEBUG
-    QStringList plugindirs;
-    QString pluginusddir = os::getApplicationPath() + "/plugin/usd";
-    if (QDir(pluginusddir).exists()) {
-        plugindirs << pluginusddir;
-    }
-    QString usddir = os::getApplicationPath() + "/usd";
-    if (QDir(usddir).exists()) {
-        plugindirs << usddir;
-    }
-    if (!plugindirs.isEmpty()) {
+    QStringList pluginDirs;
+
+    const QString pluginUsdDir = os::getApplicationPath() + "/plugin/usd";
+    if (QDir(pluginUsdDir).exists())
+        pluginDirs << pluginUsdDir;
+
+    const QString usdDir = os::getApplicationPath() + "/usd";
+    if (QDir(usdDir).exists())
+        pluginDirs << usdDir;
+
+    if (!pluginDirs.isEmpty()) {
         TfSetenv("PXR_DISABLE_STANDARD_PLUG_SEARCH_PATH", "1");
+
         std::vector<std::string> pluginPaths;
-        for (const QString& dir : plugindirs) {
+        pluginPaths.reserve(pluginDirs.size());
+        for (const QString& dir : pluginDirs)
             pluginPaths.push_back(qt::QStringToString(dir));
-        }
+
         PlugRegistry& registry = PlugRegistry::GetInstance();
         registry.RegisterPlugins(pluginPaths);
     }
-#endif
-    PlugRegistry& instance = PlugRegistry::GetInstance();
-    PlugPluginPtrVector plugins = instance.GetAllPlugins();
-#if defined(_DEBUG)
-    os::console("plugins");
-    for (const auto& plugin : plugins) {
-        os::console(qt::StringToQString(plugin->GetPath()));
-    }
+#else
+    PlugRegistry& registry = PlugRegistry::GetInstance();
+    const PlugPluginPtrVector plugins = registry.GetAllPlugins();
+    qDebug() << "plugins";
+    for (const auto& plugin : plugins)
+        qDebug().noquote() << qt::StringToQString(plugin->GetPath());
 #endif
 }
 

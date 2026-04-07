@@ -3,9 +3,11 @@
 // https://github.com/mikaelsundell/usdviewer
 
 #include "console.h"
+#include <QMetaObject>
 #include <QPointer>
-#include <QSocketNotifier>
+#include <atomic>
 #include <cstdio>
+#include <thread>
 #include <unistd.h>
 
 namespace usdviewer {
@@ -23,8 +25,8 @@ public:
     QString text() const;
     QStringList lines() const;
 
-public Q_SLOTS:
-    void readAvailable();
+private:
+    void readerLoop();
 
 public:
     struct Data {
@@ -32,9 +34,9 @@ public:
         int writeFd = -1;
         int oldStdout = -1;
         int oldStderr = -1;
-        bool running = false;
+        std::atomic_bool running = false;
         QString buffer;
-        QSocketNotifier* notifier = nullptr;
+        std::thread readerThread;
         QPointer<Console> console;
     };
     Data d;
@@ -68,7 +70,6 @@ ConsolePrivate::start()
         return false;
     }
 
-    // Flush any pending stdio output before redirecting descriptors.
     std::fflush(stdout);
     std::fflush(stderr);
 
@@ -77,28 +78,22 @@ ConsolePrivate::start()
         return false;
     }
 
-    // Disable C stdio buffering while redirected.
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     std::setvbuf(stderr, nullptr, _IONBF, 0);
 
-    d.notifier = new QSocketNotifier(d.readFd, QSocketNotifier::Read, this);
-    connect(d.notifier, &QSocketNotifier::activated, this, &ConsolePrivate::readAvailable);
-
     d.running = true;
+    d.readerThread = std::thread([this]() { readerLoop(); });
+
     return true;
 }
 
 void
 ConsolePrivate::stop()
 {
-    // Flush pending redirected stdio before restoring the original fds.
-    std::fflush(stdout);
-    std::fflush(stderr);
+    if (!d.running && d.readFd < 0 && d.writeFd < 0 && d.oldStdout < 0 && d.oldStderr < 0)
+        return;
 
-    if (d.notifier) {
-        delete d.notifier;
-        d.notifier = nullptr;
-    }
+    d.running = false;
 
     if (d.oldStdout >= 0) {
         ::dup2(d.oldStdout, STDOUT_FILENO);
@@ -112,17 +107,18 @@ ConsolePrivate::stop()
         d.oldStderr = -1;
     }
 
-    if (d.readFd >= 0) {
-        ::close(d.readFd);
-        d.readFd = -1;
-    }
-
     if (d.writeFd >= 0) {
         ::close(d.writeFd);
         d.writeFd = -1;
     }
 
-    d.running = false;
+    if (d.readerThread.joinable())
+        d.readerThread.join();
+
+    if (d.readFd >= 0) {
+        ::close(d.readFd);
+        d.readFd = -1;
+    }
 }
 
 bool
@@ -144,18 +140,33 @@ ConsolePrivate::lines() const
 }
 
 void
-ConsolePrivate::readAvailable()
+ConsolePrivate::readerLoop()
 {
     char chunk[4096];
-    const ssize_t count = ::read(d.readFd, chunk, sizeof(chunk));
-    if (count <= 0)
-        return;
 
-    const QString text = QString::fromLocal8Bit(chunk, int(count));
-    d.buffer += text;
+    for (;;) {
+        const ssize_t count = ::read(d.readFd, chunk, sizeof(chunk));
+        if (count > 0) {
+            const QString text = QString::fromLocal8Bit(chunk, int(count));
 
-    if (d.console)
-        Q_EMIT d.console->textAppended(text);
+            if (d.console) {
+                QMetaObject::invokeMethod(
+                    d.console.data(),
+                    [this, text]() {
+                        d.buffer += text;
+                        if (d.console)
+                            Q_EMIT d.console->textAppended(text);
+                    },
+                    Qt::QueuedConnection);
+            }
+            continue;
+        }
+
+        if (count == 0)
+            break;
+
+        break;
+    }
 }
 
 Console::Console(QObject* parent)

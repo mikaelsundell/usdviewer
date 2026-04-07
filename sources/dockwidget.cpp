@@ -25,6 +25,7 @@ DockWidgetPrivate::init()
     title->setStyleSheet("background: green;");
     d.widget->setTitleBarWidget(title);
     QPointer<QDockWidget> dock = d.widget;
+    // connect
     QObject::connect(dock, &QDockWidget::topLevelChanged, [dock, title](bool floating) {
         if (floating) {
             dock->setTitleBarWidget(nullptr);

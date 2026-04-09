@@ -98,6 +98,30 @@ ConsoleWidgetPrivate::eventFilter(QObject* object, QEvent* event)
         default: break;
         }
     }
+    if (object == d.ui->log) {
+        if (event->type() == QEvent::ShortcutOverride) {
+            auto* keyEvent = static_cast<QKeyEvent*>(event);
+
+            if (keyEvent->matches(QKeySequence::SelectAll) ||
+                keyEvent->matches(QKeySequence::Copy)) {
+                event->accept();
+                return true;
+            }
+        }
+        if (event->type() == QEvent::KeyPress) {
+            auto* keyEvent = static_cast<QKeyEvent*>(event);
+
+            if (keyEvent->matches(QKeySequence::SelectAll)) {
+                d.ui->log->selectAll();
+                return true;
+            }
+
+            if (keyEvent->matches(QKeySequence::Copy)) {
+                d.ui->log->copy();
+                return true;
+            }
+        }
+    }
     if (object == d.ui->find && event->type() == QEvent::KeyPress) {
         auto* keyEvent = static_cast<QKeyEvent*>(event);
         if (keyEvent->key() == Qt::Key_Escape) {
@@ -106,6 +130,7 @@ ConsoleWidgetPrivate::eventFilter(QObject* object, QEvent* event)
             return true;
         }
     }
+
     return QObject::eventFilter(object, event);
 }
 

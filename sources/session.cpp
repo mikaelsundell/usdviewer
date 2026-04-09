@@ -450,6 +450,8 @@ SessionPrivate::saveToFile(const QString& filename)
 {
     QString stageFilename;
     Session::LoadPolicy loadPolicy = Session::LoadPolicy::All;
+    bool saveAs = false;
+
     {
         WRITE_LOCKER(locker, &d.stageLock, "stageLock");
         try {
@@ -466,16 +468,19 @@ SessionPrivate::saveToFile(const QString& filename)
             if (!rootLayer->IsAnonymous())
                 currentFile = QFileInfo(qt::StringToQString(rootLayer->GetRealPath())).absoluteFilePath();
 
+            loadPolicy = d.loadPolicy;
+
             if (!rootLayer->IsAnonymous() && currentFile == stageFilename) {
                 d.stage->Save();
-            }
-            else {
-                if (!rootLayer->Export(QStringToString(stageFilename)))
-                    return false;
+                d.filename = stageFilename;
+                return true;
             }
 
+            if (!rootLayer->Export(QStringToString(stageFilename)))
+                return false;
+
             d.filename = stageFilename;
-            loadPolicy = d.loadPolicy;
+            saveAs = true;
         } catch (const std::exception&) {
             return false;
         }
@@ -487,9 +492,12 @@ SessionPrivate::saveToFile(const QString& filename)
             return false;
     }
 
-    return true;
-}
+    if (!saveAs)
+        return true;
 
+    close();
+    return loadFromFile(stageFilename, loadPolicy);
+}
 bool
 SessionPrivate::copyToFile(const QString& filename)
 {
